@@ -1,23 +1,24 @@
 # Usar uma imagem oficial do Node.js
 FROM node:16
 
-# Definir diretório de trabalho
+# Definir o diretório de trabalho dentro do container
 WORKDIR /app
 
-# Copiar o package.json e package-lock.json para dentro do container
-COPY frontend/package*.json ./
+# Copiar o package.json e o package-lock.json para o container
+COPY backend/package*.json ./
 
-# Instalar dependências
+# Instalar as dependências
 RUN npm install
 
-# Copiar o código-fonte do frontend
-COPY frontend/ .
+# Copiar o código-fonte do backend (incluindo o código fonte e scripts de build)
+COPY backend/src /app/src
+COPY frontend /app/frontend
 
-# Rodar o build do frontend
+# Expor a porta do backend
+EXPOSE 3001
+
+# Rodar o build
 RUN npm run build
 
-# Expor a porta onde o frontend vai rodar (se for um app estático, pode ser a porta 80)
-EXPOSE 3000
-
-# Comando para rodar o frontend
-CMD ["npm", "start"]
+# Comando para rodar o servidor
+CMD ["node", "src/server.js"]
