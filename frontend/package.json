@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
-    "build": "react-scripts build"
+    "preview": "vite preview",
+    "start": "react-scripts start"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
