@@ -17,4 +17,4 @@ COPY backend/src /app/src
 EXPOSE 3001
 
 # Comando para rodar o servidor do backend
-CMD ["node", "src/server.js"]
+CMD ["node", "backend/src/server.js"]
