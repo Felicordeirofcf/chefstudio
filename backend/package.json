@@ -3,10 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-   "start": "node backend/src/server.js"
-    "test": "echo \"Error: no test specified\" && exit 1"
-    "build": "your-build-command",
-  
+    "start": "node backend/src/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "your-build-command"  // Substitua 'your-build-command' com o comando real de build, ou remova se não necessário
   },
   "keywords": [],
   "author": "",
