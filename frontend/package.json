@@ -5,14 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b",
+    "build": "vite build",  // Corrigido a duplicação
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "react-scripts start"
-    "build": "vite build"  // Vírgula ou chave faltando?
-  }
-}
-
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
