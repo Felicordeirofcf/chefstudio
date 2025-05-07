@@ -17,4 +17,4 @@ COPY frontend /usr/src/app
 EXPOSE 3000
 
 # Comando para rodar o servidor do frontend
-CMD ["npm", "run", "start"]
+CMD ["npm", "run", "dev"]
