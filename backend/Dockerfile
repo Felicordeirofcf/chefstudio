@@ -1,27 +1,20 @@
-# Usa imagem base do Node.js 16 com suporte a build de nativos
-FROM node:16
+# Etapa 1: Usa uma imagem oficial do Node
+FROM node:18
 
-# Instala dependências do sistema para build de módulos nativos
-RUN apt-get update && apt-get install -y \
-    python3 \
-    make \
-    g++ \
- && rm -rf /var/lib/apt/lists/*
-
-# Define o diretório de trabalho
+# Define o diretório de trabalho dentro do container
 WORKDIR /app
 
-# Copia apenas os arquivos de dependência primeiro (melhor cache)
+# Copia os arquivos de dependência primeiro
 COPY package*.json ./
 
 # Instala as dependências dentro do container
 RUN npm install
 
-# Copia o restante dos arquivos
+# Copia o restante do código para o container
 COPY . .
 
-# Expõe a porta do backend
-EXPOSE 3001
+# Expõe a porta (ajuste conforme seu app)
+EXPOSE 3000
 
-# Comando de inicialização
-CMD ["node", "server.js"]
+# Comando para rodar a aplicação
+CMD ["npm", "start"]

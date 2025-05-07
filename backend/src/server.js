@@ -6,10 +6,10 @@ const bcrypt = require('bcryptjs');
 // const mongoose = require("mongoose"); // Descomente quando quiser conectar ao MongoDB
 
 // Importa rotas
-const authRoutes = require("./routes/authRoutes");
-const menuRoutes = require("./routes/menuRoutes");
-const adRoutes = require("./routes/adRoutes");
-const metaRoutes = require("./routes/metaRoutes");
+const authRoutes = require("../routes/authRoutes");
+const menuRoutes = require("../routes/menuRoutes");
+const adRoutes = require("../routes/adRoutes");
+const metaRoutes = require("../routes/metaRoutes");
 
 
 const app = express();
