@@ -2,6 +2,7 @@ require("dotenv").config(); // Carrega variáveis do arquivo .env
 
 const express = require("express");
 const cors = require("cors");
+const bcrypt = require('bcryptjs');
 // const mongoose = require("mongoose"); // Descomente quando quiser conectar ao MongoDB
 
 // Importa rotas
@@ -9,6 +10,7 @@ const authRoutes = require("./routes/authRoutes");
 const menuRoutes = require("./routes/menuRoutes");
 const adRoutes = require("./routes/adRoutes");
 const metaRoutes = require("./routes/metaRoutes");
+
 
 const app = express();
 const PORT = process.env.PORT || 3001;
