@@ -3,7 +3,7 @@ require("dotenv").config(); // Carrega variáveis do arquivo .env
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require('bcryptjs');
-// const mongoose = require("mongoose"); // Descomente quando quiser conectar ao MongoDB
+const mongoose = require("mongoose"); // Agora ativado!
 
 // Importa rotas
 const authRoutes = require("./routes/authRoutes");
@@ -11,21 +11,19 @@ const menuRoutes = require("./routes/menuRoutes");
 const adRoutes = require("./routes/adRoutes");
 const metaRoutes = require("./routes/metaRoutes");
 
-
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// --- Conexão com MongoDB (comentada) ---
-// Descomente para ativar conexão com banco
-/*
+// --- Conexão com MongoDB ---
 mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/chefia_studio_db", {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log("✅ MongoDB conectado com sucesso"))
-.catch(err => console.error("❌ Erro ao conectar com MongoDB:", err));
-*/
-console.log("🟡 MongoDB não conectado (modo simulado)");
+.then(() => console.log("🟢 MongoDB conectado com sucesso!"))
+.catch(err => {
+  console.error("🟡 MongoDB não conectado");
+  console.error(err);
+});
 
 // --- Middleware ---
 const allowedOrigins = [
