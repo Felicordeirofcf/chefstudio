@@ -1,20 +1,19 @@
-# Usar uma imagem oficial do Node.js
 FROM node:16
 
-# Definir o diretório de trabalho dentro do container
+# Define a pasta de trabalho dentro do container
 WORKDIR /app
 
-# Copiar o package.json para o container
+# Copia apenas os arquivos de dependência primeiro
 COPY backend/package*.json ./
 
-# Instalar as dependências do backend
+# Instala as dependências
 RUN npm install
 
-# Copiar o código-fonte do backend
+# Copia todo o restante do backend
 COPY backend/ .
 
-# Expor a porta do backend
+# Expõe a porta usada pelo backend
 EXPOSE 3001
 
-# Rodar o servidor do backend
-CMD ["npm", "start"]
+# Inicia o servidor
+CMD ["node", "server.js"]
