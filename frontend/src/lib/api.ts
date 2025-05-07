@@ -1,26 +1,25 @@
 import axios from 'axios';
 
-// Base URL for the backend API (running locally during development)
-const API_BASE_URL = 'http://localhost:3001/api';
+// ✅ Use variável de ambiente para funcionar em produção e desenvolvimento
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-// Function to get the stored JWT token
+// Função para buscar o token do localStorage
 const getToken = () => {
-  // Try to get user info from localStorage
   const userInfo = localStorage.getItem('userInfo');
   if (userInfo) {
     try {
       const parsedInfo = JSON.parse(userInfo);
       return parsedInfo.token;
     } catch (e) {
-      console.error("Error parsing userInfo from localStorage:", e);
-      localStorage.removeItem('userInfo'); // Clear invalid data
+      console.error("Erro ao ler userInfo:", e);
+      localStorage.removeItem('userInfo');
       return null;
     }
   }
   return null;
 };
 
-// Create an Axios instance for API calls
+// ✅ Instância do axios usando a base dinâmica
 const api = axios.create({
   baseURL: API_BASE_URL,
 });
