@@ -2,36 +2,44 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
 const userSchema = new mongoose.Schema({
+  // Dados básicos
   name: {
     type: String,
     required: true,
+    trim: true,
   },
   email: {
     type: String,
     required: true,
     unique: true,
     lowercase: true,
+    trim: true,
+    match: /^\S+@\S+\.\S+$/, // Regex simples para validar e-mail
   },
   password: {
     type: String,
     required: true,
+    minlength: 6,
   },
-  // Fields from mockup/registration form
-  restaurantName: { type: String },
-  businessType: { type: String },
-  address: { type: String },
-  whatsapp: { type: String },
-  menuLink: { type: String },
-  // Subscription details (simplified)
+
+  // Dados comerciais (formulário de cadastro)
+  restaurantName: { type: String, trim: true },
+  businessType: { type: String, trim: true },
+  address: { type: String, trim: true },
+  whatsapp: { type: String, trim: true },
+  menuLink: { type: String, trim: true },
+
+  // Assinatura
   subscriptionStatus: {
     type: String,
     enum: ['active', 'inactive', 'trial'],
     default: 'inactive',
   },
   subscriptionEndDate: { type: Date },
-  // Meta Ads Tokens (simplified - store securely in real app)
+
+  // Integração Meta Ads
   metaAccessToken: { type: String },
-  metaRefreshToken: { type: String }, // If applicable
+  metaRefreshToken: { type: String },
   metaConnectionStatus: {
     type: String,
     enum: ['connected', 'disconnected'],
@@ -39,7 +47,8 @@ const userSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-// Hash password before saving
+
+// --- Middleware: Hash da senha antes de salvar ---
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
   try {
@@ -51,10 +60,9 @@ userSchema.pre('save', async function (next) {
   }
 });
 
-// Method to compare password
+// --- Método para comparar senha ao fazer login ---
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
 module.exports = mongoose.model('User', userSchema);
-
