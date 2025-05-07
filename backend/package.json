@@ -9,6 +9,7 @@
     "dev": "nodemon server.js",
     "build": "echo \"No build step needed for backend\"",
     "lint": "eslint ."
+    "postinstall": "npm rebuild bcrypt --build-from-source"
   },
   "keywords": [],
   "author": "Amanda Pontes",
