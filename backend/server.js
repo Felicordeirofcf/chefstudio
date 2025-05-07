@@ -1,27 +1,29 @@
-require("dotenv").config(); // Load environment variables from .env file
+require("dotenv").config(); // Carrega variáveis do arquivo .env
+
 const express = require("express");
 const cors = require("cors");
-// const mongoose = require("mongoose"); // Connection will be set up later
+// const mongoose = require("mongoose"); // Descomente quando quiser conectar ao MongoDB
 
-// Import routes (will be created next)
+// Importa rotas
 const authRoutes = require("./routes/authRoutes");
 const menuRoutes = require("./routes/menuRoutes");
 const adRoutes = require("./routes/adRoutes");
 const metaRoutes = require("./routes/metaRoutes");
 
 const app = express();
-const PORT = process.env.PORT || 3001; // Use port from env or default to 3001
+const PORT = process.env.PORT || 3001;
 
-// --- Database Connection (Placeholder) ---
+// --- Conexão com MongoDB (comentada) ---
+// Descomente para ativar conexão com banco
 /*
 mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/chefia_studio_db", {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log("MongoDB connected successfully."))
-.catch(err => console.error("MongoDB connection error:", err));
+.then(() => console.log("✅ MongoDB conectado com sucesso"))
+.catch(err => console.error("❌ Erro ao conectar com MongoDB:", err));
 */
-console.log("MongoDB connection setup is commented out for now (simulation mode).");
+console.log("🟡 MongoDB não conectado (modo simulado)");
 
 // --- Middleware ---
 const allowedOrigins = [
@@ -31,23 +33,21 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
     } else {
-      return callback(new Error('Not allowed by CORS'));
+      callback(new Error('❌ Origin not allowed by CORS'));
     }
   },
   credentials: true,
 }));
 
-app.use(express.json()); // Parse JSON request bodies
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded request bodies
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// --- API Routes ---
+// --- Rotas da API ---
 app.get("/api", (req, res) => {
-  res.json({ message: "Welcome to ChefiaStudio Backend API (Simulated)" });
+  res.json({ message: "✅ ChefiaStudio Backend API ativa" });
 });
 
 app.use("/api/auth", authRoutes);
@@ -55,13 +55,13 @@ app.use("/api/menu", menuRoutes);
 app.use("/api/ads", adRoutes);
 app.use("/api/meta", metaRoutes);
 
-// --- Error Handling Middleware (Basic) ---
+// --- Middleware de Erro ---
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send("Something broke!");
+  console.error("❌ Erro:", err.stack);
+  res.status(500).send("Erro interno no servidor");
 });
 
-// --- Start Server ---
+// --- Inicialização do servidor ---
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
 });
