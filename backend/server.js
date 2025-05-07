@@ -16,8 +16,6 @@ const PORT = process.env.PORT || 3001;
 
 // --- Conexão com MongoDB ---
 mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/chefia_studio_db", {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
 })
 .then(() => console.log("🟢 MongoDB conectado com sucesso!"))
 .catch(err => {
