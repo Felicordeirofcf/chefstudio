@@ -5,10 +5,10 @@ const cors = require("cors");
 // const mongoose = require("mongoose"); // Descomente quando quiser conectar ao MongoDB
 
 // Importa rotas
-const authRoutes = require("./routes/authRoutes");
-const menuRoutes = require("./routes/menuRoutes");
-const adRoutes = require("./routes/adRoutes");
-const metaRoutes = require("./routes/metaRoutes");
+const authRoutes = require("./src/routes/authRoutes");
+const menuRoutes = require("./src/routes/menuRoutes");
+const adRoutes = require("./src/routes/adRoutes");
+const metaRoutes = require("./src/routes/metaRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
