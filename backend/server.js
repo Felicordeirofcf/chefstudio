@@ -3,7 +3,7 @@ require("dotenv").config(); // Carrega variáveis do arquivo .env
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require('bcryptjs');
-const mongoose = require("mongoose"); // Agora ativado!
+const mongoose = require("mongoose");
 
 // Importa rotas
 const authRoutes = require("./routes/authRoutes");
@@ -15,15 +15,14 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // --- Conexão com MongoDB ---
-mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/chefia_studio_db", {
-})
-.then(() => console.log("🟢 MongoDB conectado com sucesso!"))
-.catch(err => {
-  console.error("🟡 MongoDB não conectado");
-  console.error(err);
-});
+mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/chefia_studio_db", {})
+  .then(() => console.log("🟢 MongoDB conectado com sucesso!"))
+  .catch(err => {
+    console.error("🟡 MongoDB não conectado");
+    console.error(err);
+  });
 
-// --- Middleware ---
+// --- CORS configurado para produção ---
 const allowedOrigins = [
   'http://localhost:5173',
   'https://chefstudio.vercel.app'
@@ -34,12 +33,16 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('❌ Origin not allowed by CORS'));
+      console.log("❌ Origin not allowed by CORS:", origin);
+      callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 
+// --- Middlewares ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
