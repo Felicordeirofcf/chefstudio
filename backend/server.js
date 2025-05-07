@@ -26,7 +26,7 @@ mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/chefia_st
 // --- Middleware ---
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://bvzvwkhj.manus.space'
+  'https://cheftstudio.vercel.app'
 ];
 
 app.use(cors({
@@ -60,6 +60,6 @@ app.use((err, req, res, next) => {
 });
 
 // --- Inicialização do servidor ---
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
