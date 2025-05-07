@@ -26,7 +26,7 @@ mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/chefia_st
 // --- Middleware ---
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://cheftstudio.vercel.app'
+  'https://chefstudio.vercel.app'
 ];
 
 app.use(cors({
