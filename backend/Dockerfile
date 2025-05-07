@@ -1,20 +1,18 @@
-# Etapa 1: Usa uma imagem oficial do Node
 FROM node:18
 
-# Define o diretório de trabalho dentro do container
 WORKDIR /app
 
-# Copia os arquivos de dependência primeiro
 COPY package*.json ./
 
-# Instala as dependências dentro do container
+# Instala ferramentas de build (necessárias para bcrypt)
+RUN apt-get update && apt-get install -y python3 make g++
+
+# Instala as dependências
 RUN npm install
 
-# Copia o restante do código para o container
+# Copia o restante do código
 COPY . .
 
-# Expõe a porta (ajuste conforme seu app)
 EXPOSE 3000
 
-# Comando para rodar a aplicação
 CMD ["npm", "start"]
