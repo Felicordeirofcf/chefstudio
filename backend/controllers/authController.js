@@ -24,6 +24,8 @@ exports.loginUser = async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        metaUserId: user.metaUserId,
+        metaConnectionStatus: user.metaConnectionStatus
       }
     });
   } catch (err) {
@@ -52,7 +54,9 @@ exports.registerUser = async (req, res) => {
       user: {
         _id: newUser._id,
         name: newUser.name,
-        email: newUser.email
+        email: newUser.email,
+        metaUserId: newUser.metaUserId,
+        metaConnectionStatus: newUser.metaConnectionStatus
       }
     });
   } catch (err) {
@@ -63,15 +67,16 @@ exports.registerUser = async (req, res) => {
 
 // --------- CALLBACK FACEBOOK ----------
 exports.facebookCallback = async (req, res) => {
-  const { code } = req.query;
+  const { code, userId } = req.query;
 
-  if (!code) {
-    return res.status(400).json({ message: "Código não fornecido pelo Facebook" });
+  if (!code || !userId) {
+    return res.status(400).json({ message: "Código ou ID do usuário ausente" });
   }
 
   const redirectUri = process.env.FACEBOOK_REDIRECT_URI || "https://chefstudio-production.up.railway.app/api/auth/facebook/callback";
 
   try {
+    // 1. Troca o código por um token
     const tokenResponse = await axios.get("https://graph.facebook.com/v18.0/oauth/access_token", {
       params: {
         client_id: process.env.FACEBOOK_APP_ID,
@@ -81,17 +86,39 @@ exports.facebookCallback = async (req, res) => {
       }
     });
 
-    const tokenData = tokenResponse.data;
+    const { access_token } = tokenResponse.data;
 
-    // 🔒 Aqui você pode salvar o tokenData no MongoDB com o ID do usuário logado
-    // Exemplo: await FacebookToken.create({ userId: X, access_token: tokenData.access_token, ... })
+    // 2. Obtém o ID do usuário conectado ao Facebook
+    const meResponse = await axios.get("https://graph.facebook.com/v18.0/me", {
+      params: { access_token }
+    });
 
+    const metaUserId = meResponse.data.id;
+
+    // 3. Atualiza o usuário no banco
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        metaAccessToken: access_token,
+        metaUserId,
+        metaConnectionStatus: "connected"
+      },
+      { new: true }
+    );
+
+    // 4. Retorna o usuário atualizado
     return res.status(200).json({
-      message: "Conta conectada com sucesso!",
-      tokenData
+      message: "Conta Meta conectada com sucesso!",
+      user: {
+        _id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        metaUserId: updatedUser.metaUserId,
+        metaConnectionStatus: updatedUser.metaConnectionStatus
+      }
     });
   } catch (error) {
-    console.error("❌ Erro ao obter token do Facebook:", error.response?.data || error.message);
-    return res.status(500).json({ message: "Erro ao trocar código por token" });
+    console.error("❌ Erro ao conectar Meta Ads:", error.response?.data || error.message);
+    return res.status(500).json({ message: "Erro ao conectar com a conta Meta Ads" });
   }
 };
