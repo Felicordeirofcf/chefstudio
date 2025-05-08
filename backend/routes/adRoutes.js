@@ -15,7 +15,7 @@ const { protect } = require("../middleware/authMiddleware");
  * @swagger
  * /api/ads:
  *   get:
- *     summary: Lista todas as campanhas do usuário logado
+ *     summary: "Lista todas as campanhas do usuário logado"
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
@@ -29,7 +29,7 @@ router.get("/", protect, adController.getAllCampaigns);
  * @swagger
  * /api/ads:
  *   post:
- *     summary: Cria uma nova campanha
+ *     summary: "Cria uma nova campanha"
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
@@ -54,7 +54,7 @@ router.post("/", protect, adController.createCampaign);
  * @swagger
  * /api/ads/{id}:
  *   get:
- *     summary: Retorna uma campanha específica por ID
+ *     summary: "Retorna uma campanha específica por ID"
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
@@ -74,7 +74,7 @@ router.get("/:id", protect, adController.getCampaignById);
  * @swagger
  * /api/ads/{id}/status:
  *   put:
- *     summary: Atualiza o status de uma campanha (ex: PAUSED, ACTIVE)
+ *     summary: "Atualiza o status de uma campanha (ex: PAUSED, ACTIVE)"
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
@@ -93,6 +93,7 @@ router.get("/:id", protect, adController.getCampaignById);
  *             properties:
  *               status:
  *                 type: string
+ *                 example: PAUSED
  *     responses:
  *       200:
  *         description: Status atualizado com sucesso
@@ -103,7 +104,7 @@ router.put("/:id/status", protect, adController.updateCampaignStatus);
  * @swagger
  * /api/ads/{id}/metrics:
  *   get:
- *     summary: Retorna métricas da campanha
+ *     summary: "Retorna métricas da campanha"
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
@@ -123,7 +124,7 @@ router.get("/:id/metrics", protect, adController.getCampaignMetrics);
  * @swagger
  * /api/ads/location:
  *   post:
- *     summary: Salva as configurações de localização
+ *     summary: "Salva as configurações de localização"
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
@@ -150,7 +151,7 @@ router.post("/location", protect, adController.saveLocationSettings);
  * @swagger
  * /api/ads/location:
  *   get:
- *     summary: Retorna as configurações de localização
+ *     summary: "Retorna as configurações de localização"
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
