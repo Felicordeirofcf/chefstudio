@@ -12,9 +12,14 @@ export default function ConnectMeta() {
     setError(null);
 
     try {
-      // Redireciona para o login real via Facebook OAuth
+      // Detecta e evita duplicar /api
       const baseUrl = import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app";
-      window.location.href = `${baseUrl}/api/meta/login`;
+      const redirectUrl = baseUrl.includes("/api")
+        ? `${baseUrl}/meta/login`
+        : `${baseUrl}/api/meta/login`;
+
+      // Redireciona para login real com Facebook
+      window.location.href = redirectUrl;
     } catch (err: any) {
       console.error("Erro ao redirecionar para login Meta:", err.message);
       setError("Erro ao iniciar conexão com o Meta Ads.");
