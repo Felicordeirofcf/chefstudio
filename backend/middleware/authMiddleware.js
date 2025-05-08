@@ -1,25 +1,32 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
+// Middleware de autenticação via JWT
 exports.protect = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
+  // Verifica se o header contém "Bearer <token>"
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Token ausente ou inválido" });
+    return res.status(401).json({ message: "Token JWT ausente ou malformado no cabeçalho" });
   }
 
-  try {
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id).select("-password");
+  const token = authHeader.split(" ")[1];
 
-    if (!req.user) {
-      return res.status(401).json({ message: "Usuário não encontrado" });
+  try {
+    // Valida e decodifica o token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Busca o usuário no banco de dados
+    const user = await User.findById(decoded.id).select("-password");
+    if (!user) {
+      return res.status(401).json({ message: "Usuário associado ao token não encontrado" });
     }
 
+    // Injeta o usuário na requisição para uso nas rotas protegidas
+    req.user = user;
     next();
   } catch (err) {
-    console.error("Erro ao verificar token:", err);
-    res.status(401).json({ message: "Token inválido" });
+    console.error("❌ Erro ao verificar token JWT:", err.message);
+    res.status(401).json({ message: "Token JWT inválido ou expirado" });
   }
 };
