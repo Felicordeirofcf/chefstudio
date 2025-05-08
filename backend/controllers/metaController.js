@@ -18,11 +18,11 @@ exports.generateAdCaption = (req, res) => {
   res.json({ caption });
 };
 
-// ----------- LOGIN COM FACEBOOK (REAL) -----------
+// ----------- FACEBOOK LOGIN REAL -----------
 
 exports.loginWithFacebook = (req, res) => {
-  const redirect_uri = process.env.REDIRECT_URI;
   const appId = process.env.FB_APP_ID;
+  const redirect_uri = process.env.REDIRECT_URI;
   const scope = 'ads_management,business_management,pages_show_list';
 
   const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirect_uri}&scope=${scope}`;
@@ -38,35 +38,33 @@ exports.facebookCallback = async (req, res) => {
       client_id: process.env.FB_APP_ID,
       redirect_uri,
       client_secret: process.env.FB_APP_SECRET,
-      code,
+      code
     });
 
-    const response = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${params}`);
-    const data = await response.json();
+    const tokenRes = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${params}`);
+    const tokenData = await tokenRes.json();
 
-    if (!data.access_token) {
-      console.error("❌ Falha ao obter access_token:", data);
-      return res.status(400).json({ message: "Erro ao obter token do Facebook", error: data });
+    if (!tokenData.access_token) {
+      console.error("❌ Erro ao obter token:", tokenData);
+      return res.status(400).json({ message: "Erro ao obter token do Facebook", error: tokenData });
     }
 
-    const accessToken = data.access_token;
-
-    const meRes = await fetch(`https://graph.facebook.com/me?access_token=${accessToken}`);
+    const meRes = await fetch(`https://graph.facebook.com/me?access_token=${tokenData.access_token}`);
     const meData = await meRes.json();
 
     if (!req.user) {
-      return res.status(401).json({ message: 'Usuário não autenticado (JWT ausente)' });
+      return res.status(401).json({ message: "Usuário não autenticado (JWT ausente)" });
     }
 
-    req.user.metaAccessToken = accessToken;
+    req.user.metaAccessToken = tokenData.access_token;
     req.user.metaUserId = meData.id;
-    req.user.metaConnectionStatus = 'connected';
+    req.user.metaConnectionStatus = "connected";
     await req.user.save();
 
-    console.log("✅ Token salvo no MongoDB para:", req.user.email);
+    console.log("✅ Token Meta salvo para:", req.user.email);
     res.redirect("https://chefastudio.vercel.app/dashboard");
   } catch (err) {
-    console.error("❌ Erro ao autenticar com Facebook:", err);
+    console.error("❌ Erro no callback do Facebook:", err);
     res.status(500).send("Erro no login com Facebook");
   }
 };
@@ -76,19 +74,19 @@ exports.facebookCallback = async (req, res) => {
 exports.getAdAccounts = async (req, res) => {
   try {
     const token = req.user.metaAccessToken;
-    if (!token) return res.status(400).json({ message: 'Conta Meta Ads ainda não conectada.' });
+    if (!token) return res.status(400).json({ message: "Conta Meta Ads ainda não conectada." });
 
     const response = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?access_token=${token}`);
     const data = await response.json();
 
     if (data.error) {
-      return res.status(400).json({ message: 'Erro ao obter contas de anúncio', error: data.error });
+      return res.status(400).json({ message: "Erro ao obter contas de anúncio", error: data.error });
     }
 
     res.json({ adAccounts: data.data });
   } catch (err) {
-    console.error("❌ Erro ao buscar contas de anúncio:", err);
-    res.status(500).json({ message: 'Erro interno ao buscar contas' });
+    console.error("❌ Erro ao buscar contas:", err);
+    res.status(500).json({ message: "Erro interno ao buscar contas" });
   }
 };
 
@@ -99,7 +97,7 @@ exports.createMetaCampaign = async (req, res) => {
 
   try {
     const token = req.user.metaAccessToken;
-    if (!token) return res.status(400).json({ message: 'Token Meta não encontrado. Faça login com Facebook.' });
+    if (!token) return res.status(400).json({ message: "Token Meta não encontrado." });
 
     const response = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/campaigns`, {
       method: "POST",
@@ -117,24 +115,19 @@ exports.createMetaCampaign = async (req, res) => {
   }
 };
 
-// ----------- CONJUNTO (AD SET) -----------
+// ----------- AD SET -----------
 
 exports.createAdSet = async (req, res) => {
   const {
-    adAccountId,
-    campaignId,
-    name,
-    daily_budget,
+    adAccountId, campaignId, name, daily_budget,
     optimization_goal = "LINK_CLICKS",
     billing_event = "IMPRESSIONS",
-    start_time,
-    end_time,
-    geo_locations
+    start_time, end_time, geo_locations
   } = req.body;
 
   try {
     const token = req.user.metaAccessToken;
-    if (!token) return res.status(400).json({ message: 'Token Meta não encontrado. Faça login com Facebook.' });
+    if (!token) return res.status(400).json({ message: "Token Meta não encontrado." });
 
     const payload = {
       name,
@@ -169,24 +162,16 @@ exports.createAdSet = async (req, res) => {
   }
 };
 
-// ----------- CRIAR AD CREATIVE + AD (Anúncio real) -----------
+// ----------- AD CREATIVE + AD -----------
 
 exports.createAdCreative = async (req, res) => {
-  const {
-    adAccountId,
-    adSetId,
-    name,
-    pageId,
-    message,
-    link,
-    image_url
-  } = req.body;
+  const { adAccountId, adSetId, name, pageId, message, link, image_url } = req.body;
 
   try {
     const token = req.user.metaAccessToken;
-    if (!token) return res.status(400).json({ message: 'Token Meta não encontrado.' });
+    if (!token) return res.status(400).json({ message: "Token Meta não encontrado." });
 
-    // 1. Criar o ad creative
+    // Criar Ad Creative
     const creativeRes = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/adcreatives`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -211,16 +196,14 @@ exports.createAdCreative = async (req, res) => {
     const creativeData = await creativeRes.json();
     if (creativeData.error) return res.status(400).json({ message: "Erro ao criar ad creative", error: creativeData.error });
 
-    const creativeId = creativeData.id;
-
-    // 2. Criar o anúncio (ad)
+    // Criar Anúncio
     const adRes = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/ads`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
         adset_id: adSetId,
-        creative: { creative_id: creativeId },
+        creative: { creative_id: creativeData.id },
         status: "PAUSED",
         access_token: token
       })
