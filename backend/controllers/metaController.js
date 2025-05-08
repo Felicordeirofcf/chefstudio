@@ -1,6 +1,6 @@
-const fetch = require('node-fetch');
-const qs = require('querystring');
-const User = require('../models/User');
+const fetch = require("node-fetch");
+const qs = require("querystring");
+const User = require("../models/User");
 
 // ----------- SIMULAÇÕES -----------
 
@@ -14,16 +14,18 @@ exports.getMetaConnectionStatus = (req, res) => {
 
 exports.generateAdCaption = (req, res) => {
   const { productName } = req.body;
+  if (!productName) return res.status(400).json({ message: "Nome do produto é obrigatório." });
+
   const caption = `Experimente agora o incrível ${productName}! #oferta #delivery`;
   res.json({ caption });
 };
 
-// ----------- FACEBOOK LOGIN REAL -----------
+// ----------- LOGIN REAL COM FACEBOOK -----------
 
 exports.loginWithFacebook = (req, res) => {
   const appId = process.env.FB_APP_ID;
   const redirect_uri = process.env.REDIRECT_URI;
-  const scope = 'ads_management,business_management,pages_show_list';
+  const scope = "ads_management,business_management,pages_show_list";
 
   const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirect_uri}&scope=${scope}`;
   res.redirect(url);
@@ -38,14 +40,14 @@ exports.facebookCallback = async (req, res) => {
       client_id: process.env.FB_APP_ID,
       redirect_uri,
       client_secret: process.env.FB_APP_SECRET,
-      code
+      code,
     });
 
     const tokenRes = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${params}`);
     const tokenData = await tokenRes.json();
 
     if (!tokenData.access_token) {
-      console.error("❌ Erro ao obter token:", tokenData);
+      console.error("❌ Falha ao obter token:", tokenData);
       return res.status(400).json({ message: "Erro ao obter token do Facebook", error: tokenData });
     }
 
@@ -74,7 +76,7 @@ exports.facebookCallback = async (req, res) => {
 exports.getAdAccounts = async (req, res) => {
   try {
     const token = req.user.metaAccessToken;
-    if (!token) return res.status(400).json({ message: "Conta Meta Ads ainda não conectada." });
+    if (!token) return res.status(400).json({ message: "Token Meta não encontrado. Conecte-se ao Facebook." });
 
     const response = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?access_token=${token}`);
     const data = await response.json();
@@ -94,6 +96,10 @@ exports.getAdAccounts = async (req, res) => {
 
 exports.createMetaCampaign = async (req, res) => {
   const { adAccountId, name, objective = "LINK_CLICKS", status = "PAUSED" } = req.body;
+
+  if (!adAccountId || !name) {
+    return res.status(400).json({ message: "adAccountId e name são obrigatórios." });
+  }
 
   try {
     const token = req.user.metaAccessToken;
@@ -120,10 +126,13 @@ exports.createMetaCampaign = async (req, res) => {
 exports.createAdSet = async (req, res) => {
   const {
     adAccountId, campaignId, name, daily_budget,
-    optimization_goal = "LINK_CLICKS",
-    billing_event = "IMPRESSIONS",
-    start_time, end_time, geo_locations
+    start_time, end_time, optimization_goal = "LINK_CLICKS",
+    billing_event = "IMPRESSIONS", geo_locations
   } = req.body;
+
+  if (!adAccountId || !campaignId || !name || !daily_budget || !start_time || !end_time) {
+    return res.status(400).json({ message: "Campos obrigatórios ausentes para o Ad Set." });
+  }
 
   try {
     const token = req.user.metaAccessToken;
@@ -162,16 +171,20 @@ exports.createAdSet = async (req, res) => {
   }
 };
 
-// ----------- AD CREATIVE + AD -----------
+// ----------- AD CREATIVE + ANÚNCIO -----------
 
 exports.createAdCreative = async (req, res) => {
   const { adAccountId, adSetId, name, pageId, message, link, image_url } = req.body;
+
+  if (!adAccountId || !adSetId || !name || !pageId || !message || !link || !image_url) {
+    return res.status(400).json({ message: "Todos os campos são obrigatórios para criar o anúncio." });
+  }
 
   try {
     const token = req.user.metaAccessToken;
     if (!token) return res.status(400).json({ message: "Token Meta não encontrado." });
 
-    // Criar Ad Creative
+    // Ad Creative
     const creativeRes = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/adcreatives`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -194,9 +207,9 @@ exports.createAdCreative = async (req, res) => {
     });
 
     const creativeData = await creativeRes.json();
-    if (creativeData.error) return res.status(400).json({ message: "Erro ao criar ad creative", error: creativeData.error });
+    if (creativeData.error) return res.status(400).json({ message: "Erro ao criar Ad Creative", error: creativeData.error });
 
-    // Criar Anúncio
+    // Ad
     const adRes = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/ads`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
