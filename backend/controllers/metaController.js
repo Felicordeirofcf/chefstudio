@@ -64,7 +64,7 @@ exports.facebookCallback = async (req, res) => {
     await req.user.save();
 
     console.log("✅ Token Meta salvo para:", req.user.email);
-    res.redirect("https://chefastudio.vercel.app/dashboard");
+    res.redirect("https://chefstudio.vercel.app/dashboard");
   } catch (err) {
     console.error("❌ Erro no callback do Facebook:", err);
     res.status(500).send("Erro no login com Facebook");

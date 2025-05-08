@@ -68,4 +68,27 @@ router.post("/login", authController.loginUser);
  */
 router.post("/register", authController.registerUser);
 
+/**
+ * @swagger
+ * /api/auth/facebook/callback:
+ *   get:
+ *     summary: Callback de autenticação do Facebook
+ *     tags: [Auth]
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Código de autorização do Facebook
+ *     responses:
+ *       200:
+ *         description: Conta conectada com sucesso
+ *       400:
+ *         description: Código ausente ou inválido
+ *       500:
+ *         description: Erro ao trocar código por token
+ */
+router.get("/facebook/callback", authController.facebookCallback);
+
 module.exports = router;
