@@ -15,7 +15,7 @@ const { protect } = require("../middleware/authMiddleware");
  * @swagger
  * /api/ads:
  *   get:
- *     summary: "Lista todas as campanhas reais da conta Meta Ads"
+ *     summary: Lista todas as campanhas reais da conta Meta Ads
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
@@ -25,13 +25,18 @@ const { protect } = require("../middleware/authMiddleware");
  *         required: true
  *         schema:
  *           type: string
- *         description: ID da conta de anúncios (ex: 123456789)
+ *         description: "ID da conta de anúncios (ex: 123456789)"
  *     responses:
  *       200:
- *         description: Lista de campanhas retornada
+ *         description: Lista de campanhas retornada com sucesso
+ *       401:
+ *         description: Token inválido ou ausente
+ *       500:
+ *         description: Erro interno ao listar campanhas
  */
 router.get("/", protect, adController.getAllCampaigns);
 
+module.exports = router;
 /**
  * @swagger
  * /api/ads:
