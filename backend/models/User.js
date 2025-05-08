@@ -6,21 +6,24 @@ const userSchema = new mongoose.Schema(
     // 🔹 Informações básicas do usuário
     name: {
       type: String,
-      required: true,
+      required: [true, "O nome é obrigatório"],
       trim: true
     },
     email: {
       type: String,
-      required: true,
+      required: [true, "O e-mail é obrigatório"],
       unique: true,
       lowercase: true,
       trim: true,
-      match: /^\S+@\S+\.\S+$/ // Regex simples para validar email
+      match: [
+        /^\S+@\S+\.\S+$/,
+        "Formato de e-mail inválido"
+      ]
     },
     password: {
       type: String,
-      required: true,
-      minlength: 6
+      required: [true, "A senha é obrigatória"],
+      minlength: [6, "A senha deve ter pelo menos 6 caracteres"]
     },
 
     // 🔗 Integração com Meta Ads
@@ -33,13 +36,14 @@ const userSchema = new mongoose.Schema(
     }
   },
   {
-    timestamps: true
+    timestamps: true // Cria automaticamente campos createdAt e updatedAt
   }
 );
 
-// 🔐 Hash da senha antes de salvar (caso modificada)
+// 🔐 Hash da senha antes de salvar
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
+
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
@@ -49,7 +53,7 @@ userSchema.pre("save", async function (next) {
   }
 });
 
-// 🔑 Método para verificar senha
+// 🔑 Método de verificação de senha
 userSchema.methods.comparePassword = function (inputPassword) {
   return bcrypt.compare(inputPassword, this.password);
 };
