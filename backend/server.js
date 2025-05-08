@@ -54,7 +54,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 app.use(cors({
   origin: [
     "http://localhost:5173",
-    "https://chefastudio.vercel.app"
+    "https://chefstudio.vercel.app" 
   ],
   credentials: true
 }));
