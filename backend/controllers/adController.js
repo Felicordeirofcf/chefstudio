@@ -1,67 +1,138 @@
-// controllers/adController.js
+const fetch = require("node-fetch");
 
-// ----------- CAMPANHAS -----------
+// ----------- CAMPANHAS REAL META ADS -----------
 
-exports.getAllCampaigns = (req, res) => {
-  res.json([
-    { id: 1, name: "Campanha Hamburguer", status: "active" },
-    { id: 2, name: "Campanha Pizza", status: "paused" }
-  ]);
-};
+exports.getAllCampaigns = async (req, res) => {
+  try {
+    const token = req.user.metaAccessToken;
+    const adAccountId = req.query.adAccountId; // passado como query param
 
-exports.createCampaign = (req, res) => {
-  const { name, objective } = req.body;
-
-  if (!name || !objective) {
-    return res.status(400).json({ message: "Nome e objetivo são obrigatórios." });
-  }
-
-  res.status(201).json({
-    message: "Campanha criada com sucesso (simulada)",
-    data: {
-      id: Math.floor(Math.random() * 1000),
-      name,
-      objective,
-      status: "draft"
+    if (!token || !adAccountId) {
+      return res.status(400).json({ message: "Token ou adAccountId ausente." });
     }
-  });
+
+    const response = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/campaigns?access_token=${token}`);
+    const data = await response.json();
+
+    if (data.error) {
+      return res.status(400).json({ message: "Erro ao buscar campanhas", error: data.error });
+    }
+
+    res.status(200).json(data.data);
+  } catch (err) {
+    console.error("❌ Erro ao listar campanhas:", err);
+    res.status(500).json({ message: "Erro interno ao listar campanhas" });
+  }
 };
 
-exports.getCampaignById = (req, res) => {
+exports.createCampaign = async (req, res) => {
+  const { adAccountId, name, objective = "LINK_CLICKS", status = "PAUSED" } = req.body;
+
+  try {
+    const token = req.user.metaAccessToken;
+    if (!token || !adAccountId || !name) {
+      return res.status(400).json({ message: "Token, adAccountId e nome são obrigatórios." });
+    }
+
+    const response = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/campaigns`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        objective,
+        status,
+        access_token: token
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      return res.status(400).json({ message: "Erro ao criar campanha", error: data.error });
+    }
+
+    res.status(201).json({ message: "Campanha criada com sucesso!", campaign: data });
+  } catch (err) {
+    console.error("❌ Erro ao criar campanha:", err);
+    res.status(500).json({ message: "Erro interno ao criar campanha" });
+  }
+};
+
+exports.getCampaignById = async (req, res) => {
   const { id } = req.params;
-  res.json({
-    id,
-    name: "Campanha Exemplo",
-    status: "active"
-  });
+
+  try {
+    const token = req.user.metaAccessToken;
+    if (!token) return res.status(400).json({ message: "Token não encontrado." });
+
+    const response = await fetch(`https://graph.facebook.com/v19.0/${id}?access_token=${token}`);
+    const data = await response.json();
+
+    if (data.error) {
+      return res.status(400).json({ message: "Erro ao buscar campanha", error: data.error });
+    }
+
+    res.status(200).json(data);
+  } catch (err) {
+    console.error("❌ Erro ao buscar campanha:", err);
+    res.status(500).json({ message: "Erro interno ao buscar campanha" });
+  }
 };
 
-exports.updateCampaignStatus = (req, res) => {
+exports.updateCampaignStatus = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
-  if (!status) {
-    return res.status(400).json({ message: "Status é obrigatório." });
+  try {
+    const token = req.user.metaAccessToken;
+    if (!token || !status) {
+      return res.status(400).json({ message: "Token e status são obrigatórios." });
+    }
+
+    const response = await fetch(`https://graph.facebook.com/v19.0/${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status,
+        access_token: token
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      return res.status(400).json({ message: "Erro ao atualizar status", error: data.error });
+    }
+
+    res.status(200).json({ message: `Status atualizado para ${status}`, result: data });
+  } catch (err) {
+    console.error("❌ Erro ao atualizar status:", err);
+    res.status(500).json({ message: "Erro interno ao atualizar status" });
   }
-
-  res.json({
-    message: `Status da campanha ${id} atualizado para '${status}' (simulado)`,
-    updated: { id, status }
-  });
 };
 
-exports.getCampaignMetrics = (req, res) => {
+exports.getCampaignMetrics = async (req, res) => {
   const { id } = req.params;
-  res.json({
-    id,
-    clicks: 120,
-    impressions: 1500,
-    ctr: "8%",
-    spent: "R$ 45,00"
-  });
+
+  try {
+    const token = req.user.metaAccessToken;
+    if (!token) return res.status(400).json({ message: "Token não encontrado." });
+
+    const response = await fetch(`https://graph.facebook.com/v19.0/${id}/insights?access_token=${token}`);
+    const data = await response.json();
+
+    if (data.error) {
+      return res.status(400).json({ message: "Erro ao obter métricas", error: data.error });
+    }
+
+    res.status(200).json(data.data);
+  } catch (err) {
+    console.error("❌ Erro ao obter métricas:", err);
+    res.status(500).json({ message: "Erro interno ao obter métricas" });
+  }
 };
 
-// ----------- LOCALIZAÇÃO -----------
+// ----------- LOCALIZAÇÃO (simulado) -----------
 
 exports.saveLocationSettings = (req, res) => {
   const { latitude, longitude, radius } = req.body;

@@ -8,17 +8,24 @@ const { protect } = require("../middleware/authMiddleware");
  * @swagger
  * tags:
  *   name: Ads
- *   description: Gerenciamento de campanhas e localização (simulado)
+ *   description: Gerenciamento de campanhas e localização com Meta Ads API
  */
 
 /**
  * @swagger
  * /api/ads:
  *   get:
- *     summary: "Lista todas as campanhas do usuário logado"
+ *     summary: "Lista todas as campanhas reais da conta Meta Ads"
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: adAccountId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID da conta de anúncios (ex: 123456789)
  *     responses:
  *       200:
  *         description: Lista de campanhas retornada
@@ -29,7 +36,7 @@ router.get("/", protect, adController.getAllCampaigns);
  * @swagger
  * /api/ads:
  *   post:
- *     summary: "Cria uma nova campanha"
+ *     summary: "Cria uma nova campanha real na conta Meta Ads"
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
@@ -39,11 +46,22 @@ router.get("/", protect, adController.getAllCampaigns);
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - adAccountId
+ *               - name
  *             properties:
+ *               adAccountId:
+ *                 type: string
+ *                 example: "123456789"
  *               name:
  *                 type: string
+ *                 example: "Campanha ChefiaStudio"
  *               objective:
  *                 type: string
+ *                 example: LINK_CLICKS
+ *               status:
+ *                 type: string
+ *                 example: PAUSED
  *     responses:
  *       201:
  *         description: Campanha criada com sucesso
@@ -54,7 +72,7 @@ router.post("/", protect, adController.createCampaign);
  * @swagger
  * /api/ads/{id}:
  *   get:
- *     summary: "Retorna uma campanha específica por ID"
+ *     summary: "Retorna uma campanha real por ID"
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
@@ -64,6 +82,7 @@ router.post("/", protect, adController.createCampaign);
  *         required: true
  *         schema:
  *           type: string
+ *         description: ID da campanha do Meta Ads
  *     responses:
  *       200:
  *         description: Campanha retornada com sucesso
@@ -74,7 +93,7 @@ router.get("/:id", protect, adController.getCampaignById);
  * @swagger
  * /api/ads/{id}/status:
  *   put:
- *     summary: "Atualiza o status de uma campanha (ex: PAUSED, ACTIVE)"
+ *     summary: "Atualiza o status de uma campanha real (ex: PAUSED, ACTIVE)"
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
@@ -104,7 +123,7 @@ router.put("/:id/status", protect, adController.updateCampaignStatus);
  * @swagger
  * /api/ads/{id}/metrics:
  *   get:
- *     summary: "Retorna métricas da campanha"
+ *     summary: "Retorna métricas da campanha real (insights)"
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
@@ -124,7 +143,7 @@ router.get("/:id/metrics", protect, adController.getCampaignMetrics);
  * @swagger
  * /api/ads/location:
  *   post:
- *     summary: "Salva as configurações de localização"
+ *     summary: "Salva as configurações de localização (simulado)"
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
@@ -151,7 +170,7 @@ router.post("/location", protect, adController.saveLocationSettings);
  * @swagger
  * /api/ads/location:
  *   get:
- *     summary: "Retorna as configurações de localização"
+ *     summary: "Retorna as configurações de localização (simulado)"
  *     tags: [Ads]
  *     security:
  *       - bearerAuth: []
