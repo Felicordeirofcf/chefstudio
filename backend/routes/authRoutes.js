@@ -1,32 +1,71 @@
 const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/authController");
-// const { protect } = require("../middleware/authMiddleware"); // Middleware for protected routes (implement later)
 
-// @route   POST /api/auth/register
-// @desc    Register a new user (Simulated)
-// @access  Public
-router.post("/register", authController.registerUser);
+/**
+ * @swagger
+ * tags:
+ *   name: Auth
+ *   description: Rotas de autenticação de usuário
+ */
 
-// @route   POST /api/auth/login
-// @desc    Authenticate user & get token (Simulated)
-// @access  Public
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Realiza login do usuário
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login realizado com sucesso
+ *       401:
+ *         description: Credenciais inválidas
+ */
 router.post("/login", authController.loginUser);
 
-// @route   GET /api/auth/profile
-// @desc    Get user profile (Simulated, needs protection later)
-// @access  Private (Placeholder)
-router.get("/profile", /* protect, */ authController.getUserProfile);
-
-// @route   PUT /api/auth/profile
-// @desc    Update user profile / restaurant info (Simulated, needs protection later)
-// @access  Private (Placeholder)
-router.put("/profile", /* protect, */ authController.updateUserProfile);
-
-// @route   PUT /api/auth/subscription
-// @desc    Update user subscription status (Simulated, needs protection later)
-// @access  Private (Placeholder)
-router.put("/subscription", /* protect, */ authController.updateSubscription);
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Registra novo usuário
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - password
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Usuário registrado com sucesso
+ *       400:
+ *         description: Email já cadastrado
+ */
+router.post("/register", authController.registerUser);
 
 module.exports = router;
-
