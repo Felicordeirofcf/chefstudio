@@ -1,9 +1,8 @@
-
 import React from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
-import { User, CreditCard, LogOut, Menu as MenuIcon, X as XIcon, Settings, ChevronDown, ChevronUp, Megaphone } from 'lucide-react';
+import { User, CreditCard, LogOut, Menu as MenuIcon, X as XIcon, Settings, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getUserProfile, logoutUser } from "../../lib/api";
 import { useToast } from "../../hooks/use-toast";
@@ -41,10 +40,10 @@ const DashboardLayout: React.FC = () => {
   const managementSubItems = [
     { name: 'Meu Perfil', path: '/dashboard/profile', icon: User },
     { name: 'Planos', path: '/dashboard/plans', icon: CreditCard },
-    { name: 'Conectar com Ads', path: '/connectmeta', icon: Megaphone }
+    { name: 'Conectar com Ads', path: '/connect-meta', icon: Zap },
   ];
 
-  const isActive = (path: string) => location.pathname === path || (path === '/dashboard/profile' && location.pathname.startsWith('/dashboard/profile')) || (path === '/dashboard/plans' && location.pathname.startsWith('/dashboard/plans')) || (path === '/connect-meta' && location.pathname.startsWith('/connect-meta'));
+  const isActive = (path: string) => location.pathname === path || (path === '/dashboard/profile' && location.pathname.startsWith('/dashboard/profile')) || (path === '/dashboard/plans' && location.pathname.startsWith('/dashboard/plans')) || (path === '/connect-meta' && location.pathname === '/connect-meta');
   const isManagementActive = () => managementSubItems.some(item => isActive(item.path));
 
   return (
@@ -105,6 +104,7 @@ const DashboardLayout: React.FC = () => {
             </Avatar>
           </div>
         </header>
+
         <header className="bg-white shadow-md p-4 hidden md:flex justify-end items-center sticky top-0 z-20">
           <div className="flex items-center space-x-4">
             <span className="text-sm text-gray-700">Olá, {userProfile?.name || 'Usuário'}</span>
@@ -114,6 +114,7 @@ const DashboardLayout: React.FC = () => {
             </Avatar>
           </div>
         </header>
+
         <main className="flex-1 bg-gray-100 overflow-y-auto">
           <Outlet />
         </main>
