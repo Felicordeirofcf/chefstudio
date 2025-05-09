@@ -25,7 +25,7 @@ exports.generateAdCaption = (req, res) => {
 
 exports.loginWithFacebook = (req, res) => {
   const appId = process.env.FB_APP_ID;
-  const redirectUri = process.env.REDIRECT_URI;
+  const redirectUri = process.env.REDIRECT_URI; // ex: https://chefstudio.vercel.app/api/auth/facebook/callback
   const scope = "ads_management,business_management,pages_show_list";
 
   const token = req.query.token;
@@ -51,26 +51,32 @@ exports.facebookCallback = async (req, res) => {
       code,
     });
 
+    // Solicitar o token de acesso ao Facebook
     const tokenRes = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${params}`);
     const tokenData = await tokenRes.json();
     if (tokenData.error) {
       return res.status(400).json({ message: "Erro ao obter token do Facebook", error: tokenData.error });
     }
 
+    // Obter informações do usuário
     const meRes = await fetch(`https://graph.facebook.com/me?access_token=${tokenData.access_token}`);
     const meData = await meRes.json();
 
+    // Verificação de usuário no banco
     const decoded = jwt.verify(state, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id);
-    if (!user) return res.status(404).json({ message: "Usuário não encontrado" });
+    if (!user) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
 
+    // Atualizar o usuário com as informações do Meta
     user.metaAccessToken = tokenData.access_token;
     user.metaUserId = meData.id;
     user.metaConnectionStatus = "connected";
     await user.save();
 
     console.log("✅ Token Meta salvo para:", user.email);
-    return res.redirect("https://chefastudio.vercel.app/dashboard");
+    return res.redirect("https://chefstudio.vercel.app/dashboard");
   } catch (err) {
     console.error("❌ Erro no callback do Facebook:", err);
     return res.status(500).send("Erro ao processar conexão com o Facebook");
