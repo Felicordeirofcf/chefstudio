@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
 const User = require("../models/User");
+const { protect } = require("../middleware/authMiddleware");
 
 // Gera um token JWT válido por 7 dias
 const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -140,3 +141,19 @@ exports.facebookCallback = async (req, res) => {
     return res.status(500).json({ message: "Erro ao conectar com a conta Meta Ads" });
   }
 };
+
+/**
+ * @swagger
+ * /api/auth/profile:
+ *   get:
+ *     summary: Retorna o perfil do usuário autenticado
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dados do perfil retornados com sucesso
+ *       401:
+ *         description: Não autorizado
+ */
+
