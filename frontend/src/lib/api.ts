@@ -1,60 +1,53 @@
 import axios from 'axios';
 
-// ✅ Força o uso de /api no final da base URL
+// 🔗 Força uso de "/api" no final da URL base
 const RAW_BASE_URL = import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app";
 const API_BASE_URL = `${RAW_BASE_URL.replace(/\/+$/, "")}/api`;
 
-// 🔑 Busca token do localStorage
+// 🔐 Recupera token salvo no localStorage
 const getToken = (): string | null => {
   try {
     const userInfo = localStorage.getItem('userInfo');
     return userInfo ? JSON.parse(userInfo).token : null;
-  } catch (e) {
-    console.error("Erro ao ler userInfo:", e);
+  } catch {
     localStorage.removeItem('userInfo');
     return null;
   }
 };
 
-// ✅ Instância do axios com base URL correta
+// ✅ Instância Axios com base correta
 const api = axios.create({ baseURL: API_BASE_URL });
 
-// 🔒 Intercepta requisições para injetar JWT
+// 🔒 Intercepta requisições e injeta JWT
 api.interceptors.request.use(
   (config) => {
     const token = getToken();
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
+    if (token) config.headers['Authorization'] = `Bearer ${token}`;
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-//
-// --- 🔐 AUTENTICAÇÃO ---
-//
+// =========================
+// AUTENTICAÇÃO
+// =========================
 
 export const registerUser = async (userData: any) => {
   const response = await api.post(`/auth/register`, userData);
   if (response.data?.token) {
-    const profile = await api.get(`/auth/profile`);
-    const fullUser = { ...response.data, ...profile.data };
-    localStorage.setItem('userInfo', JSON.stringify(fullUser));
-    return fullUser;
+    localStorage.setItem('userInfo', JSON.stringify(response.data));
+    return response.data;
   }
-  return response.data;
+  return null;
 };
 
 export const loginUser = async (credentials: any) => {
   const response = await api.post(`/auth/login`, credentials);
   if (response.data?.token) {
-    const profile = await api.get(`/auth/profile`);
-    const fullUser = { ...response.data, ...profile.data };
-    localStorage.setItem('userInfo', JSON.stringify(fullUser));
-    return fullUser;
+    localStorage.setItem('userInfo', JSON.stringify(response.data));
+    return response.data;
   }
-  return response.data;
+  return null;
 };
 
 export const logoutUser = () => localStorage.removeItem('userInfo');
@@ -85,19 +78,17 @@ export const updatePlan = async (planData: { planName: string }) => {
   return response.data;
 };
 
-//
-// --- 🌐 LOGIN COM FACEBOOK (Meta OAuth) ---
-//
+// =========================
+// LOGIN FACEBOOK (OAuth)
+// =========================
 
 export const getFacebookLoginUrl = async (): Promise<void> => {
   const token = getToken();
   if (!token) throw new Error("Token JWT não encontrado. Faça login novamente.");
 
   const loginUrl = `${API_BASE_URL}/meta/login?token=${encodeURIComponent(token)}`;
-
   const response = await api.get(loginUrl, {
     headers: { Authorization: `Bearer ${token}` },
-    // @ts-ignore
     validateStatus: (status) => status === 302 || status === 200,
   });
 
@@ -108,9 +99,9 @@ export const getFacebookLoginUrl = async (): Promise<void> => {
   }
 };
 
-//
-// --- 🍔 MENU (Simulado) ---
-//
+// =========================
+// OUTROS (Simulados)
+// =========================
 
 export const getMenuItems = async () => {
   await new Promise(resolve => setTimeout(resolve, 300));
@@ -126,18 +117,10 @@ export const addMenuItem = async (item: any) => {
   return { message: "Item adicionado com sucesso (simulado)", item: { ...item, id: `sim_${Date.now()}` } };
 };
 
-//
-// --- 📢 ADS SIMULADOS ---
-//
-
 export const createAdCampaign = async (details: any) => {
   await new Promise(resolve => setTimeout(resolve, 1000));
   return { message: "Campanha criada com sucesso (simulado)", campaignId: `sim_camp_${Date.now()}` };
 };
-
-//
-// --- 📊 MÉTRICAS SIMULADAS ---
-//
 
 export const getMetaAdAccounts = async () => {
   await new Promise(resolve => setTimeout(resolve, 500));
@@ -153,10 +136,6 @@ export const getMetaLiveMetrics = async () => {
     ctr: (Math.random() * 1.5 + 0.5).toFixed(2),
   };
 };
-
-//
-// --- 🍽️ RESTAURANTE (Simulado) ---
-//
 
 export const saveRestaurantInfo = async (data: any) => {
   await new Promise(resolve => setTimeout(resolve, 500));
