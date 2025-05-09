@@ -12,22 +12,44 @@ export default function ConnectMeta() {
     setError(null);
 
     try {
-      // Detecta e evita duplicar /api
+      const userInfo = localStorage.getItem("userInfo");
+      const token = userInfo ? JSON.parse(userInfo).token : null;
+
+      if (!token) {
+        throw new Error("Token JWT não encontrado. Faça login novamente.");
+      }
+
       const baseUrl = import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app";
-      const redirectUrl = baseUrl.includes("/api")
+      const loginUrl = baseUrl.includes("/api")
         ? `${baseUrl}/meta/login`
         : `${baseUrl}/api/meta/login`;
 
-      // Redireciona para login real com Facebook
-      window.location.href = redirectUrl;
+      // Chamada que retorna redirecionamento com JWT injetado como state
+      const res = await fetch(loginUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        redirect: "manual"
+      });
+
+      if (res.status === 302 || res.redirected) {
+        // fallback para redirecionamento manual
+        window.location.href = res.url;
+      } else {
+        const data = await res.json();
+        throw new Error(data.message || "Erro ao redirecionar.");
+      }
+
     } catch (err: any) {
       console.error("Erro ao redirecionar para login Meta:", err.message);
-      setError("Erro ao iniciar conexão com o Meta Ads.");
+      setError(err.message || "Erro ao iniciar conexão com o Meta Ads.");
       toast({
         title: "Erro",
-        description: "Falha ao iniciar o login com o Facebook.",
+        description: err.message || "Falha ao iniciar o login com o Facebook.",
         variant: "destructive",
       });
+    } finally {
       setLoading(false);
     }
   };

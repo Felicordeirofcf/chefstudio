@@ -2,7 +2,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from 'react';
-import { loginUser } from "../../lib/api"; // Import the REAL API function
+import { loginUser } from "../../lib/api"; // Importa a função REAL de login
 
 export default function Login() {
   const navigate = useNavigate();
@@ -11,30 +11,36 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const imageUrl = "/image.png"; // Path relative to the public folder
+  const imageUrl = "/image.png"; // Imagem da pasta public
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
     setLoading(true);
-    try {
-      // Use the REAL login function
-      const response = await loginUser({ email, password });
-      console.log("Login successful:", response);
-      // api.ts now handles saving to localStorage
 
-      // Check if Meta is connected and redirect accordingly
-      if (response.isMetaConnected) {
-        navigate("/dashboard"); // Navigate to dashboard if Meta is already connected
+    try {
+      const response = await loginUser({ email, password });
+
+      if (!response.token) throw new Error("Token ausente na resposta do servidor.");
+
+      // Salva token e dados do usuário no localStorage
+      localStorage.setItem("userInfo", JSON.stringify({
+        token: response.token,
+        user: response.user,
+        isMetaConnected: response.user?.metaConnectionStatus === "connected"
+      }));
+
+      // Redirecionamento baseado na conexão com Meta
+      if (response.user?.metaConnectionStatus === "connected") {
+        navigate("/dashboard");
       } else {
-        navigate("/connect-meta"); // Navigate to Meta connection step if not connected
+        navigate("/connect-meta");
       }
 
     } catch (err: any) {
       console.error("Login failed:", err.message);
       setError(err.message || "Falha no login. Verifique suas credenciais.");
-      // Clear potentially stored invalid token if login fails after a previous session
-      localStorage.removeItem('userInfo');
+      localStorage.removeItem("userInfo");
     } finally {
       setLoading(false);
     }
@@ -43,16 +49,16 @@ export default function Login() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
       <div className="flex w-full max-w-4xl bg-white rounded-lg shadow-xl overflow-hidden mx-4 sm:mx-0">
-        {/* Image Section */}
+        {/* Imagem lateral */}
         <div className="w-1/2 hidden md:block relative">
-           <img
+          <img
             src={imageUrl}
             alt="Chef sorrindo"
             className="object-cover w-full h-full"
           />
         </div>
 
-        {/* Form Section */}
+        {/* Formulário */}
         <div className="w-full md:w-1/2 p-8 sm:p-12 flex flex-col justify-center">
           <h2 className="text-3xl font-bold text-center mb-4 text-gray-800">Bem vindo(a)</h2>
           <p className="text-center text-gray-500 mb-10">Faça login para continuar</p>
@@ -66,7 +72,6 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
             </div>
             <div>
@@ -77,7 +82,6 @@ export default function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
             </div>
             {error && <p className="text-red-500 text-sm text-center">{error}</p>}
@@ -90,12 +94,6 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="mt-5 text-center">
-            {/* Link to a future forgot password page */}
-            {/* <Link to="/forgot-password" className="text-sm text-purple-600 hover:underline">
-              Esqueci minha senha
-            </Link> */}
-          </div>
           <div className="mt-8 text-center">
             <p className="text-sm text-gray-500">
               Não tem uma conta?{" "}
@@ -109,4 +107,3 @@ export default function Login() {
     </div>
   );
 }
-
