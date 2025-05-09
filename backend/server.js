@@ -15,7 +15,13 @@ const menuRoutes = require("./routes/menuRoutes");
 const app = express();
 const PORT = process.env.PORT || 3001;
 const MONGO_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/chefia_studio_db";
-const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+
+// Se não houver BASE_URL, tenta montar automaticamente
+const BASE_URL =
+  process.env.BASE_URL ||
+  (process.env.NODE_ENV === "production"
+    ? "https://chefstudio-production.up.railway.app"
+    : `http://localhost:${PORT}`);
 
 // -------------------- 🔗 MongoDB --------------------
 
