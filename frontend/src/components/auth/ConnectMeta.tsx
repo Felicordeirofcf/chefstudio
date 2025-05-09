@@ -24,7 +24,6 @@ export default function ConnectMeta() {
         ? `${baseUrl}/meta/login`
         : `${baseUrl}/api/meta/login`;
 
-      // Chamada que retorna redirecionamento com JWT injetado como state
       const res = await fetch(loginUrl, {
         method: "GET",
         headers: {
@@ -33,12 +32,20 @@ export default function ConnectMeta() {
         redirect: "manual"
       });
 
-      if (res.status === 302 || res.redirected) {
-        // fallback para redirecionamento manual
-        window.location.href = res.url;
+      // Redirecionamento manual seguro
+      const redirectUrl = res.headers.get("location") || res.url;
+      if (res.status === 302 || res.redirected || redirectUrl) {
+        window.location.href = redirectUrl;
+        return;
+      }
+
+      // Se não houve redirecionamento, tenta ler json (só se tiver)
+      const text = await res.text();
+      if (text) {
+        const data = JSON.parse(text);
+        throw new Error(data?.message || "Erro inesperado ao redirecionar.");
       } else {
-        const data = await res.json();
-        throw new Error(data.message || "Erro ao redirecionar.");
+        throw new Error("Erro inesperado: resposta vazia.");
       }
 
     } catch (err: any) {
