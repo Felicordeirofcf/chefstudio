@@ -37,13 +37,23 @@ api.interceptors.request.use(
 
 export const registerUser = async (userData: any) => {
   const response = await api.post(`/auth/register`, userData);
-  if (response.data?.token) localStorage.setItem('userInfo', JSON.stringify(response.data));
+  if (response.data?.token) {
+    const profile = await api.get(`/auth/profile`);
+    const fullUser = { ...response.data, ...profile.data };
+    localStorage.setItem('userInfo', JSON.stringify(fullUser));
+    return fullUser;
+  }
   return response.data;
 };
 
 export const loginUser = async (credentials: any) => {
   const response = await api.post(`/auth/login`, credentials);
-  if (response.data?.token) localStorage.setItem('userInfo', JSON.stringify(response.data));
+  if (response.data?.token) {
+    const profile = await api.get(`/auth/profile`);
+    const fullUser = { ...response.data, ...profile.data };
+    localStorage.setItem('userInfo', JSON.stringify(fullUser));
+    return fullUser;
+  }
   return response.data;
 };
 
