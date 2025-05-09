@@ -16,7 +16,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // ✅ Mongo URI segura
-const MONGO_URI = process.env.MONGODB_URI || "mongodb+srv://felipecordeirofcf:zQyUTVMjkIeffDVE@cluster0.hebh3d1.mongodb.net/chefia_studio_db?retryWrites=true&w=majority&appName=Cluster0";
+const MONGO_URI = process.env.MONGODB_URI || "mongodb+srv://<username>:<password>@cluster0.hebh3d1.mongodb.net/chefia_studio_db?retryWrites=true&w=majority&appName=Cluster0";
 
 // BASE_URL dinâmica
 const BASE_URL = process.env.BASE_URL || (process.env.NODE_ENV === "production"
@@ -60,10 +60,10 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 // -------------------- 🌐 CORS --------------------
 
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
+  origin: process.env.ALLOWED_ORIGINS.split(",") || [
+    "http://localhost:5173", 
     "https://chefstudio.vercel.app"
-  ],
+  ], // Usando variáveis de ambiente para URLs permitidas
   credentials: true
 }));
 
