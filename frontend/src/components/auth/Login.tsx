@@ -21,19 +21,23 @@ export default function Login() {
     try {
       const response = await loginUser({ email, password });
 
-      if (!response?.token || !response?.user) {
+      if (!response?.token || !response?.email) {
         throw new Error("Login mal sucedido: token ou dados do usuário ausentes.");
       }
 
-      // Armazena os dados no localStorage
+      // Armazena os dados diretamente
       localStorage.setItem("userInfo", JSON.stringify({
         token: response.token,
-        user: response.user,
-        isMetaConnected: response.user.metaConnectionStatus === "connected"
+        _id: response._id,
+        name: response.name,
+        email: response.email,
+        metaUserId: response.metaUserId,
+        metaConnectionStatus: response.metaConnectionStatus,
+        isMetaConnected: response.metaConnectionStatus === "connected"
       }));
 
       // Redireciona conforme conexão com Meta
-      if (response.user.metaConnectionStatus === "connected") {
+      if (response.metaConnectionStatus === "connected") {
         navigate("/dashboard");
       } else {
         navigate("/connect-meta");
@@ -51,7 +55,7 @@ export default function Login() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
       <div className="flex w-full max-w-4xl bg-white rounded-lg shadow-xl overflow-hidden mx-4 sm:mx-0">
-        
+
         <div className="w-1/2 hidden md:block relative">
           <img
             src={imageUrl}
