@@ -9,7 +9,7 @@ export default function MetaConnect() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const imageUrl = "/images/meta-connect.png"; // imagem localizada na pasta public
+  const imageUrl = "/images/meta-connect.png"; // Deve estar em /public/images
 
   const handleConnect = async () => {
     setError(null);
@@ -23,18 +23,20 @@ export default function MetaConnect() {
         throw new Error("Token JWT não encontrado. Faça login novamente.");
       }
 
-      const baseUrl = import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app";
+      // ✅ Limpa possíveis barras no final da base URL
+      const baseUrl = (import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app").replace(/\/+$/, "");
+
+      // ✅ Garante URL correta com token
       const redirectUrl = `${baseUrl}/api/meta/login?token=${encodeURIComponent(token)}`;
 
-      // Redireciona diretamente para a URL de login com o token no state (query param)
       window.location.href = redirectUrl;
 
     } catch (err: any) {
-      console.error("Erro ao conectar:", err);
+      console.error("Erro ao conectar com Meta:", err);
       setError(err.message || "Erro ao conectar com Meta.");
       toast({
         title: "Erro",
-        description: err.message,
+        description: err.message || "Erro inesperado.",
         variant: "destructive",
       });
       setLoading(false);

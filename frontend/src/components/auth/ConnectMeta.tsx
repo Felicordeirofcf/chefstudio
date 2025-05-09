@@ -19,20 +19,25 @@ export default function ConnectMeta() {
         throw new Error("Token JWT não encontrado. Faça login novamente.");
       }
 
-      const baseUrl = import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app";
+      // 🔐 Base URL da API sem /api no final
+      const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "https://chefstudio-production.up.railway.app";
+
+      // ✅ Rota final com token
       const redirectUrl = `${baseUrl}/api/meta/login?token=${encodeURIComponent(token)}`;
 
-      // Redireciona diretamente para a URL de login com o token no state (query param)
+      // 🔁 Redirecionamento real
       window.location.href = redirectUrl;
 
     } catch (err: any) {
-      console.error("Erro ao conectar:", err);
+      console.error("Erro ao conectar com Meta:", err);
       setError(err.message || "Erro ao conectar com Meta.");
+
       toast({
         title: "Erro",
-        description: err.message,
+        description: err.message || "Erro inesperado.",
         variant: "destructive",
       });
+
       setLoading(false);
     }
   };
