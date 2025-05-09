@@ -12,20 +12,20 @@ export default function ConnectMeta() {
     setError(null);
 
     try {
-      const userInfo = localStorage.getItem("userInfo");
-      const token = userInfo ? JSON.parse(userInfo).token : null;
+      const raw = localStorage.getItem("userInfo");
+      if (!raw) throw new Error("Usuário não autenticado.");
 
-      if (!token) {
-        throw new Error("Token JWT não encontrado. Faça login novamente.");
+      const parsed = JSON.parse(raw);
+      const token = parsed?.token;
+      const userId = parsed?._id;
+
+      if (!token || !userId) {
+        throw new Error("Token ou ID do usuário não encontrado. Faça login novamente.");
       }
 
-      // 🔐 Base URL da API sem /api no final
       const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "https://chefstudio-production.up.railway.app";
+      const redirectUrl = `${baseUrl}/api/meta/login?token=${encodeURIComponent(token)}&userId=${encodeURIComponent(userId)}`;
 
-      // ✅ Rota final com token
-      const redirectUrl = `${baseUrl}/api/meta/login?token=${encodeURIComponent(token)}`;
-
-      // 🔁 Redirecionamento real
       window.location.href = redirectUrl;
 
     } catch (err: any) {
