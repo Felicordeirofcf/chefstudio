@@ -2,7 +2,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from 'react';
-import { loginUser } from "../../lib/api"; // Importa a função REAL de login
+import { loginUser } from "../../lib/api";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -11,7 +11,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const imageUrl = "/image.png"; // Imagem da pasta public
+  const imageUrl = "/image.png"; // Local: public/image.png
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -21,25 +21,27 @@ export default function Login() {
     try {
       const response = await loginUser({ email, password });
 
-      if (!response.token) throw new Error("Token ausente na resposta do servidor.");
+      if (!response?.token || !response?.user) {
+        throw new Error("Login mal sucedido: token ou dados do usuário ausentes.");
+      }
 
-      // Salva token e dados do usuário no localStorage
+      // Armazena os dados no localStorage
       localStorage.setItem("userInfo", JSON.stringify({
         token: response.token,
         user: response.user,
-        isMetaConnected: response.user?.metaConnectionStatus === "connected"
+        isMetaConnected: response.user.metaConnectionStatus === "connected"
       }));
 
-      // Redirecionamento baseado na conexão com Meta
-      if (response.user?.metaConnectionStatus === "connected") {
+      // Redireciona conforme conexão com Meta
+      if (response.user.metaConnectionStatus === "connected") {
         navigate("/dashboard");
       } else {
         navigate("/connect-meta");
       }
 
     } catch (err: any) {
-      console.error("Login failed:", err.message);
-      setError(err.message || "Falha no login. Verifique suas credenciais.");
+      console.error("Erro no login:", err.message);
+      setError(err.message || "Falha ao fazer login. Verifique suas credenciais.");
       localStorage.removeItem("userInfo");
     } finally {
       setLoading(false);
@@ -49,7 +51,7 @@ export default function Login() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
       <div className="flex w-full max-w-4xl bg-white rounded-lg shadow-xl overflow-hidden mx-4 sm:mx-0">
-        {/* Imagem lateral */}
+        
         <div className="w-1/2 hidden md:block relative">
           <img
             src={imageUrl}
@@ -58,33 +60,30 @@ export default function Login() {
           />
         </div>
 
-        {/* Formulário */}
         <div className="w-full md:w-1/2 p-8 sm:p-12 flex flex-col justify-center">
           <h2 className="text-3xl font-bold text-center mb-4 text-gray-800">Bem vindo(a)</h2>
           <p className="text-center text-gray-500 mb-10">Faça login para continuar</p>
 
           <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <Input
-                id="email"
-                type="email"
-                placeholder="E-mail"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Senha"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
+            <Input
+              id="email"
+              type="email"
+              placeholder="E-mail"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <Input
+              id="password"
+              type="password"
+              placeholder="Senha"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+
             {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+
             <Button
               type="submit"
               disabled={loading}
