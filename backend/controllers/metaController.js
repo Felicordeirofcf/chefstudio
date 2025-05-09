@@ -26,22 +26,20 @@ exports.generateAdCaption = (req, res) => {
 exports.loginWithFacebook = (req, res) => {
   const appId = process.env.FB_APP_ID;
   const redirectUri = process.env.REDIRECT_URI;
-  const token = req.headers.authorization?.split(" ")[1];
+  const scope = "ads_management,business_management,pages_show_list";
 
+  const token = req.headers.authorization?.split(" ")[1];
   if (!token) {
     return res.status(401).json({ message: "Token JWT ausente ou malformado no cabeçalho" });
   }
 
-  const scope = "ads_management,business_management,pages_show_list";
-
-  const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&state=${token}`;
-
+  const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&state=${encodeURIComponent(token)}`;
   return res.redirect(authUrl);
 };
 
 exports.facebookCallback = async (req, res) => {
   const { code, state } = req.query;
-  const redirect_uri = process.env.REDIRECT_URI;
+  const redirectUri = process.env.REDIRECT_URI;
 
   if (!code || !state) {
     return res.status(400).json({ message: "Código ou token ausente no callback" });
@@ -50,14 +48,13 @@ exports.facebookCallback = async (req, res) => {
   try {
     const params = qs.stringify({
       client_id: process.env.FB_APP_ID,
-      redirect_uri,
+      redirect_uri: redirectUri,
       client_secret: process.env.FB_APP_SECRET,
       code,
     });
 
     const tokenRes = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${params}`);
     const tokenData = await tokenRes.json();
-
     if (!tokenData.access_token) {
       return res.status(400).json({ message: "Erro ao obter token do Facebook", error: tokenData });
     }
@@ -65,13 +62,8 @@ exports.facebookCallback = async (req, res) => {
     const meRes = await fetch(`https://graph.facebook.com/me?access_token=${tokenData.access_token}`);
     const meData = await meRes.json();
 
-    // Usa o token recebido no state (JWT do usuário logado)
-    const jwt = state;
-
-    const jwtDecoded = require("jsonwebtoken").verify(jwt, process.env.JWT_SECRET);
-    const userId = jwtDecoded.id;
-
-    const user = await User.findById(userId);
+    const decoded = jwt.verify(state, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
     if (!user) return res.status(404).json({ message: "Usuário não encontrado" });
 
     user.metaAccessToken = tokenData.access_token;
@@ -81,10 +73,9 @@ exports.facebookCallback = async (req, res) => {
 
     console.log("✅ Token Meta salvo para:", user.email);
     return res.redirect("https://chefastudio.vercel.app/dashboard");
-
   } catch (err) {
     console.error("❌ Erro no callback do Facebook:", err);
-    return res.status(500).send("Erro ao conectar com o Facebook");
+    return res.status(500).send("Erro ao processar conexão com o Facebook");
   }
 };
 
