@@ -760,3 +760,18 @@ export {
   SidebarTrigger,
   useSidebar,
 }
+
+// --- Botão adicional ---
+
+import { Megaphone } from "lucide-react"
+import { Link } from "react-router-dom"
+
+// ... dentro de SidebarMenu ou onde os botões do menu são renderizados:
+<SidebarMenuItem>
+  <Link to="/connect-meta">
+    <SidebarMenuButton tooltip="Conectar com Ads">
+      <Megaphone className="h-4 w-4" />
+      <span>Conectar com Ads</span>
+    </SidebarMenuButton>
+  </Link>
+</SidebarMenuItem>
