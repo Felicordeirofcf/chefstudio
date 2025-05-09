@@ -41,7 +41,7 @@ const DashboardLayout: React.FC = () => {
   const managementSubItems = [
     { name: 'Meu Perfil', path: '/dashboard/profile', icon: User },
     { name: 'Planos', path: '/dashboard/plans', icon: CreditCard },
-    { name: 'Conectar com Ads', path: '/connect-meta', icon: Megaphone }
+    { name: 'Conectar com Ads', path: '/connectmeta', icon: Megaphone }
   ];
 
   const isActive = (path: string) => location.pathname === path || (path === '/dashboard/profile' && location.pathname.startsWith('/dashboard/profile')) || (path === '/dashboard/plans' && location.pathname.startsWith('/dashboard/plans')) || (path === '/connect-meta' && location.pathname.startsWith('/connect-meta'));
