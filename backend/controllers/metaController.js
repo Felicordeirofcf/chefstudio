@@ -28,9 +28,8 @@ exports.loginWithFacebook = (req, res) => {
   const redirectUri = process.env.REDIRECT_URI;
   const scope = "ads_management,business_management,pages_show_list";
 
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({ message: "Token JWT ausente ou malformado no cabeçalho" });
+  const token = req.query.token;
+if (!token) return res.status(400).json({ message: "Token ausente na URL" });
   }
 
   const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&state=${encodeURIComponent(token)}`;

@@ -20,43 +20,19 @@ export default function ConnectMeta() {
       }
 
       const baseUrl = import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app";
-      const loginUrl = baseUrl.includes("/api")
-        ? `${baseUrl}/meta/login`
-        : `${baseUrl}/api/meta/login`;
+      const redirectUrl = `${baseUrl}/api/meta/login?token=${encodeURIComponent(token)}`;
 
-      const res = await fetch(loginUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        redirect: "manual"
-      });
-
-      // Redirecionamento manual seguro
-      const redirectUrl = res.headers.get("location") || res.url;
-      if (res.status === 302 || res.redirected || redirectUrl) {
-        window.location.href = redirectUrl;
-        return;
-      }
-
-      // Se não houve redirecionamento, tenta ler json (só se tiver)
-      const text = await res.text();
-      if (text) {
-        const data = JSON.parse(text);
-        throw new Error(data?.message || "Erro inesperado ao redirecionar.");
-      } else {
-        throw new Error("Erro inesperado: resposta vazia.");
-      }
+      // Redireciona diretamente para a URL de login com o token no state (query param)
+      window.location.href = redirectUrl;
 
     } catch (err: any) {
-      console.error("Erro ao redirecionar para login Meta:", err.message);
-      setError(err.message || "Erro ao iniciar conexão com o Meta Ads.");
+      console.error("Erro ao conectar:", err);
+      setError(err.message || "Erro ao conectar com Meta.");
       toast({
         title: "Erro",
-        description: err.message || "Falha ao iniciar o login com o Facebook.",
+        description: err.message,
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
