@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/authController");
+const { protect } = require("../middleware/authMiddleware");
 
 /**
  * @swagger
@@ -67,6 +68,22 @@ router.post("/login", authController.loginUser);
  *         description: Email já cadastrado
  */
 router.post("/register", authController.registerUser);
+
+/**
+ * @swagger
+ * /api/auth/profile:
+ *   get:
+ *     summary: Retorna o perfil do usuário autenticado
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Perfil do usuário retornado com sucesso
+ *       401:
+ *         description: Token inválido ou não fornecido
+ */
+router.get("/profile", protect, authController.getProfile);
 
 /**
  * @swagger
