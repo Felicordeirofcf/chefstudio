@@ -29,8 +29,7 @@ exports.loginWithFacebook = (req, res) => {
   const scope = "ads_management,business_management,pages_show_list";
 
   const token = req.query.token;
-if (!token) return res.status(400).json({ message: "Token ausente na URL" });
-  }
+  if (!token) return res.status(400).json({ message: "Token ausente na URL" });
 
   const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&state=${encodeURIComponent(token)}`;
   return res.redirect(authUrl);
