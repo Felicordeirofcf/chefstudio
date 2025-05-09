@@ -1,5 +1,6 @@
 const fetch = require("node-fetch");
 const qs = require("querystring");
+const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 // ----------- SIMULAÇÕES -----------
@@ -27,13 +28,31 @@ exports.loginWithFacebook = (req, res) => {
   const redirect_uri = process.env.REDIRECT_URI;
   const scope = "ads_management,business_management,pages_show_list";
 
-  const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirect_uri}&scope=${scope}`;
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Token JWT ausente" });
+  }
+  const token = authHeader.split(" ")[1];
+
+  const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirect_uri}&scope=${scope}&state=${token}`;
   res.redirect(url);
 };
 
 exports.facebookCallback = async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
   const redirect_uri = process.env.REDIRECT_URI;
+
+  if (!code || !state) {
+    return res.status(400).json({ message: "Código ou token ausente na URL" });
+  }
+
+  // Verifica o JWT recebido via state
+  let decoded;
+  try {
+    decoded = jwt.verify(state, process.env.JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ message: "JWT inválido ou expirado", error: err.message });
+  }
 
   try {
     const params = qs.stringify({
@@ -47,27 +66,25 @@ exports.facebookCallback = async (req, res) => {
     const tokenData = await tokenRes.json();
 
     if (!tokenData.access_token) {
-      console.error("❌ Falha ao obter token:", tokenData);
       return res.status(400).json({ message: "Erro ao obter token do Facebook", error: tokenData });
     }
 
     const meRes = await fetch(`https://graph.facebook.com/me?access_token=${tokenData.access_token}`);
     const meData = await meRes.json();
 
-    if (!req.user) {
-      return res.status(401).json({ message: "Usuário não autenticado (JWT ausente)" });
-    }
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ message: "Usuário não encontrado" });
 
-    req.user.metaAccessToken = tokenData.access_token;
-    req.user.metaUserId = meData.id;
-    req.user.metaConnectionStatus = "connected";
-    await req.user.save();
+    user.metaAccessToken = tokenData.access_token;
+    user.metaUserId = meData.id;
+    user.metaConnectionStatus = "connected";
+    await user.save();
 
-    console.log("✅ Token Meta salvo para:", req.user.email);
-    res.redirect("https://chefstudio.vercel.app/dashboard");
+    console.log("✅ Meta conectado para:", user.email);
+    res.redirect("https://chefastudio.vercel.app/dashboard");
   } catch (err) {
     console.error("❌ Erro no callback do Facebook:", err);
-    res.status(500).send("Erro no login com Facebook");
+    res.status(500).json({ message: "Erro no login com Facebook" });
   }
 };
 
@@ -184,7 +201,6 @@ exports.createAdCreative = async (req, res) => {
     const token = req.user.metaAccessToken;
     if (!token) return res.status(400).json({ message: "Token Meta não encontrado." });
 
-    // Ad Creative
     const creativeRes = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/adcreatives`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -209,7 +225,6 @@ exports.createAdCreative = async (req, res) => {
     const creativeData = await creativeRes.json();
     if (creativeData.error) return res.status(400).json({ message: "Erro ao criar Ad Creative", error: creativeData.error });
 
-    // Ad
     const adRes = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/ads`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
