@@ -15,22 +15,17 @@ const menuRoutes = require("./routes/menuRoutes");
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ✅ Mongo URI segura (recomenda-se armazenar no .env)
-const MONGO_URI = process.env.MONGODB_URI || "mongodb+srv://felipecordeirofcf:Amand%40403871@cluster0.hebh3d1.mongodb.net/chefiastudio?retryWrites=true&w=majority&appName=Cluster0";
+// ✅ Mongo URI segura
+const MONGO_URI = process.env.MONGODB_URI || "mongodb+srv://felipecordeirofcf:zQyUTVMjkIeffDVE@cluster0.hebh3d1.mongodb.net/chefia_studio_db?retryWrites=true&w=majority&appName=Cluster0";
 
-// Se não houver BASE_URL, tenta montar automaticamente
-const BASE_URL =
-  process.env.BASE_URL ||
-  (process.env.NODE_ENV === "production"
-    ? "https://chefstudio-production.up.railway.app"
-    : `http://localhost:${PORT}`);
+// BASE_URL dinâmica
+const BASE_URL = process.env.BASE_URL || (process.env.NODE_ENV === "production"
+  ? "https://chefstudio-production.up.railway.app"
+  : `http://localhost:${PORT}`);
 
 // -------------------- 🔗 MongoDB --------------------
 
-mongoose.connect(MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+mongoose.connect(MONGO_URI)
   .then(() => console.log("🟢 MongoDB conectado com sucesso"))
   .catch(err => console.error("🟡 Erro ao conectar com o MongoDB:", err));
 
@@ -84,7 +79,7 @@ app.use("/api/ads", adRoutes);
 app.use("/api/meta", metaRoutes);
 app.use("/api/menu", menuRoutes);
 
-// -------------------- ✅ Endpoints de verificação --------------------
+// -------------------- ✅ Endpoint de verificação --------------------
 
 app.get("/", (req, res) => {
   res.send("🚀 API online. Acesse <a href='/api-docs'>/api-docs</a> para a documentação.");
@@ -94,13 +89,13 @@ app.get("/api", (req, res) => {
   res.json({ message: "✅ API ChefiaStudio rodando!" });
 });
 
-// -------------------- ❌ Tratamento de 404 --------------------
+// -------------------- ❌ 404 --------------------
 
 app.use((req, res) => {
   res.status(404).json({ message: "Rota não encontrada" });
 });
 
-// -------------------- ❌ Erro interno genérico --------------------
+// -------------------- ❌ Erro interno --------------------
 
 app.use((err, req, res, next) => {
   console.error("❌ Erro interno:", err.stack);
