@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// ✅ Use variável de ambiente para funcionar em produção e desenvolvimento
+// ✅ Use variável de ambiente sem "/api"
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 // 🔑 Busca token do localStorage
@@ -72,17 +72,14 @@ export const updatePlan = async (planData: { planName: string }) => {
   return response.data;
 };
 
-// --- 🌐 META ADS REAL ---
+// --- 🌐 LOGIN REAL COM META (Facebook OAuth) ---
 
-/**
- * Gera e redireciona para a URL real de login com o Facebook
- */
 export const getFacebookLoginUrl = async (): Promise<void> => {
   const token = getToken();
   if (!token) throw new Error("Token JWT não encontrado. Faça login novamente.");
 
-  const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, ""); // remove qualquer barra final
-  const loginUrl = `${cleanBaseUrl}/meta/login`;
+  const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, "");
+  const loginUrl = `${cleanBaseUrl}/api/meta/login`;
 
   const response = await api.get(loginUrl, {
     headers: { Authorization: `Bearer ${token}` },
@@ -90,15 +87,6 @@ export const getFacebookLoginUrl = async (): Promise<void> => {
     validateStatus: (status) => status === 302 || status === 200,
   });
 
-  if (response.request?.responseURL) {
-    window.location.href = response.request.responseURL;
-  } else {
-    throw new Error("Erro ao obter URL de redirecionamento.");
-  }
-};
-
-
-  // Se o backend retornou redirecionamento
   if (response.request?.responseURL) {
     window.location.href = response.request.responseURL;
   } else {
@@ -129,7 +117,7 @@ export const createAdCampaign = async (details: any) => {
   return { message: "Campanha criada com sucesso (simulado)", campaignId: `sim_camp_${Date.now()}` };
 };
 
-// --- 📊 MÉTRICAS ---
+// --- 📊 MÉTRICAS (Simuladas) ---
 
 export const getMetaAdAccounts = async () => {
   await new Promise(resolve => setTimeout(resolve, 500));
@@ -146,7 +134,7 @@ export const getMetaLiveMetrics = async () => {
   };
 };
 
-// --- 🍽️ RESTAURANTE ---
+// --- 🍽️ RESTAURANTE (Simulado) ---
 
 export const saveRestaurantInfo = async (data: any) => {
   await new Promise(resolve => setTimeout(resolve, 500));
