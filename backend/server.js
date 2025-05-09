@@ -14,7 +14,9 @@ const menuRoutes = require("./routes/menuRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const MONGO_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/chefia_studio_db";
+
+// ✅ Mongo URI segura (recomenda-se armazenar no .env)
+const MONGO_URI = process.env.MONGODB_URI || "mongodb+srv://felipecordeirofcf:Amand%40403871@cluster0.hebh3d1.mongodb.net/chefiastudio?retryWrites=true&w=majority&appName=Cluster0";
 
 // Se não houver BASE_URL, tenta montar automaticamente
 const BASE_URL =
@@ -25,7 +27,10 @@ const BASE_URL =
 
 // -------------------- 🔗 MongoDB --------------------
 
-mongoose.connect(MONGO_URI)
+mongoose.connect(MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
   .then(() => console.log("🟢 MongoDB conectado com sucesso"))
   .catch(err => console.error("🟡 Erro ao conectar com o MongoDB:", err));
 
