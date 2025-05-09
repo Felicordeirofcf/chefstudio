@@ -53,8 +53,8 @@ exports.facebookCallback = async (req, res) => {
 
     const tokenRes = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${params}`);
     const tokenData = await tokenRes.json();
-    if (!tokenData.access_token) {
-      return res.status(400).json({ message: "Erro ao obter token do Facebook", error: tokenData });
+    if (tokenData.error) {
+      return res.status(400).json({ message: "Erro ao obter token do Facebook", error: tokenData.error });
     }
 
     const meRes = await fetch(`https://graph.facebook.com/me?access_token=${tokenData.access_token}`);
@@ -118,7 +118,9 @@ exports.createMetaCampaign = async (req, res) => {
     });
 
     const data = await response.json();
-    if (data.error) return res.status(400).json({ message: "Erro ao criar campanha", error: data.error });
+    if (data.error) {
+      return res.status(400).json({ message: "Erro ao criar campanha", error: data.error });
+    }
 
     res.status(201).json({ message: "Campanha criada com sucesso!", campaign: data });
   } catch (err) {
@@ -168,7 +170,9 @@ exports.createAdSet = async (req, res) => {
     });
 
     const data = await response.json();
-    if (data.error) return res.status(400).json({ message: "Erro ao criar Ad Set", error: data.error });
+    if (data.error) {
+      return res.status(400).json({ message: "Erro ao criar Ad Set", error: data.error });
+    }
 
     res.status(201).json({ message: "Ad Set criado com sucesso!", adset: data });
   } catch (err) {
@@ -212,7 +216,9 @@ exports.createAdCreative = async (req, res) => {
     });
 
     const creativeData = await creativeRes.json();
-    if (creativeData.error) return res.status(400).json({ message: "Erro ao criar Ad Creative", error: creativeData.error });
+    if (creativeData.error) {
+      return res.status(400).json({ message: "Erro ao criar Ad Creative", error: creativeData.error });
+    }
 
     const adRes = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/ads`, {
       method: "POST",
@@ -227,7 +233,9 @@ exports.createAdCreative = async (req, res) => {
     });
 
     const adData = await adRes.json();
-    if (adData.error) return res.status(400).json({ message: "Erro ao criar anúncio", error: adData.error });
+    if (adData.error) {
+      return res.status(400).json({ message: "Erro ao criar anúncio", error: adData.error });
+    }
 
     res.status(201).json({ message: "Anúncio criado com sucesso!", ad: adData });
   } catch (err) {

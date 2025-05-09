@@ -26,7 +26,7 @@ exports.loginUser = async (req, res) => {
       name: user.name,
       email: user.email,
       metaUserId: user.metaUserId,
-      metaConnectionStatus: user.metaConnectionStatus
+      metaConnectionStatus: user.metaConnectionStatus,
     });
   } catch (err) {
     console.error("❌ Erro no login:", err);
@@ -57,7 +57,7 @@ exports.registerUser = async (req, res) => {
       name: newUser.name,
       email: newUser.email,
       metaUserId: newUser.metaUserId,
-      metaConnectionStatus: newUser.metaConnectionStatus
+      metaConnectionStatus: newUser.metaConnectionStatus,
     });
   } catch (err) {
     console.error("❌ Erro ao registrar:", err);
@@ -80,7 +80,7 @@ exports.getProfile = async (req, res) => {
       email: user.email,
       metaUserId: user.metaUserId,
       metaConnectionStatus: user.metaConnectionStatus,
-      plan: user.plan || null
+      plan: user.plan || null,
     });
   } catch (err) {
     console.error("❌ Erro ao buscar perfil:", err);
@@ -101,44 +101,47 @@ exports.facebookCallback = async (req, res) => {
   const redirectUri = process.env.FACEBOOK_REDIRECT_URI || "https://chefstudio-production.up.railway.app/api/auth/facebook/callback";
 
   try {
+    // Obtenção do token de acesso do Facebook
     const tokenResponse = await axios.get("https://graph.facebook.com/v18.0/oauth/access_token", {
       params: {
         client_id: process.env.FACEBOOK_APP_ID,
         client_secret: process.env.FACEBOOK_APP_SECRET,
         redirect_uri: redirectUri,
-        code
-      }
+        code,
+      },
     });
 
     const { access_token } = tokenResponse.data;
 
+    // Obtenção de informações do usuário
     const meResponse = await axios.get("https://graph.facebook.com/v18.0/me", {
-      params: { access_token }
+      params: { access_token },
     });
 
     const metaUserId = meResponse.data.id;
 
+    // Atualização do usuário no banco de dados
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       {
         metaAccessToken: access_token,
         metaUserId,
-        metaConnectionStatus: "connected"
+        metaConnectionStatus: "connected",
       },
       { new: true }
     );
 
-    return res.status(200).json({
+    res.status(200).json({
       message: "Conta Meta conectada com sucesso!",
       _id: updatedUser._id,
       name: updatedUser.name,
       email: updatedUser.email,
       metaUserId: updatedUser.metaUserId,
-      metaConnectionStatus: updatedUser.metaConnectionStatus
+      metaConnectionStatus: updatedUser.metaConnectionStatus,
     });
   } catch (error) {
     console.error("❌ Erro ao conectar Meta Ads:", error.response?.data || error.message);
-    return res.status(500).json({ message: "Erro ao conectar com a conta Meta Ads" });
+    res.status(500).json({ message: "Erro ao conectar com a conta Meta Ads" });
   }
 };
 
@@ -156,4 +159,3 @@ exports.facebookCallback = async (req, res) => {
  *       401:
  *         description: Não autorizado
  */
-
