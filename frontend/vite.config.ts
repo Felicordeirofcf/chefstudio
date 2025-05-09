@@ -1,34 +1,39 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { fileURLToPath, URL } from "node:url"; // Import URL and fileURLToPath
+import { fileURLToPath, URL } from "node:url";
 
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)), // Use URL and fileURLToPath
-    },
-  },
-  server: {
-    proxy: {
-      "/api": {
-        target: process.env.VITE_API_URL || "http://localhost:3001", // Use variable for API URL or default to localhost
-        changeOrigin: true,
-        secure: process.env.VITE_API_URL ? true : false, // Set secure to true in production environments
+export default defineConfig(({ mode }) => {
+  const isDev = mode === "development";
+
+  return {
+    plugins: [react()],
+    resolve: {
+      alias: {
+        "@": fileURLToPath(new URL("./src", import.meta.url)),
       },
     },
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes("node_modules")) {
-            return "vendor"; // Group all dependencies into a single chunk
-          }
+    server: isDev
+      ? {
+          proxy: {
+            "/api": {
+              target: process.env.VITE_API_URL || "http://localhost:3001",
+              changeOrigin: true,
+              secure: false,
+            },
+          },
+        }
+      : undefined,
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("node_modules")) {
+              return "vendor";
+            }
+          },
         },
       },
+      chunkSizeWarningLimit: 1000,
     },
-    chunkSizeWarningLimit: 1000, // Increase chunk size warning limit (default is 500 KB)
-  },
+  };
 });
