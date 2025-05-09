@@ -18,7 +18,7 @@ router.post("/generate-caption", protect, metaController.generateAdCaption);
 
 // 🔐 Login real com Facebook
 router.get("/login", metaController.loginWithFacebook);
-router.get("/callback", protect, metaController.facebookCallback);
+router.get("/callback", metaController.facebookCallback);
 
 // 📊 Contas de anúncio
 router.get("/adaccounts", protect, metaController.getAdAccounts);
