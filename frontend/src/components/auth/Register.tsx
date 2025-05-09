@@ -1,64 +1,43 @@
-import {
-  Button
-} from "../ui/button";
-import {
-  Input
-} from "../ui/input";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../ui/select" // Import Select components
-import {
-  Link,
-  useNavigate
-} from "react-router-dom";
-import {
-  useState
-} from 'react';
-import {
-  registerUser
-} from "../../lib/api"; // Import the REAL API function
-import {
-  useToast
-} from "../../hooks/use-toast";
-import {
-  Toaster
-} from "../ui/toaster";
+} from "../ui/select";
+import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { registerUser } from "../../lib/api";
+import { useToast } from "../../hooks/use-toast";
+import { Toaster } from "../ui/toaster";
 
 export default function Register() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // User Account State
-  const [name, setName] = useState(""); // Responsible person's name
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // Establishment State
   const [establishmentName, setEstablishmentName] = useState("");
   const [businessType, setBusinessType] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
-  const [menuLink, setMenuLink] = useState(""); // Optional
-
-  // Address State (Optional)
+  const [menuLink, setMenuLink] = useState("");
   const [address, setAddress] = useState("");
   const [cep, setCep] = useState("");
 
-  // UI State
-  const [error, setError] = useState < string | null > (null);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const imageUrl = "/image.png"; // Reuse login image or use a different one
+  const imageUrl = "/image.png";
 
   const handleRegister = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
 
-    // Frontend Validations
     if (password !== confirmPassword) {
       setError("As senhas não coincidem.");
       return;
@@ -68,18 +47,16 @@ export default function Register() {
       return;
     }
     if (!name || !email || !establishmentName || !businessType || !whatsapp) {
-        setError("Por favor, preencha todos os campos obrigatórios.");
-        return;
+      setError("Preencha todos os campos obrigatórios.");
+      return;
     }
-    // Basic WhatsApp format check (optional, backend does more thorough check)
     if (!/^\(?\d{2}\)?\s?\d{4,5}-?\d{4}$/.test(whatsapp)) {
-        setError("Formato de WhatsApp inválido (ex: (11) 98765-4321).");
-        return;
+      setError("Formato de WhatsApp inválido (ex: (11) 98765-4321).");
+      return;
     }
 
     setLoading(true);
     try {
-      // Consolidate all data
       const userData = {
         name,
         email,
@@ -89,25 +66,46 @@ export default function Register() {
         whatsapp,
         menuLink,
         address,
-        cep
+        cep,
       };
+
       const response = await registerUser(userData);
-      console.log("Registration successful:", response);
+
+      if (!response?.token || !response?.email) {
+        throw new Error("Erro no cadastro: resposta incompleta.");
+      }
+
+      // Armazena no localStorage de forma uniforme
+      localStorage.setItem("userInfo", JSON.stringify({
+        token: response.token,
+        _id: response._id,
+        name: response.name,
+        email: response.email,
+        metaUserId: response.metaUserId,
+        metaConnectionStatus: response.metaConnectionStatus,
+        isMetaConnected: response.metaConnectionStatus === "connected"
+      }));
+
       toast({
         title: "Cadastro realizado!",
         description: "Sua conta foi criada com sucesso.",
       });
-      // api.ts handles saving to localStorage
-      navigate("/dashboard"); // Navigate to dashboard on successful registration
+
+      if (response.metaConnectionStatus === "connected") {
+        navigate("/dashboard");
+      } else {
+        navigate("/connect-meta");
+      }
+
     } catch (err: any) {
-      console.error("Registration failed:", err.message);
-      setError(err.message || "Falha no cadastro. Verifique os dados e tente novamente.");
+      console.error("Falha ao registrar:", err);
+      setError(err.message || "Erro ao registrar. Verifique os dados.");
       toast({
         title: "Erro no Cadastro",
         description: err.message || "Não foi possível criar sua conta.",
         variant: "destructive",
       });
-      localStorage.removeItem('userInfo'); // Ensure no partial data is stored
+      localStorage.removeItem("userInfo");
     } finally {
       setLoading(false);
     }
@@ -116,72 +114,27 @@ export default function Register() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50 py-12">
       <div className="flex w-full max-w-4xl bg-white rounded-lg shadow-xl overflow-hidden mx-4 sm:mx-0">
-        {/* Image Section */}
         <div className="w-1/2 hidden md:block relative">
-           <img
+          <img
             src={imageUrl}
             alt="ChefiaStudio Cadastro"
             className="object-cover w-full h-full"
           />
         </div>
 
-        {/* Form Section */}
         <div className="w-full md:w-1/2 p-6 sm:p-10 flex flex-col justify-center">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-3 text-gray-800">Crie sua Conta</h2>
           <p className="text-center text-gray-500 mb-6">Preencha os dados abaixo para começar.</p>
 
           <form onSubmit={handleRegister} className="space-y-3">
-            {/* Account Info */}
-            <Input
-              id="name"
-              type="text"
-              placeholder="Nome do Responsável *"
-              required
-              value={name}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-            <Input
-              id="email"
-              type="email"
-              placeholder="E-mail *"
-              required
-              value={email}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-            <Input
-              id="password"
-              type="password"
-              placeholder="Senha (mínimo 6 caracteres) *"
-              required
-              value={password}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-             <Input
-              id="confirmPassword"
-              type="password"
-              placeholder="Confirmar Senha *"
-              required
-              value={confirmPassword}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
+            <Input id="name" type="text" placeholder="Nome do Responsável *" value={name} onChange={(e) => setName(e.target.value)} required />
+            <Input id="email" type="email" placeholder="E-mail *" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Input id="password" type="password" placeholder="Senha *" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <Input id="confirmPassword" type="password" placeholder="Confirmar Senha *" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+            <Input id="establishmentName" type="text" placeholder="Nome do Estabelecimento *" value={establishmentName} onChange={(e) => setEstablishmentName(e.target.value)} required />
 
-            {/* Establishment Info */}
-            <Input
-              id="establishmentName"
-              type="text"
-              placeholder="Nome do Estabelecimento *"
-              required
-              value={establishmentName}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEstablishmentName(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-            {/* Use Select for Business Type */}
-            <Select required value={businessType} onValueChange={setBusinessType}>
-              <SelectTrigger className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-500">
+            <Select value={businessType} onValueChange={setBusinessType} required>
+              <SelectTrigger className="text-gray-500">
                 <SelectValue placeholder="Tipo de Negócio *" />
               </SelectTrigger>
               <SelectContent>
@@ -193,41 +146,11 @@ export default function Register() {
                 <SelectItem value="Outro">Outro</SelectItem>
               </SelectContent>
             </Select>
-            <Input
-              id="whatsapp"
-              type="text"
-              placeholder="WhatsApp (com DDD) *"
-              required
-              value={whatsapp}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWhatsapp(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-            <Input
-              id="menuLink"
-              type="url"
-              placeholder="Link do Cardápio (Opcional)"
-              value={menuLink}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMenuLink(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
 
-            {/* Address Info (Optional) */}
-             <Input
-              id="address"
-              type="text"
-              placeholder="Endereço Completo (Opcional)"
-              value={address}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddress(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-             <Input
-              id="cep"
-              type="text"
-              placeholder="CEP (Opcional, ex: 12345-678)"
-              value={cep}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCep(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
+            <Input id="whatsapp" type="text" placeholder="WhatsApp *" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} required />
+            <Input id="menuLink" type="url" placeholder="Link do Cardápio (Opcional)" value={menuLink} onChange={(e) => setMenuLink(e.target.value)} />
+            <Input id="address" type="text" placeholder="Endereço (Opcional)" value={address} onChange={(e) => setAddress(e.target.value)} />
+            <Input id="cep" type="text" placeholder="CEP (Opcional)" value={cep} onChange={(e) => setCep(e.target.value)} />
 
             {error && <p className="text-red-500 text-xs text-center py-2">{error}</p>}
 
@@ -254,4 +177,3 @@ export default function Register() {
     </div>
   );
 }
-
