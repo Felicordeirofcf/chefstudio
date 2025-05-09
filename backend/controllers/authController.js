@@ -5,13 +5,14 @@ const User = require("../models/User");
 // Gera um token JWT válido por 7 dias
 const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
+//
 // --------- LOGIN ----------
+//
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
     const user = await User.findOne({ email });
-
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({ message: "Credenciais inválidas" });
     }
@@ -20,13 +21,11 @@ exports.loginUser = async (req, res) => {
 
     res.json({
       token,
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        metaUserId: user.metaUserId,
-        metaConnectionStatus: user.metaConnectionStatus
-      }
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      metaUserId: user.metaUserId,
+      metaConnectionStatus: user.metaConnectionStatus
     });
   } catch (err) {
     console.error("❌ Erro no login:", err);
@@ -34,7 +33,9 @@ exports.loginUser = async (req, res) => {
   }
 };
 
+//
 // --------- REGISTRO ----------
+//
 exports.registerUser = async (req, res) => {
   const { name, email, password } = req.body;
 
@@ -51,13 +52,11 @@ exports.registerUser = async (req, res) => {
 
     res.status(201).json({
       token,
-      user: {
-        _id: newUser._id,
-        name: newUser.name,
-        email: newUser.email,
-        metaUserId: newUser.metaUserId,
-        metaConnectionStatus: newUser.metaConnectionStatus
-      }
+      _id: newUser._id,
+      name: newUser.name,
+      email: newUser.email,
+      metaUserId: newUser.metaUserId,
+      metaConnectionStatus: newUser.metaConnectionStatus
     });
   } catch (err) {
     console.error("❌ Erro ao registrar:", err);
@@ -65,7 +64,32 @@ exports.registerUser = async (req, res) => {
   }
 };
 
+//
+// --------- PERFIL AUTENTICADO ----------
+//
+exports.getProfile = async (req, res) => {
+  try {
+    const user = req.user;
+
+    if (!user) return res.status(404).json({ message: "Usuário não encontrado" });
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      metaUserId: user.metaUserId,
+      metaConnectionStatus: user.metaConnectionStatus,
+      plan: user.plan || null
+    });
+  } catch (err) {
+    console.error("❌ Erro ao buscar perfil:", err);
+    res.status(500).json({ message: "Erro ao buscar perfil do usuário" });
+  }
+};
+
+//
 // --------- CALLBACK FACEBOOK ----------
+//
 exports.facebookCallback = async (req, res) => {
   const { code, userId } = req.query;
 
@@ -76,7 +100,6 @@ exports.facebookCallback = async (req, res) => {
   const redirectUri = process.env.FACEBOOK_REDIRECT_URI || "https://chefstudio-production.up.railway.app/api/auth/facebook/callback";
 
   try {
-    // 1. Troca o código por um token
     const tokenResponse = await axios.get("https://graph.facebook.com/v18.0/oauth/access_token", {
       params: {
         client_id: process.env.FACEBOOK_APP_ID,
@@ -88,14 +111,12 @@ exports.facebookCallback = async (req, res) => {
 
     const { access_token } = tokenResponse.data;
 
-    // 2. Obtém o ID do usuário conectado ao Facebook
     const meResponse = await axios.get("https://graph.facebook.com/v18.0/me", {
       params: { access_token }
     });
 
     const metaUserId = meResponse.data.id;
 
-    // 3. Atualiza o usuário no banco
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       {
@@ -106,16 +127,13 @@ exports.facebookCallback = async (req, res) => {
       { new: true }
     );
 
-    // 4. Retorna o usuário atualizado
     return res.status(200).json({
       message: "Conta Meta conectada com sucesso!",
-      user: {
-        _id: updatedUser._id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        metaUserId: updatedUser.metaUserId,
-        metaConnectionStatus: updatedUser.metaConnectionStatus
-      }
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      metaUserId: updatedUser.metaUserId,
+      metaConnectionStatus: updatedUser.metaConnectionStatus
     });
   } catch (error) {
     console.error("❌ Erro ao conectar Meta Ads:", error.response?.data || error.message);
