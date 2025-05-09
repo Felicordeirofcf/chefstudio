@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// ✅ Variável de ambiente (sem /api no final)
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+// ✅ Base da API limpa (sem barras finais)
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app").replace(/\/+$/, "");
 
 // 🔑 Busca token do localStorage
 const getToken = (): string | null => {
@@ -30,7 +30,9 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+//
 // --- 🔐 AUTENTICAÇÃO ---
+//
 
 export const registerUser = async (userData: any) => {
   const response = await api.post(`/auth/register`, userData);
@@ -72,13 +74,15 @@ export const updatePlan = async (planData: { planName: string }) => {
   return response.data;
 };
 
-// --- 🌐 LOGIN REAL COM META (Facebook OAuth) ---
+//
+// --- 🌐 LOGIN COM FACEBOOK (Meta OAuth) ---
+//
 
 export const getFacebookLoginUrl = async (): Promise<void> => {
   const token = getToken();
   if (!token) throw new Error("Token JWT não encontrado. Faça login novamente.");
 
-  const loginUrl = `${API_BASE_URL}/api/meta/login`;
+  const loginUrl = `${API_BASE_URL}/api/meta/login?token=${encodeURIComponent(token)}`;
 
   const response = await api.get(loginUrl, {
     headers: { Authorization: `Bearer ${token}` },
@@ -93,7 +97,9 @@ export const getFacebookLoginUrl = async (): Promise<void> => {
   }
 };
 
+//
 // --- 🍔 MENU (Simulado) ---
+//
 
 export const getMenuItems = async () => {
   await new Promise(resolve => setTimeout(resolve, 300));
@@ -109,14 +115,18 @@ export const addMenuItem = async (item: any) => {
   return { message: "Item adicionado com sucesso (simulado)", item: { ...item, id: `sim_${Date.now()}` } };
 };
 
+//
 // --- 📢 ADS SIMULADOS ---
+//
 
 export const createAdCampaign = async (details: any) => {
   await new Promise(resolve => setTimeout(resolve, 1000));
   return { message: "Campanha criada com sucesso (simulado)", campaignId: `sim_camp_${Date.now()}` };
 };
 
-// --- 📊 MÉTRICAS (Simuladas) ---
+//
+// --- 📊 MÉTRICAS SIMULADAS ---
+//
 
 export const getMetaAdAccounts = async () => {
   await new Promise(resolve => setTimeout(resolve, 500));
@@ -133,7 +143,9 @@ export const getMetaLiveMetrics = async () => {
   };
 };
 
+//
 // --- 🍽️ RESTAURANTE (Simulado) ---
+//
 
 export const saveRestaurantInfo = async (data: any) => {
   await new Promise(resolve => setTimeout(resolve, 500));
