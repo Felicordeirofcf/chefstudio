@@ -11,30 +11,36 @@ const { protect } = require("../middleware/authMiddleware");
  *   description: Integração com Meta Ads (Facebook/Instagram)
  */
 
-// 🔗 Simulações e utilidades
+// ----------- SIMULAÇÕES E UTILIDADES -----------
+
 router.post("/connect", protect, metaController.connectMetaAccount);
 router.get("/status", protect, metaController.getMetaConnectionStatus);
 router.post("/generate-caption", protect, metaController.generateAdCaption);
 
-// 🔐 Login real com Facebook (JWT necessário na entrada)
+// ----------- AUTENTICAÇÃO COM FACEBOOK -----------
+
+// 🔐 Login inicial (com JWT no state da query string)
 router.get("/login", metaController.loginWithFacebook);
 
-// ⚠️ Callback PÚBLICO, pois o Facebook redireciona sem header Authorization
+// ⚠️ Callback após login (público)
 router.get("/callback", metaController.facebookCallback);
 
-// 📊 Contas de anúncio
+// ----------- CONTAS E CRIAÇÃO DE ANÚNCIOS -----------
+
+// 📊 Obter contas de anúncio
 router.get("/adaccounts", protect, metaController.getAdAccounts);
 
-// 🎯 Campanhas
+// 🎯 Criar campanha
 router.post("/create-campaign", protect, metaController.createMetaCampaign);
 
-// 📦 Ad Sets
+// 📦 Criar Ad Set
 router.post("/create-adset", protect, metaController.createAdSet);
 
-// 🎨 Criativo + Anúncio
+// 🎨 Criar criativo + anúncio
 router.post("/create-ad", protect, metaController.createAdCreative);
 
-// 🔒 Rota protegida de teste
+// ----------- TESTE DE ROTA PROTEGIDA -----------
+
 router.get("/test", protect, (req, res) => {
   res.send("🔒 Rota protegida funcionando");
 });
