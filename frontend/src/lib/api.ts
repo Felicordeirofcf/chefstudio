@@ -81,16 +81,22 @@ export const getFacebookLoginUrl = async (): Promise<void> => {
   const token = getToken();
   if (!token) throw new Error("Token JWT não encontrado. Faça login novamente.");
 
-  const loginUrl = API_BASE_URL.includes("/api")
-    ? `${API_BASE_URL}/meta/login`
-    : `${API_BASE_URL}/api/meta/login`;
+  const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, ""); // remove qualquer barra final
+  const loginUrl = `${cleanBaseUrl}/meta/login`;
 
-  // Solicita a URL com Authorization via GET
   const response = await api.get(loginUrl, {
     headers: { Authorization: `Bearer ${token}` },
     // @ts-ignore
     validateStatus: (status) => status === 302 || status === 200,
   });
+
+  if (response.request?.responseURL) {
+    window.location.href = response.request.responseURL;
+  } else {
+    throw new Error("Erro ao obter URL de redirecionamento.");
+  }
+};
+
 
   // Se o backend retornou redirecionamento
   if (response.request?.responseURL) {
