@@ -34,20 +34,44 @@ api.interceptors.request.use(
 
 export const registerUser = async (userData: any) => {
   const response = await api.post(`/auth/register`, userData);
-  if (response.data?.token) {
-    localStorage.setItem('userInfo', JSON.stringify(response.data));
-    return response.data;
-  }
-  return null;
+  const { token, _id, name, email, metaUserId, metaConnectionStatus, plan } = response.data || {};
+
+  if (!token || !_id) throw new Error("Registro mal sucedido: token ou dados do usuário ausentes.");
+
+  const userInfo = {
+    token,
+    _id,
+    name,
+    email,
+    metaUserId,
+    metaConnectionStatus,
+    plan,
+    isMetaConnected: metaConnectionStatus === "connected"
+  };
+
+  localStorage.setItem('userInfo', JSON.stringify(userInfo));
+  return userInfo;
 };
 
 export const loginUser = async (credentials: any) => {
   const response = await api.post(`/auth/login`, credentials);
-  if (response.data?.token) {
-    localStorage.setItem('userInfo', JSON.stringify(response.data));
-    return response.data;
-  }
-  return null;
+  const { token, _id, name, email, metaUserId, metaConnectionStatus, plan } = response.data || {};
+
+  if (!token || !_id) throw new Error("Login mal sucedido: token ou dados do usuário ausentes.");
+
+  const userInfo = {
+    token,
+    _id,
+    name,
+    email,
+    metaUserId,
+    metaConnectionStatus,
+    plan,
+    isMetaConnected: metaConnectionStatus === "connected"
+  };
+
+  localStorage.setItem('userInfo', JSON.stringify(userInfo));
+  return userInfo;
 };
 
 export const logoutUser = () => localStorage.removeItem('userInfo');
