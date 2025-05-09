@@ -17,7 +17,7 @@ router.get("/status", protect, metaController.getMetaConnectionStatus);
 router.post("/generate-caption", protect, metaController.generateAdCaption);
 
 // 🔐 Login real com Facebook (JWT necessário na entrada)
-router.get("/login", protect, metaController.loginWithFacebook);
+router.get("/login", metaController.loginWithFacebook);
 
 // ⚠️ Callback PÚBLICO, pois o Facebook redireciona sem header Authorization
 router.get("/callback", metaController.facebookCallback);

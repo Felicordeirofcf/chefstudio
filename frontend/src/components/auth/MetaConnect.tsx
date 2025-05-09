@@ -9,7 +9,7 @@ export default function MetaConnect() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const imageUrl = "/images/meta-connect.png"; // substitua se tiver uma imagem no public
+  const imageUrl = "/images/meta-connect.png"; // imagem localizada na pasta public
 
   const handleConnect = async () => {
     setError(null);
@@ -20,28 +20,14 @@ export default function MetaConnect() {
       const token = userInfo ? JSON.parse(userInfo).token : null;
 
       if (!token) {
-        setError("Usuário não autenticado.");
-        return;
+        throw new Error("Token JWT não encontrado. Faça login novamente.");
       }
 
-      // Redireciona via backend que injeta o JWT no state do OAuth
       const baseUrl = import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app";
+      const redirectUrl = `${baseUrl}/api/meta/login?token=${encodeURIComponent(token)}`;
 
-      // Faz a chamada com Authorization para incluir o JWT no state
-      const res = await fetch(`${baseUrl}/api/meta/login`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!res.redirected) {
-        const data = await res.json();
-        throw new Error(data.message || "Falha no redirecionamento do login Meta.");
-      }
-
-      // Se o navegador não redirecionar automaticamente
-      window.location.href = res.url;
+      // Redireciona diretamente para a URL de login com o token no state (query param)
+      window.location.href = redirectUrl;
 
     } catch (err: any) {
       console.error("Erro ao conectar:", err);
@@ -51,7 +37,6 @@ export default function MetaConnect() {
         description: err.message,
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
@@ -68,7 +53,7 @@ export default function MetaConnect() {
         <h2 className="text-3xl font-bold text-gray-800">Quase lá...</h2>
         <p className="text-gray-500 leading-relaxed">
           Para criar campanhas automaticamente<br />
-          conecte sua conta Meta aADS.
+          conecte sua conta Meta ADS.
         </p>
 
         <div className="flex justify-center my-6">
