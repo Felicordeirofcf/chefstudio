@@ -71,22 +71,6 @@ router.post("/register", authController.registerUser);
 
 /**
  * @swagger
- * /api/auth/profile:
- *   get:
- *     summary: Retorna o perfil do usuário autenticado
- *     tags: [Auth]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Perfil do usuário retornado com sucesso
- *       401:
- *         description: Token inválido ou não fornecido
- */
-router.get("/profile", protect, authController.getProfile);
-
-/**
- * @swagger
  * /api/auth/facebook/callback:
  *   get:
  *     summary: Callback de autenticação do Facebook
@@ -107,5 +91,21 @@ router.get("/profile", protect, authController.getProfile);
  *         description: Erro ao trocar código por token
  */
 router.get("/facebook/callback", authController.facebookCallback);
+
+/**
+ * @swagger
+ * /api/auth/profile:
+ *   get:
+ *     summary: Retorna o perfil do usuário autenticado
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Perfil do usuário retornado com sucesso
+ *       401:
+ *         description: Não autorizado
+ */
+router.get("/profile", protect, authController.getProfile);
 
 module.exports = router;
