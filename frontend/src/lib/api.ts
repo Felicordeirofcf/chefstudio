@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-// ✅ Base da API limpa (sem barras finais)
-const API_BASE_URL = (import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app").replace(/\/+$/, "");
+// ✅ Força o uso de /api no final da base URL
+const RAW_BASE_URL = import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app";
+const API_BASE_URL = `${RAW_BASE_URL.replace(/\/+$/, "")}/api`;
 
 // 🔑 Busca token do localStorage
 const getToken = (): string | null => {
@@ -15,7 +16,7 @@ const getToken = (): string | null => {
   }
 };
 
-// ✅ Instância do axios com base URL
+// ✅ Instância do axios com base URL correta
 const api = axios.create({ baseURL: API_BASE_URL });
 
 // 🔒 Intercepta requisições para injetar JWT
@@ -82,7 +83,7 @@ export const getFacebookLoginUrl = async (): Promise<void> => {
   const token = getToken();
   if (!token) throw new Error("Token JWT não encontrado. Faça login novamente.");
 
-  const loginUrl = `${API_BASE_URL}/api/meta/login?token=${encodeURIComponent(token)}`;
+  const loginUrl = `${API_BASE_URL}/meta/login?token=${encodeURIComponent(token)}`;
 
   const response = await api.get(loginUrl, {
     headers: { Authorization: `Bearer ${token}` },
