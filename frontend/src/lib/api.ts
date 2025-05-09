@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// ✅ Use variável de ambiente sem "/api"
+// ✅ Variável de ambiente (sem /api no final)
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 // 🔑 Busca token do localStorage
@@ -78,8 +78,7 @@ export const getFacebookLoginUrl = async (): Promise<void> => {
   const token = getToken();
   if (!token) throw new Error("Token JWT não encontrado. Faça login novamente.");
 
-  const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, "");
-  const loginUrl = `${cleanBaseUrl}/api/meta/login`;
+  const loginUrl = `${API_BASE_URL}/api/meta/login`;
 
   const response = await api.get(loginUrl, {
     headers: { Authorization: `Bearer ${token}` },
