@@ -12,7 +12,6 @@ export default function ConnectMeta() {
     setError(null);
 
     try {
-      // Verifica se o usuário está autenticado
       const rawUserInfo = localStorage.getItem("userInfo");
       if (!rawUserInfo) throw new Error("Usuário não autenticado.");
 
@@ -21,17 +20,9 @@ export default function ConnectMeta() {
         throw new Error("Token ou ID do usuário não encontrado. Faça login novamente.");
       }
 
-      // URL base da API configurada no arquivo .env
-      const baseUrl =
-        import.meta.env.VITE_API_URL?.replace(/\/+$/, "") ||
-        "https://chefstudio-production.up.railway.app";
+      const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "https://chefstudio-production.up.railway.app";
+      const redirectUrl = `${baseUrl}/api/meta/login?token=${encodeURIComponent(token)}&userId=${encodeURIComponent(userId)}`;
 
-      // Corrige a URL de redirecionamento incluindo os parâmetros code e userId
-      const redirectUrl = `${baseUrl}/api/meta/login?token=${encodeURIComponent(
-        token
-      )}&userId=${encodeURIComponent(userId)}`;
-
-      // Redireciona o usuário para a URL do Meta para autenticação
       window.location.href = redirectUrl;
     } catch (err: any) {
       const message = err?.message || "Erro inesperado ao conectar com Meta.";
@@ -57,6 +48,7 @@ export default function ConnectMeta() {
             viewBox="0 0 24 24"
             stroke="currentColor"
             strokeWidth={2}
+            aria-hidden="true"  // Melhoria de acessibilidade
           >
             <path
               strokeLinecap="round"
