@@ -11,6 +11,10 @@ export default function MetaConnect() {
 
   const imageUrl = "/images/meta-connect.png"; // Deve estar em /public/images
 
+  const generateState = (): string => {
+    return Math.random().toString(36).substring(2); // Gera uma string única aleatória para prevenir CSRF
+  };
+
   const handleConnect = async () => {
     setError(null);
     setLoading(true);
@@ -26,8 +30,8 @@ export default function MetaConnect() {
       // ✅ Limpa possíveis barras no final da base URL
       const baseUrl = (import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app").replace(/\/+$/, "");
 
-      // ✅ Garante URL correta com token
-      const state = "valor_unico_gerado_aleatoriamente"; // Gere esse valor para prevenir CSRF
+      // ✅ Garante URL correta com token e estado único para prevenir CSRF
+      const state = generateState();
       const redirectUrl = `${baseUrl}/api/meta/login?token=${encodeURIComponent(token)}&state=${state}`;
 
       // Redireciona para o Meta
@@ -56,7 +60,7 @@ export default function MetaConnect() {
 
         <h2 className="text-3xl font-bold text-gray-800">Quase lá...</h2>
         <p className="text-gray-500 leading-relaxed">
-          Para criar campanhas automaticamente<br />
+          Para criar campanhas automaticamente,<br />
           conecte sua conta Meta ADS.
         </p>
 
