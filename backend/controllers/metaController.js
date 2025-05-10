@@ -26,57 +26,103 @@ exports.generateAdCaption = (req, res) => {
 // ----------- LOGIN REAL COM FACEBOOK -----------
 
 exports.loginWithFacebook = (req, res) => {
+  console.log("[DEBUG] loginWithFacebook - FB_APP_ID:", process.env.FB_APP_ID);
+  console.log("[DEBUG] loginWithFacebook - FACEBOOK_REDIRECT_URI:", process.env.FACEBOOK_REDIRECT_URI);
   const appId = process.env.FB_APP_ID;
   const redirectUri = process.env.FACEBOOK_REDIRECT_URI; // Corrigido para FACEBOOK_REDIRECT_URI
   const scope = "ads_management,business_management,pages_read_engagement,ads_read";
- // Alterei os escopos para os mais comuns e necessários
 
   const token = req.query.token;
   if (!token) {
     return res.status(400).json({ message: "Token ausente na URL" });
   }
+  if (!appId) {
+    console.error("❌ Erro: FB_APP_ID não está definido nas variáveis de ambiente.");
+    return res.status(500).json({ message: "Erro de configuração do servidor: FB_APP_ID ausente." });
+  }
+  if (!redirectUri) {
+    console.error("❌ Erro: FACEBOOK_REDIRECT_URI não está definido nas variáveis de ambiente.");
+    return res.status(500).json({ message: "Erro de configuração do servidor: FACEBOOK_REDIRECT_URI ausente." });
+  }
 
-  const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&state=${encodeURIComponent(token)}`;
+  const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${encodeURIComponent(token)}`;
   return res.redirect(authUrl);
 };
 
 exports.facebookCallback = async (req, res) => {
   const { code, state } = req.query;
-  const redirectUri = process.env.FACEBOOK_REDIRECT_URI; // Corrigido para FACEBOOK_REDIRECT_URI
+  
+  // Adicionando logs para depuração das variáveis de ambiente no Railway
+  console.log("[DEBUG] facebookCallback - Iniciando...");
+  console.log("[DEBUG] facebookCallback - FB_APP_ID:", process.env.FB_APP_ID);
+  console.log("[DEBUG] facebookCallback - FB_APP_SECRET:", process.env.FB_APP_SECRET ? 'Definido' : 'NÃO DEFINIDO'); // Não logar o secret diretamente
+  console.log("[DEBUG] facebookCallback - FACEBOOK_REDIRECT_URI:", process.env.FACEBOOK_REDIRECT_URI);
+  console.log("[DEBUG] facebookCallback - Code recebido:", code);
+  console.log("[DEBUG] facebookCallback - State recebido:", state);
+
+  const redirectUri = process.env.FACEBOOK_REDIRECT_URI; 
+  const clientId = process.env.FB_APP_ID;
+  const clientSecret = process.env.FB_APP_SECRET;
 
   if (!code || !state) {
+    console.error("❌ Erro facebookCallback: Código ou state ausente.");
     return res.status(400).json({ message: "Código ou token ausente no callback" });
+  }
+
+  if (!clientId) {
+    console.error("❌ Erro facebookCallback: FB_APP_ID não está definido nas variáveis de ambiente para a troca de token.");
+    return res.status(500).json({ message: "Erro de configuração do servidor: FB_APP_ID ausente para troca de token." });
+  }
+  if (!clientSecret) {
+    console.error("❌ Erro facebookCallback: FB_APP_SECRET não está definido nas variáveis de ambiente para a troca de token.");
+    return res.status(500).json({ message: "Erro de configuração do servidor: FB_APP_SECRET ausente para troca de token." });
+  }
+  if (!redirectUri) {
+    console.error("❌ Erro facebookCallback: FACEBOOK_REDIRECT_URI não está definido nas variáveis de ambiente para a troca de token.");
+    return res.status(500).json({ message: "Erro de configuração do servidor: FACEBOOK_REDIRECT_URI ausente para troca de token." });
   }
 
   try {
     const params = qs.stringify({
-      client_id: process.env.FB_APP_ID,
+      client_id: clientId, // Usando a variável clientId
       redirect_uri: redirectUri,
-      client_secret: process.env.FB_APP_SECRET,
+      client_secret: clientSecret, // Usando a variável clientSecret
       code,
     });
+    console.log("[DEBUG] facebookCallback - Parâmetros para troca de token:", params);
 
-    // Solicitar o token de acesso ao Facebook
     const tokenRes = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${params}`);
     const tokenData = await tokenRes.json();
+    console.log("[DEBUG] facebookCallback - Resposta da troca de token:", JSON.stringify(tokenData));
 
     if (tokenData.error) {
+      console.error("❌ Erro facebookCallback ao obter token do Facebook:", JSON.stringify(tokenData.error));
       return res.status(400).json({ message: "Erro ao obter token do Facebook", error: tokenData.error });
     }
 
-    // Obter informações do usuário
-    const meRes = await fetch(`https://graph.facebook.com/me?access_token=${tokenData.access_token}`);
-    const meData = await meRes.json();
+    const accessToken = tokenData.access_token;
+    if (!accessToken) {
+        console.error("❌ Erro facebookCallback: Access token não recebido do Facebook.");
+        return res.status(500).json({ message: "Erro ao obter access token do Facebook." });
+    }
 
-    // Verificação de usuário no banco
+    const meRes = await fetch(`https://graph.facebook.com/me?access_token=${accessToken}&fields=id,name,email`); // Adicionado fields para solicitar email
+    const meData = await meRes.json();
+    console.log("[DEBUG] facebookCallback - Resposta do /me endpoint:", JSON.stringify(meData));
+
+    if (meData.error) {
+        console.error("❌ Erro facebookCallback ao obter dados do usuário do Facebook:", JSON.stringify(meData.error));
+        return res.status(500).json({ message: "Erro ao obter dados do usuário do Facebook", error: meData.error });
+    }
+
     const decoded = jwt.verify(state, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id);
     if (!user) {
+      console.error("❌ Erro facebookCallback: Usuário não encontrado no banco com ID do state.");
       return res.status(404).json({ message: "Usuário não encontrado" });
     }
 
-    // Atualizar o usuário com as informações do Meta
-    user.metaAccessToken = tokenData.access_token;
+    user.metaAccessToken = accessToken;
     user.metaUserId = meData.id;
     user.metaConnectionStatus = "connected";
     await user.save();
@@ -84,7 +130,11 @@ exports.facebookCallback = async (req, res) => {
     console.log("✅ Token Meta salvo para:", user.email);
     return res.redirect("https://chefstudio.vercel.app/dashboard");
   } catch (err) {
-    console.error("❌ Erro no callback do Facebook:", err);
+    console.error("❌ Erro GERAL no callback do Facebook:", err.message, err.stack);
+    // Adicionando mais detalhes do erro no log
+    if (err.response && err.response.data) {
+        console.error("❌ Erro GERAL no callback - Detalhes da resposta:", JSON.stringify(err.response.data));
+    }
     return res.status(500).send("Erro ao processar conexão com o Facebook");
   }
 };
@@ -98,7 +148,7 @@ exports.getAdAccounts = async (req, res) => {
       return res.status(400).json({ message: "Token Meta não encontrado. Conecte-se ao Facebook." });
     }
 
-    const response = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?access_token=${token}`);
+    const response = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?access_token=${token}&fields=id,name,account_status`); // Adicionado fields
     const data = await response.json();
 
     if (data.error) {
