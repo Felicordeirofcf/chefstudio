@@ -107,7 +107,8 @@ exports.facebookCallback = async (req, res) => {
     // Obtenção do token de acesso do Facebook
     const redirectUri = process.env.FACEBOOK_REDIRECT_URI || "https://chefstudio-production.up.railway.app/api/auth/facebook/callback";
     
-    const tokenResponse = await axios.get("https://graph.facebook.com/v18.0/oauth/access_token", {
+    const tokenResponse = await axios.get("https://graph.facebook.com/v18.0/oauth/access_token?client_id=1130665422196621&redirect_uri=SEU_REDIRECT_URI&client_secret=37f1dec2f50ef0d37b85e59735a82510&code=SEU_AUTH_CODE
+", {
       params: {
         client_id: process.env.FACEBOOK_APP_ID,
         client_secret: process.env.FACEBOOK_APP_SECRET,
