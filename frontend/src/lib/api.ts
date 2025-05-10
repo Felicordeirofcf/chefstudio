@@ -1,10 +1,8 @@
 import axios from 'axios';
 
-// 🔗 Força uso de "/api" no final da URL base
 const RAW_BASE_URL = import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app";
 const API_BASE_URL = `${RAW_BASE_URL.replace(/\/+$/, "")}/api`;
 
-// 🔐 Recupera token salvo no localStorage
 const getToken = (): string | null => {
   try {
     const userInfo = localStorage.getItem('userInfo');
@@ -15,10 +13,8 @@ const getToken = (): string | null => {
   }
 };
 
-// ✅ Instância Axios com base correta
 const api = axios.create({ baseURL: API_BASE_URL });
 
-// 🔒 Intercepta requisições e injeta JWT
 api.interceptors.request.use(
   (config) => {
     const token = getToken();
@@ -28,50 +24,54 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// =========================
-// AUTENTICAÇÃO
-// =========================
-
 export const registerUser = async (userData: any) => {
-  const response = await api.post(`/auth/register`, userData);
-  const { token, _id, name, email, metaUserId, metaConnectionStatus, plan } = response.data || {};
+  try {
+    const response = await api.post(`/auth/register`, userData);
+    const { token, _id, name, email, metaUserId, metaConnectionStatus, plan } = response.data || {};
 
-  if (!token || !_id) throw new Error("Registro mal sucedido: token ou dados do usuário ausentes.");
+    if (!token || !_id) throw new Error("Registro mal sucedido: token ou dados do usuário ausentes.");
 
-  const userInfo = {
-    token,
-    _id,
-    name,
-    email,
-    metaUserId,
-    metaConnectionStatus,
-    plan,
-    isMetaConnected: metaConnectionStatus === "connected"
-  };
+    const userInfo = {
+      token,
+      _id,
+      name,
+      email,
+      metaUserId,
+      metaConnectionStatus,
+      plan,
+      isMetaConnected: metaConnectionStatus === "connected"
+    };
 
-  localStorage.setItem('userInfo', JSON.stringify(userInfo));
-  return userInfo;
+    localStorage.setItem('userInfo', JSON.stringify(userInfo));
+    return userInfo;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Erro ao registrar usuário.");
+  }
 };
 
 export const loginUser = async (credentials: any) => {
-  const response = await api.post(`/auth/login`, credentials);
-  const { token, _id, name, email, metaUserId, metaConnectionStatus, plan } = response.data || {};
+  try {
+    const response = await api.post(`/auth/login`, credentials);
+    const { token, _id, name, email, metaUserId, metaConnectionStatus, plan } = response.data || {};
 
-  if (!token || !_id) throw new Error("Login mal sucedido: token ou dados do usuário ausentes.");
+    if (!token || !_id) throw new Error("Login mal sucedido: token ou dados do usuário ausentes.");
 
-  const userInfo = {
-    token,
-    _id,
-    name,
-    email,
-    metaUserId,
-    metaConnectionStatus,
-    plan,
-    isMetaConnected: metaConnectionStatus === "connected"
-  };
+    const userInfo = {
+      token,
+      _id,
+      name,
+      email,
+      metaUserId,
+      metaConnectionStatus,
+      plan,
+      isMetaConnected: metaConnectionStatus === "connected"
+    };
 
-  localStorage.setItem('userInfo', JSON.stringify(userInfo));
-  return userInfo;
+    localStorage.setItem('userInfo', JSON.stringify(userInfo));
+    return userInfo;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Erro ao fazer login.");
+  }
 };
 
 export const logoutUser = () => localStorage.removeItem('userInfo');
@@ -87,46 +87,51 @@ export const getUserProfile = async () => {
 };
 
 export const updateUserProfile = async (profileData: any) => {
-  const response = await api.put(`/auth/profile`, profileData);
-  const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
-  const updatedUser = { ...currentUser, ...response.data };
-  localStorage.setItem('userInfo', JSON.stringify(updatedUser));
-  return response.data;
-};
-
-export const updatePlan = async (planData: { planName: string }) => {
-  const response = await api.put(`/auth/plan`, planData);
-  const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
-  currentUser.plan = response.data.plan;
-  localStorage.setItem('userInfo', JSON.stringify(currentUser));
-  return response.data;
-};
-
-// =========================
-// LOGIN FACEBOOK (OAuth)
-// =========================
-
-export const getFacebookLoginUrl = async (): Promise<void> => {
-  const token = getToken();
-  if (!token) throw new Error("Token JWT não encontrado. Faça login novamente.");
-
-  const loginUrl = `${API_BASE_URL}/meta/login?token=${encodeURIComponent(token)}`;
-  const response = await api.get(loginUrl, {
-    headers: { Authorization: `Bearer ${token}` },
-    validateStatus: (status) => status === 302 || status === 200,
-  });
-
-  if (response.request?.responseURL) {
-    window.location.href = response.request.responseURL;
-  } else {
-    throw new Error("Erro ao obter URL de redirecionamento.");
+  try {
+    const response = await api.put(`/auth/profile`, profileData);
+    const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    const updatedUser = { ...currentUser, ...response.data };
+    localStorage.setItem('userInfo', JSON.stringify(updatedUser));
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Erro ao atualizar perfil.");
   }
 };
 
-// =========================
-// OUTROS (Simulados)
-// =========================
+export const updatePlan = async (planData: { planName: string }) => {
+  try {
+    const response = await api.put(`/auth/plan`, planData);
+    const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    currentUser.plan = response.data.plan;
+    localStorage.setItem('userInfo', JSON.stringify(currentUser));
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Erro ao atualizar plano.");
+  }
+};
 
+export const getFacebookLoginUrl = async (): Promise<void> => {
+  try {
+    const token = getToken();
+    if (!token) throw new Error("Token JWT não encontrado. Faça login novamente.");
+
+    const loginUrl = `${API_BASE_URL}/meta/login?token=${encodeURIComponent(token)}`;
+    const response = await api.get(loginUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+      validateStatus: (status) => status === 302 || status === 200,
+    });
+
+    if (response.request?.responseURL) {
+      window.location.href = response.request.responseURL;
+    } else {
+      throw new Error("Erro ao obter URL de redirecionamento.");
+    }
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Erro ao obter URL de login do Facebook.");
+  }
+};
+
+// Simulações
 export const getMenuItems = async () => {
   await new Promise(resolve => setTimeout(resolve, 300));
   return [
