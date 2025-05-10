@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const axios = require("axios");
 const User = require("../models/User");
 const { protect } = require("../middleware/authMiddleware");
+const bcrypt = require("bcryptjs");
 
 // Gera um token JWT válido por 7 dias
 const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -46,7 +47,10 @@ exports.registerUser = async (req, res) => {
       return res.status(400).json({ message: "Email já cadastrado" });
     }
 
-    const newUser = new User({ name, email, password });
+    // Criptografando a senha antes de salvar
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = new User({ name, email, password: hashedPassword });
     await newUser.save();
 
     const token = generateToken(newUser._id);
@@ -115,6 +119,9 @@ exports.facebookCallback = async (req, res) => {
         redirect_uri: redirectUri,
         code,
       },
+    }).catch(error => {
+      console.error("❌ Erro ao obter token de acesso do Facebook:", error.response?.data || error.message);
+      throw new Error("Erro ao obter token de acesso do Facebook");
     });
 
     const { access_token } = tokenResponse.data;
@@ -147,7 +154,10 @@ exports.facebookCallback = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Erro ao conectar Meta Ads:", error.response?.data || error.message);
-    res.status(500).json({ message: "Erro ao conectar com a conta Meta Ads" });
+    res.status(500).json({ 
+      message: "Erro ao conectar com a conta Meta Ads", 
+      error: error.response?.data || error.message 
+    });
   }
 };
 
