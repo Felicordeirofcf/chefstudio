@@ -1,22 +1,11 @@
 import { Button } from "../ui/button";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useToast } from "../../hooks/use-toast";
 
 export default function ConnectMeta() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Carregar SDK do Facebook assim que o componente for montado
-    (function (d, s, id) {
-      var js, fjs = d.getElementsByTagName(s)[0];
-      if (d.getElementById(id)) return;
-      js = d.createElement(s); js.id = id;
-      js.src = "https://connect.facebook.net/en_US/sdk.js";
-      fjs.parentNode.insertBefore(js, fjs);
-    })(document, "script", "facebook-jssdk");
-  }, []);
 
   const handleConnect = async () => {
     setLoading(true);
@@ -47,24 +36,6 @@ export default function ConnectMeta() {
       toast({
         title: "Erro",
         description: message,
-        variant: "destructive",
-      });
-      setLoading(false);
-    }
-  };
-
-  const responseFacebook = (response: any) => {
-    if (response.accessToken) {
-      // Aqui você pode passar o token de acesso para o seu backend
-      console.log("Facebook login success:", response);
-
-      // Redireciona o usuário para a próxima etapa
-      handleConnect();
-    } else {
-      setError("Erro no login do Facebook.");
-      toast({
-        title: "Erro",
-        description: "Falha no login do Facebook.",
         variant: "destructive",
       });
       setLoading(false);
@@ -105,19 +76,6 @@ export default function ConnectMeta() {
         >
           {loading ? "Redirecionando..." : "Conectar Instagram / Facebook"}
         </Button>
-
-        <div className="mt-6">
-          {/* Facebook Login Button */}
-          <FacebookLogin
-            appId="719838193777692" // Substitua pelo seu App ID
-            autoLoad={false}
-            fields="name,email,picture"
-            callback={responseFacebook}
-            icon="fa-facebook"
-            textButton="Conectar com Facebook"
-            cssClass="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-md font-semibold transition duration-300"
-          />
-        </div>
       </div>
     </div>
   );
