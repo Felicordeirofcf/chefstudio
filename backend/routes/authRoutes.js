@@ -88,7 +88,7 @@ router.post("/register", authController.registerUser);
 
 /**
  * @swagger
- * /api/auth/facebook/callback:
+ * /api/facebook/callback:
  *   get:
  *     summary: Callback de autenticação do Facebook
  *     tags: [Auth]
@@ -113,7 +113,7 @@ router.post("/register", authController.registerUser);
  *       500:
  *         description: Erro ao trocar código por token
  */
-router.get("/facebook/callback", authController.facebookCallback); // Simplificado
+router.get("/callback", authController.facebookCallback);
 
 /**
  * @swagger
