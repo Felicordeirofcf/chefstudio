@@ -90,21 +90,7 @@ router.post("/register", authController.registerUser);
  *       500:
  *         description: Erro ao trocar código por token
  */
-router.get("/facebook/callback", async (req, res) => {
-  const { code, userId } = req.query;
-
-  if (!code || !userId) {
-    return res.status(400).json({ message: "Código ou ID do usuário ausente" });
-  }
-
-  try {
-    // Chama o método do controller para realizar o callback
-    await authController.facebookCallback(req, res);
-  } catch (error) {
-    // Caso haja erro, retorna uma mensagem personalizada
-    res.status(500).json({ message: "Erro interno ao processar o callback", error: error.message });
-  }
-});
+router.get("/facebook/callback", authController.facebookCallback); // Simplificado
 
 /**
  * @swagger
