@@ -24,9 +24,13 @@ const BASE_URL = process.env.BASE_URL || (process.env.NODE_ENV === "production"
   : `http://localhost:${PORT}`);
 
 // -------------------- 🔗 MongoDB --------------------
-mongoose.connect(MONGO_URI)
+// A conexão com MongoDB agora será verificada
+mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log("🟢 MongoDB conectado com sucesso"))
-  .catch(err => console.error("🟡 Erro ao conectar com o MongoDB:", err));
+  .catch(err => {
+    console.error("🟡 Erro ao conectar com o MongoDB:", err);
+    process.exit(1); // Finaliza a aplicação em caso de erro na conexão
+  });
 
 // -------------------- 📘 Swagger --------------------
 const swaggerOptions = {
@@ -46,10 +50,10 @@ const swaggerOptions = {
         }
       }
     },
-    security: [{ bearerAuth: [] }],
+    security: [{ bearerAuth: [] }], // Garantindo que a autenticação esteja configurada para todas as rotas
     servers: [{ url: BASE_URL }]
   },
-  apis: ["./routes/*.js"]
+  apis: ["./routes/*.js"] // Garantir que as rotas de documentação estão no lugar correto
 };
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
