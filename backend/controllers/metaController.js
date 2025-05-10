@@ -28,7 +28,8 @@ exports.generateAdCaption = (req, res) => {
 exports.loginWithFacebook = (req, res) => {
   const appId = process.env.FB_APP_ID;
   const redirectUri = process.env.REDIRECT_URI; // ex: https://chefstudio.vercel.app/api/auth/facebook/callback
-  const scope = "public_profile,email,pages_read_engagement"; // Alterei os escopos para os mais comuns e necessários
+  const scope = "ads_management,business_management,pages_read_engagement,ads_read";
+ // Alterei os escopos para os mais comuns e necessários
 
   const token = req.query.token;
   if (!token) {
