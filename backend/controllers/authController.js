@@ -92,16 +92,21 @@ exports.getProfile = async (req, res) => {
 // --------- CALLBACK FACEBOOK ----------
 //
 exports.facebookCallback = async (req, res) => {
-  const { code, userId } = req.query;
+  const { code, state } = req.query;
 
-  if (!code || !userId) {
-    return res.status(400).json({ message: "Código ou ID do usuário ausente" });
+  // Verificando se o código e o state foram passados corretamente
+  if (!code || !state) {
+    return res.status(400).json({ message: "Código ou token ausente no callback" });
   }
 
-  const redirectUri = process.env.FACEBOOK_REDIRECT_URI || "https://chefstudio-production.up.railway.app/api/auth/facebook/callback";
-
   try {
+    // Validar o estado (token JWT) passado para garantir que a resposta é autêntica
+    const decoded = jwt.verify(state, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
     // Obtenção do token de acesso do Facebook
+    const redirectUri = process.env.FACEBOOK_REDIRECT_URI || "https://chefstudio-production.up.railway.app/api/auth/facebook/callback";
+    
     const tokenResponse = await axios.get("https://graph.facebook.com/v18.0/oauth/access_token", {
       params: {
         client_id: process.env.FACEBOOK_APP_ID,
@@ -113,14 +118,14 @@ exports.facebookCallback = async (req, res) => {
 
     const { access_token } = tokenResponse.data;
 
-    // Obtenção de informações do usuário
+    // Obtenção das informações do usuário
     const meResponse = await axios.get("https://graph.facebook.com/v18.0/me", {
       params: { access_token },
     });
 
     const metaUserId = meResponse.data.id;
 
-    // Atualização do usuário no banco de dados
+    // Atualização do usuário no banco de dados com o Meta ID e token
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       {
