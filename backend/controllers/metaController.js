@@ -15,7 +15,9 @@ exports.getMetaConnectionStatus = (req, res) => {
 
 exports.generateAdCaption = (req, res) => {
   const { productName } = req.body;
-  if (!productName) return res.status(400).json({ message: "Nome do produto é obrigatório." });
+  if (!productName) {
+    return res.status(400).json({ message: "Nome do produto é obrigatório." });
+  }
 
   const caption = `Experimente agora o incrível ${productName}! #oferta #delivery`;
   res.json({ caption });
@@ -26,10 +28,12 @@ exports.generateAdCaption = (req, res) => {
 exports.loginWithFacebook = (req, res) => {
   const appId = process.env.FB_APP_ID;
   const redirectUri = process.env.REDIRECT_URI; // ex: https://chefstudio.vercel.app/api/auth/facebook/callback
-  const scope = "ads_management,business_management,pages_show_list";
+  const scope = "public_profile,email,pages_read_engagement"; // Alterei os escopos para os mais comuns e necessários
 
   const token = req.query.token;
-  if (!token) return res.status(400).json({ message: "Token ausente na URL" });
+  if (!token) {
+    return res.status(400).json({ message: "Token ausente na URL" });
+  }
 
   const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&state=${encodeURIComponent(token)}`;
   return res.redirect(authUrl);
@@ -54,6 +58,7 @@ exports.facebookCallback = async (req, res) => {
     // Solicitar o token de acesso ao Facebook
     const tokenRes = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${params}`);
     const tokenData = await tokenRes.json();
+
     if (tokenData.error) {
       return res.status(400).json({ message: "Erro ao obter token do Facebook", error: tokenData.error });
     }
@@ -88,7 +93,9 @@ exports.facebookCallback = async (req, res) => {
 exports.getAdAccounts = async (req, res) => {
   try {
     const token = req.user.metaAccessToken;
-    if (!token) return res.status(400).json({ message: "Token Meta não encontrado. Conecte-se ao Facebook." });
+    if (!token) {
+      return res.status(400).json({ message: "Token Meta não encontrado. Conecte-se ao Facebook." });
+    }
 
     const response = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?access_token=${token}`);
     const data = await response.json();
@@ -115,7 +122,9 @@ exports.createMetaCampaign = async (req, res) => {
 
   try {
     const token = req.user.metaAccessToken;
-    if (!token) return res.status(400).json({ message: "Token Meta não encontrado." });
+    if (!token) {
+      return res.status(400).json({ message: "Token Meta não encontrado." });
+    }
 
     const response = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/campaigns`, {
       method: "POST",
@@ -150,7 +159,9 @@ exports.createAdSet = async (req, res) => {
 
   try {
     const token = req.user.metaAccessToken;
-    if (!token) return res.status(400).json({ message: "Token Meta não encontrado." });
+    if (!token) {
+      return res.status(400).json({ message: "Token Meta não encontrado." });
+    }
 
     const payload = {
       name,
@@ -198,7 +209,9 @@ exports.createAdCreative = async (req, res) => {
 
   try {
     const token = req.user.metaAccessToken;
-    if (!token) return res.status(400).json({ message: "Token Meta não encontrado." });
+    if (!token) {
+      return res.status(400).json({ message: "Token Meta não encontrado." });
+    }
 
     const creativeRes = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/adcreatives`, {
       method: "POST",
