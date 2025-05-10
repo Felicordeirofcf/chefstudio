@@ -106,8 +106,7 @@ exports.facebookCallback = async (req, res) => {
 
     // Obtenção do token de acesso do Facebook
     const redirectUri = process.env.FACEBOOK_REDIRECT_URI || "https://chefstudio-production.up.railway.app/api/auth/facebook/callback";
-    
-    // Corrigido: removeu a URL fixa e usa o `code` dinâmico
+
     const tokenResponse = await axios.get("https://graph.facebook.com/v18.0/oauth/access_token", {
       params: {
         client_id: process.env.FACEBOOK_APP_ID,
@@ -148,6 +147,40 @@ exports.facebookCallback = async (req, res) => {
   } catch (error) {
     console.error("❌ Erro ao conectar Meta Ads:", error.response?.data || error.message);
     res.status(500).json({ message: "Erro ao conectar com a conta Meta Ads" });
+  }
+};
+
+//
+// --------- LOGOUT FACEBOOK (Desconectar) ----------
+//
+exports.facebookLogout = async (req, res) => {
+  try {
+    const user = req.user; // O usuário autenticado
+    if (!user.metaUserId) {
+      return res.status(400).json({ message: "Nenhuma conta Meta conectada" });
+    }
+
+    // Remover as informações de conexão do Meta
+    const updatedUser = await User.findByIdAndUpdate(
+      user._id,
+      {
+        metaAccessToken: null,
+        metaUserId: null,
+        metaConnectionStatus: "disconnected",
+      },
+      { new: true }
+    );
+
+    res.status(200).json({
+      message: "Conta Meta desconectada com sucesso!",
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      metaConnectionStatus: updatedUser.metaConnectionStatus,
+    });
+  } catch (error) {
+    console.error("❌ Erro ao desconectar Meta Ads:", error.message);
+    res.status(500).json({ message: "Erro ao desconectar a conta Meta Ads" });
   }
 };
 

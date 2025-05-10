@@ -58,6 +58,13 @@ router.get("/status", protect, metaController.getMetaConnectionStatus);
  *     responses:
  *       200:
  *         description: Legenda gerada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 caption:
+ *                   type: string
  */
 router.post("/generate-caption", protect, metaController.generateAdCaption);
 
@@ -101,6 +108,10 @@ router.get("/login", metaController.loginWithFacebook);
  *     responses:
  *       200:
  *         description: Redirecionamento para dashboard após sucesso
+ *       400:
+ *         description: Código ou estado ausente ou inválido
+ *       500:
+ *         description: Erro ao trocar código por token
  */
 router.get("/callback", metaController.facebookCallback);
 
@@ -116,6 +127,22 @@ router.get("/callback", metaController.facebookCallback);
  *     responses:
  *       200:
  *         description: Lista de contas retornada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 adAccounts:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       account_status:
+ *                         type: string
  */
 router.get("/adaccounts", protect, metaController.getAdAccounts);
 
@@ -144,6 +171,20 @@ router.get("/adaccounts", protect, metaController.getAdAccounts);
  *     responses:
  *       201:
  *         description: Campanha criada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 campaign:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     status:
+ *                       type: string
  */
 router.post("/create-campaign", protect, metaController.createMetaCampaign);
 
@@ -157,6 +198,20 @@ router.post("/create-campaign", protect, metaController.createMetaCampaign);
  *     responses:
  *       201:
  *         description: Ad Set criado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 adset:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     status:
+ *                       type: string
  */
 router.post("/create-adset", protect, metaController.createAdSet);
 
@@ -170,6 +225,20 @@ router.post("/create-adset", protect, metaController.createAdSet);
  *     responses:
  *       201:
  *         description: Anúncio criado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ad:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     status:
+ *                       type: string
  */
 router.post("/create-ad", protect, metaController.createAdCreative);
 

@@ -33,6 +33,23 @@ const { protect } = require("../middleware/authMiddleware");
  *     responses:
  *       200:
  *         description: Login realizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                 _id:
+ *                   type: string
+ *                 name:
+ *                   type: string
+ *                 email:
+ *                   type: string
+ *                 metaUserId:
+ *                   type: string
+ *                 metaConnectionStatus:
+ *                   type: string
  *       401:
  *         description: Credenciais inválidas
  */
@@ -82,11 +99,17 @@ router.post("/register", authController.registerUser);
  *           type: string
  *         required: true
  *         description: Código de autorização do Facebook
+ *       - in: query
+ *         name: state
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Token JWT que representa o usuário autenticado
  *     responses:
  *       200:
  *         description: Conta conectada com sucesso
  *       400:
- *         description: Código ausente ou inválido
+ *         description: Código ou estado ausente ou inválido
  *       500:
  *         description: Erro ao trocar código por token
  */
@@ -103,8 +126,28 @@ router.get("/facebook/callback", authController.facebookCallback); // Simplifica
  *     responses:
  *       200:
  *         description: Perfil do usuário retornado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 _id:
+ *                   type: string
+ *                 name:
+ *                   type: string
+ *                 email:
+ *                   type: string
+ *                 metaUserId:
+ *                   type: string
+ *                 metaConnectionStatus:
+ *                   type: string
+ *                 plan:
+ *                   type: string
+ *                   nullable: true
  *       401:
  *         description: Não autorizado
+ *       404:
+ *         description: Usuário não encontrado
  */
 router.get("/profile", protect, authController.getProfile);
 
