@@ -27,7 +27,7 @@ exports.generateAdCaption = (req, res) => {
 
 exports.loginWithFacebook = (req, res) => {
   const appId = process.env.FB_APP_ID;
-  const redirectUri = process.env.REDIRECT_URI; // ex: https://chefstudio.vercel.app/api/auth/facebook/callback
+  const redirectUri = process.env.FACEBOOK_REDIRECT_URI; // Corrigido para FACEBOOK_REDIRECT_URI
   const scope = "ads_management,business_management,pages_read_engagement,ads_read";
  // Alterei os escopos para os mais comuns e necessários
 
@@ -42,7 +42,7 @@ exports.loginWithFacebook = (req, res) => {
 
 exports.facebookCallback = async (req, res) => {
   const { code, state } = req.query;
-  const redirectUri = process.env.REDIRECT_URI;
+  const redirectUri = process.env.FACEBOOK_REDIRECT_URI; // Corrigido para FACEBOOK_REDIRECT_URI
 
   if (!code || !state) {
     return res.status(400).json({ message: "Código ou token ausente no callback" });
@@ -263,3 +263,4 @@ exports.createAdCreative = async (req, res) => {
     res.status(500).json({ message: "Erro interno ao criar anúncio" });
   }
 };
+
