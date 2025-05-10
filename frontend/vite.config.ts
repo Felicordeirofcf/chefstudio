@@ -1,3 +1,7 @@
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { fileURLToPath, URL } from 'node:url';
+
 export default defineConfig(({ mode }) => {
   const isDev = mode === "development";
 
@@ -12,7 +16,7 @@ export default defineConfig(({ mode }) => {
       ? {
           proxy: {
             "/api": {
-              target: process.env.VITE_API_URL || "http://localhost:3001", // Usando variável de ambiente
+              target: process.env.VITE_API_URL || "https://chefstudio-production.up.railway.app", // Usando variável de ambiente
               changeOrigin: true,
               secure: false,
             },
