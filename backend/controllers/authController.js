@@ -108,13 +108,14 @@ exports.facebookCallback = async (req, res) => {
     const decoded = jwt.verify(state, process.env.JWT_SECRET);
     const userId = decoded.id;
 
-    // Obtenção do token de acesso do Facebook
+    // Adicionando o console.log para verificar o valor do FACEBOOK_APP_ID
+    console.log("FACEBOOK_APP_ID:", process.env.FACEBOOK_APP_ID);  // Verifique se o ID está sendo carregado corretamente
+
     const redirectUri = process.env.FACEBOOK_REDIRECT_URI || "https://chefstudio-production.up.railway.app/api/auth/facebook/callback";
-    
-    // Obter token de acesso do Facebook
+
     const tokenResponse = await axios.get("https://graph.facebook.com/v18.0/oauth/access_token", {
       params: {
-        client_id: process.env.FACEBOOK_APP_ID,
+        client_id: process.env.FACEBOOK_APP_ID,  // Certifique-se de que esta variável está correta
         client_secret: process.env.FACEBOOK_APP_SECRET,
         redirect_uri: redirectUri,
         code,
