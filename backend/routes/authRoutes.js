@@ -98,9 +98,11 @@ router.get("/facebook/callback", async (req, res) => {
   }
 
   try {
+    // Chama o método do controller para realizar o callback
     await authController.facebookCallback(req, res);
   } catch (error) {
-    res.status(500).json({ message: "Erro interno ao processar o callback" });
+    // Caso haja erro, retorna uma mensagem personalizada
+    res.status(500).json({ message: "Erro interno ao processar o callback", error: error.message });
   }
 });
 
