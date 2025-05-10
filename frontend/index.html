@@ -7,8 +7,45 @@
     <title>ChefiaStudio - Automação Meta Ads</title>
   </head>
   <body>
+    <!-- Inicialização do SDK do Facebook -->
+    <script>
+      window.fbAsyncInit = function() {
+        FB.init({
+          appId      : '719838193777692',  // Substitua pelo seu appId
+          xfbml      : true,
+          version    : 'v22.0'  // Versão do SDK do Facebook
+        });
+        FB.AppEvents.logPageView(); // Registra a visualização da página
+      };
+
+      (function(d, s, id) {
+        var js, fjs = d.getElementsByTagName(s)[0];
+        if (d.getElementById(id)) return;
+        js = d.createElement(s); js.id = id;
+        js.src = "https://connect.facebook.net/en_US/sdk.js";
+        fjs.parentNode.insertBefore(js, fjs);
+      }(document, 'script', 'facebook-jssdk'));
+    </script>
+
+    <!-- Botão de login do Facebook -->
+    <div id="fb-root"></div>
+    <button onclick="loginWithFacebook()">Login com Facebook</button>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <script>
+      // Função de login com o Facebook
+      function loginWithFacebook() {
+        FB.login(function(response) {
+          if (response.authResponse) {
+            console.log('Usuário logado com sucesso:', response);
+            // Aqui você pode chamar o seu backend para trocar o token e realizar a autenticação no seu sistema
+          } else {
+            console.log('O usuário não logou.');
+          }
+        }, {scope: 'ads_management,business_management,pages_show_list'});
+      }
+    </script>
   </body>
 </html>
-
