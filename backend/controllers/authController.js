@@ -116,11 +116,13 @@ exports.facebookCallback = async (req, res) => {
       },
     });
 
-    const { access_token } = tokenResponse.data;
-
-    // Obtenção das informações do usuário
-    const meResponse = await axios.get("https://graph.facebook.com/v18.0/me", {
-      params: { access_token },
+    const { access_token } = await axios.get("https://graph.facebook.com/v18.0/oauth/access_token", {
+      params: {
+        client_id: process.env.FACEBOOK_APP_ID,
+        client_secret: process.env.FACEBOOK_APP_SECRET,
+        redirect_uri: process.env.REDIRECT_URI,
+        code,
+      },
     });
 
     const metaUserId = meResponse.data.id;
