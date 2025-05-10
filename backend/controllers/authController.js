@@ -1,201 +1,265 @@
+const fetch = require("node-fetch");
+const qs = require("querystring");
 const jwt = require("jsonwebtoken");
-const axios = require("axios");
 const User = require("../models/User");
-const { protect } = require("../middleware/authMiddleware");
 
-// Gera um token JWT válido por 7 dias
-const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+// ----------- SIMULAÇÕES -----------
 
-//
-// --------- LOGIN ----------
-//
-exports.loginUser = async (req, res) => {
-  const { email, password } = req.body;
-
-  try {
-    const user = await User.findOne({ email });
-    if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ message: "Credenciais inválidas" });
-    }
-
-    const token = generateToken(user._id);
-
-    res.json({
-      token,
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      metaUserId: user.metaUserId,
-      metaConnectionStatus: user.metaConnectionStatus,
-    });
-  } catch (err) {
-    console.error("❌ Erro no login:", err);
-    res.status(500).json({ message: "Erro ao autenticar usuário" });
-  }
+exports.connectMetaAccount = (req, res) => {
+  res.json({ message: "Conexão simulada com Meta Ads." });
 };
 
-//
-// --------- REGISTRO ----------
-//
-exports.registerUser = async (req, res) => {
-  const { name, email, password } = req.body;
-
-  try {
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: "Email já cadastrado" });
-    }
-
-    const newUser = new User({ name, email, password });
-    await newUser.save();
-
-    const token = generateToken(newUser._id);
-
-    res.status(201).json({
-      token,
-      _id: newUser._id,
-      name: newUser.name,
-      email: newUser.email,
-      metaUserId: newUser.metaUserId,
-      metaConnectionStatus: newUser.metaConnectionStatus,
-    });
-  } catch (err) {
-    console.error("❌ Erro ao registrar:", err);
-    res.status(500).json({ message: "Erro ao registrar usuário" });
-  }
+exports.getMetaConnectionStatus = (req, res) => {
+  res.json({ connected: false, message: "Simulação de status de conexão com Meta Ads." });
 };
 
-//
-// --------- PERFIL AUTENTICADO ----------
-//
-exports.getProfile = async (req, res) => {
-  try {
-    const user = req.user;
-
-    if (!user) return res.status(404).json({ message: "Usuário não encontrado" });
-
-    res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      metaUserId: user.metaUserId,
-      metaConnectionStatus: user.metaConnectionStatus,
-      plan: user.plan || null,
-    });
-  } catch (err) {
-    console.error("❌ Erro ao buscar perfil:", err);
-    res.status(500).json({ message: "Erro ao buscar perfil do usuário" });
+exports.generateAdCaption = (req, res) => {
+  const { productName } = req.body;
+  if (!productName) {
+    return res.status(400).json({ message: "Nome do produto é obrigatório." });
   }
+
+  const caption = `Experimente agora o incrível ${productName}! #oferta #delivery`;
+  res.json({ caption });
 };
 
-//
-// --------- CALLBACK FACEBOOK ----------
-//
+// ----------- LOGIN REAL COM FACEBOOK -----------
+
+exports.loginWithFacebook = (req, res) => {
+  const appId = process.env.FB_APP_ID;
+  const redirectUri = process.env.REDIRECT_URI; // ex: https://chefstudio.vercel.app/api/auth/facebook/callback
+  const scope = "ads_management,business_management,pages_read_engagement,ads_read";
+ // Alterei os escopos para os mais comuns e necessários
+
+  const token = req.query.token;
+  if (!token) {
+    return res.status(400).json({ message: "Token ausente na URL" });
+  }
+
+  const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&state=${encodeURIComponent(token)}`;
+  return res.redirect(authUrl);
+};
+
 exports.facebookCallback = async (req, res) => {
   const { code, state } = req.query;
+  const redirectUri = process.env.REDIRECT_URI;
 
-  // Verificando se o código e o state foram passados corretamente
   if (!code || !state) {
     return res.status(400).json({ message: "Código ou token ausente no callback" });
   }
 
   try {
-    // Validar o estado (token JWT) passado para garantir que a resposta é autêntica
-    const decoded = jwt.verify(state, process.env.JWT_SECRET);
-    const userId = decoded.id;
-
-    // Obtenção do token de acesso do Facebook
-    const redirectUri = process.env.FACEBOOK_REDIRECT_URI || "https://chefstudio-production.up.railway.app/api/auth/facebook/callback";
-    
-    // Obter token de acesso do Facebook
-    const tokenResponse = await axios.get("https://graph.facebook.com/v18.0/oauth/access_token", {
-      params: {
-        client_id: process.env.FACEBOOK_APP_ID,
-        client_secret: process.env.FACEBOOK_APP_SECRET,
-        redirect_uri: redirectUri,
-        code,
-      },
+    const params = qs.stringify({
+      client_id: process.env.FB_APP_ID,
+      redirect_uri: redirectUri,
+      client_secret: process.env.FB_APP_SECRET,
+      code,
     });
 
-    const { access_token } = tokenResponse.data;
+    // Solicitar o token de acesso ao Facebook
+    const tokenRes = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${params}`);
+    const tokenData = await tokenRes.json();
 
-    // Obtenção das informações do usuário do Facebook
-    const meResponse = await axios.get("https://graph.facebook.com/v18.0/me", {
-      params: { access_token },
-    });
-
-    const metaUserId = meResponse.data.id;
-
-    // Atualização do usuário no banco de dados com o Meta ID e token
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      {
-        metaAccessToken: access_token,
-        metaUserId,
-        metaConnectionStatus: "connected",
-      },
-      { new: true }
-    );
-
-    res.status(200).json({
-      message: "Conta Meta conectada com sucesso!",
-      _id: updatedUser._id,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      metaUserId: updatedUser.metaUserId,
-      metaConnectionStatus: updatedUser.metaConnectionStatus,
-    });
-  } catch (error) {
-    console.error("❌ Erro ao conectar Meta Ads:", error.response?.data || error.message);
-    res.status(500).json({ message: "Erro ao conectar com a conta Meta Ads" });
-  }
-};
-
-//
-// --------- LOGOUT FACEBOOK (Desconectar) ----------
-//
-exports.facebookLogout = async (req, res) => {
-  try {
-    const user = req.user; // O usuário autenticado
-    if (!user.metaUserId) {
-      return res.status(400).json({ message: "Nenhuma conta Meta conectada" });
+    if (tokenData.error) {
+      return res.status(400).json({ message: "Erro ao obter token do Facebook", error: tokenData.error });
     }
 
-    // Remover as informações de conexão do Meta
-    const updatedUser = await User.findByIdAndUpdate(
-      user._id,
-      {
-        metaAccessToken: null,
-        metaUserId: null,
-        metaConnectionStatus: "disconnected",
-      },
-      { new: true }
-    );
+    // Obter informações do usuário
+    const meRes = await fetch(`https://graph.facebook.com/me?access_token=${tokenData.access_token}`);
+    const meData = await meRes.json();
 
-    res.status(200).json({
-      message: "Conta Meta desconectada com sucesso!",
-      _id: updatedUser._id,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      metaConnectionStatus: updatedUser.metaConnectionStatus,
-    });
-  } catch (error) {
-    console.error("❌ Erro ao desconectar Meta Ads:", error.message);
-    res.status(500).json({ message: "Erro ao desconectar a conta Meta Ads" });
+    // Verificação de usuário no banco
+    const decoded = jwt.verify(state, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    // Atualizar o usuário com as informações do Meta
+    user.metaAccessToken = tokenData.access_token;
+    user.metaUserId = meData.id;
+    user.metaConnectionStatus = "connected";
+    await user.save();
+
+    console.log("✅ Token Meta salvo para:", user.email);
+    return res.redirect("https://chefstudio.vercel.app/dashboard");
+  } catch (err) {
+    console.error("❌ Erro no callback do Facebook:", err);
+    return res.status(500).send("Erro ao processar conexão com o Facebook");
   }
 };
 
-/**
- * @swagger
- * /api/auth/profile:
- *   get:
- *     summary: Retorna o perfil do usuário autenticado
- *     tags: [Auth]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Dados do perfil retornados com sucesso
- *       401:
- *         description: Não autorizado
- */
+// ----------- CONTAS DE ANÚNCIO -----------
+
+exports.getAdAccounts = async (req, res) => {
+  try {
+    const token = req.user.metaAccessToken;
+    if (!token) {
+      return res.status(400).json({ message: "Token Meta não encontrado. Conecte-se ao Facebook." });
+    }
+
+    const response = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?access_token=${token}`);
+    const data = await response.json();
+
+    if (data.error) {
+      return res.status(400).json({ message: "Erro ao obter contas de anúncio", error: data.error });
+    }
+
+    res.json({ adAccounts: data.data });
+  } catch (err) {
+    console.error("❌ Erro ao buscar contas:", err);
+    res.status(500).json({ message: "Erro interno ao buscar contas" });
+  }
+};
+
+// ----------- CAMPANHA -----------
+
+exports.createMetaCampaign = async (req, res) => {
+  const { adAccountId, name, objective = "LINK_CLICKS", status = "PAUSED" } = req.body;
+
+  if (!adAccountId || !name) {
+    return res.status(400).json({ message: "adAccountId e name são obrigatórios." });
+  }
+
+  try {
+    const token = req.user.metaAccessToken;
+    if (!token) {
+      return res.status(400).json({ message: "Token Meta não encontrado." });
+    }
+
+    const response = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/campaigns`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, objective, status, access_token: token })
+    });
+
+    const data = await response.json();
+    if (data.error) {
+      return res.status(400).json({ message: "Erro ao criar campanha", error: data.error });
+    }
+
+    res.status(201).json({ message: "Campanha criada com sucesso!", campaign: data });
+  } catch (err) {
+    console.error("❌ Erro ao criar campanha:", err);
+    res.status(500).json({ message: "Erro interno ao criar campanha" });
+  }
+};
+
+// ----------- AD SET -----------
+
+exports.createAdSet = async (req, res) => {
+  const {
+    adAccountId, campaignId, name, daily_budget,
+    start_time, end_time, optimization_goal = "LINK_CLICKS",
+    billing_event = "IMPRESSIONS", geo_locations
+  } = req.body;
+
+  if (!adAccountId || !campaignId || !name || !daily_budget || !start_time || !end_time) {
+    return res.status(400).json({ message: "Campos obrigatórios ausentes para o Ad Set." });
+  }
+
+  try {
+    const token = req.user.metaAccessToken;
+    if (!token) {
+      return res.status(400).json({ message: "Token Meta não encontrado." });
+    }
+
+    const payload = {
+      name,
+      campaign_id: campaignId,
+      daily_budget,
+      billing_event,
+      optimization_goal,
+      start_time,
+      end_time,
+      targeting: {
+        geo_locations: geo_locations || { countries: ["BR"] },
+        age_min: 18,
+        age_max: 65
+      },
+      status: "PAUSED",
+      access_token: token
+    };
+
+    const response = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/adsets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    if (data.error) {
+      return res.status(400).json({ message: "Erro ao criar Ad Set", error: data.error });
+    }
+
+    res.status(201).json({ message: "Ad Set criado com sucesso!", adset: data });
+  } catch (err) {
+    console.error("❌ Erro ao criar Ad Set:", err);
+    res.status(500).json({ message: "Erro interno ao criar Ad Set" });
+  }
+};
+
+// ----------- AD CREATIVE + ANÚNCIO -----------
+
+exports.createAdCreative = async (req, res) => {
+  const { adAccountId, adSetId, name, pageId, message, link, image_url } = req.body;
+
+  if (!adAccountId || !adSetId || !name || !pageId || !message || !link || !image_url) {
+    return res.status(400).json({ message: "Todos os campos são obrigatórios para criar o anúncio." });
+  }
+
+  try {
+    const token = req.user.metaAccessToken;
+    if (!token) {
+      return res.status(400).json({ message: "Token Meta não encontrado." });
+    }
+
+    const creativeRes = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/adcreatives`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        object_story_spec: {
+          page_id: pageId,
+          link_data: {
+            message,
+            link,
+            image_url,
+            call_to_action: {
+              type: "LEARN_MORE",
+              value: { link }
+            }
+          }
+        },
+        access_token: token
+      })
+    });
+
+    const creativeData = await creativeRes.json();
+    if (creativeData.error) {
+      return res.status(400).json({ message: "Erro ao criar Ad Creative", error: creativeData.error });
+    }
+
+    const adRes = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/ads`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        adset_id: adSetId,
+        creative: { creative_id: creativeData.id },
+        status: "PAUSED",
+        access_token: token
+      })
+    });
+
+    const adData = await adRes.json();
+    if (adData.error) {
+      return res.status(400).json({ message: "Erro ao criar anúncio", error: adData.error });
+    }
+
+    res.status(201).json({ message: "Anúncio criado com sucesso!", ad: adData });
+  } catch (err) {
+    console.error("❌ Erro ao criar anúncio:", err);
+    res.status(500).json({ message: "Erro interno ao criar anúncio" });
+  }
+};
