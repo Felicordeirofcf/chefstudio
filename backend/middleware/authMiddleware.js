@@ -41,7 +41,7 @@ exports.protect = async (req, res, next) => {
     req.user = user;
     next();
   } catch (err) {
-    console.error("❌ Erro ao verificar token JWT:", err.message);
+    console.error("❌ Erro ao verificar token JWT:", err);
     return res.status(500).json({
       message: "Erro interno na autenticação.",
       error: err.message,

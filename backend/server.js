@@ -60,10 +60,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 // -------------------- 🌐 CORS --------------------
 
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS.split(",") || [
-    "http://localhost:5173", 
-    "https://chefstudio.vercel.app"
-  ], // Usando variáveis de ambiente para URLs permitidas
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : ["http://localhost:5173", "https://chefstudio.vercel.app"], // Usando variáveis de ambiente para URLs permitidas
   credentials: true
 }));
 
