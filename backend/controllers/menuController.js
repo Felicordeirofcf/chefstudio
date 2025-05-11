@@ -1,120 +1,138 @@
-const MenuItem = require("../models/MenuItem"); // Assuming model is defined
+const MenuItem = require("../models/MenuItem");
+const mongoose = require("mongoose");
 
-// Simulated in-memory storage for menu items (replace with DB interaction later)
-let simulatedMenu = [
-    { _id: "sim_menu_1", name: "Hambúrguer Clássico", price: 25.50, category: "Hambúrgueres", owner: "sim_test_user_123", imageUrl: "https://via.placeholder.com/150x100.png?text=Hambúrguer" },
-    { _id: "sim_menu_2", name: "Batata Frita", price: 12.00, category: "Acompanhamentos", owner: "sim_test_user_123", imageUrl: "https://via.placeholder.com/150x100.png?text=Batata+Frita" },
-    { _id: "sim_menu_3", name: "Refrigerante Lata", price: 5.00, category: "Bebidas", owner: "sim_test_user_123", imageUrl: "https://via.placeholder.com/150x100.png?text=Refrigerante" },
-];
-
-// @desc    Get all menu items for the logged-in user (Simulated)
+// @desc    Get all menu items
 // @route   GET /api/menu
-// @access  Private (Placeholder)
+// @access  Public (temporarily, until auth is fully enforced)
 const getAllMenuItems = async (req, res) => {
-    // In real app, get owner ID from req.user (set by protect middleware)
-    const ownerId = "sim_test_user_123"; 
-    console.log("Simulating fetching all menu items for owner:", ownerId);
-
-    // Simulate fetching items for the user
-    const userMenu = simulatedMenu.filter(item => item.owner === ownerId);
-    
-    res.json(userMenu);
+  try {
+    const menuItems = await MenuItem.find({}); // Fetches all items for now
+    res.json(menuItems);
+  } catch (error) {
+    console.error("Erro ao buscar itens do cardápio:", error);
+    res.status(500).json({ message: "Erro interno do servidor ao buscar itens do cardápio." });
+  }
 };
 
-// @desc    Add a new menu item (Simulated)
+// @desc    Add a new menu item
 // @route   POST /api/menu
-// @access  Private (Placeholder)
+// @access  Private (once protect middleware is active)
 const addMenuItem = async (req, res) => {
-    const { name, description, price, category, imageUrl } = req.body;
-    const ownerId = "sim_test_user_123"; // Get from token later
+  const { name, description, price, category, imageUrl } = req.body;
+  const ownerId = req.user?.id || null;
 
-    console.log("Simulating adding menu item for owner:", ownerId);
+  if (!name || price === undefined) {
+    return res.status(400).json({ message: "Nome e preço são obrigatórios." });
+  }
 
-    // Simulate basic validation
-    if (!name || !price) {
-        return res.status(400).json({ message: "Nome e preço são obrigatórios." });
+  try {
+    const newItem = new MenuItem({
+      name,
+      description,
+      price,
+      category,
+      imageUrl,
+      // ownerId, // Descomente quando o 'protect' estiver ativo e ownerId for obrigatório
+    });
+    const savedItem = await newItem.save();
+    res.status(201).json(savedItem);
+  } catch (error) {
+    console.error("Erro ao adicionar item ao cardápio:", error);
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: "Erro de validação", errors: error.errors });
     }
-
-    // Simulate creating new item
-    const newItem = {
-        _id: `sim_menu_${Date.now()}`,
-        name,
-        description,
-        price,
-        category,
-        imageUrl: imageUrl || "https://via.placeholder.com/150x100.png?text=Novo+Item",
-        owner: ownerId,
-    };
-    simulatedMenu.push(newItem);
-    console.log("Simulated item added:", newItem);
-
-    res.status(201).json(newItem);
+    res.status(500).json({ message: "Erro interno do servidor ao adicionar item ao cardápio." });
+  }
 };
 
-// @desc    Get a specific menu item by ID (Simulated)
+// @desc    Get a menu item by ID
 // @route   GET /api/menu/:id
-// @access  Private (Placeholder)
+// @access  Public (temporarily)
 const getMenuItemById = async (req, res) => {
-    const itemId = req.params.id;
-    const ownerId = "sim_test_user_123"; // Get from token later
-    console.log(`Simulating fetching menu item ${itemId} for owner ${ownerId}`);
-
-    // Simulate finding the item
-    const item = simulatedMenu.find(i => i._id === itemId && i.owner === ownerId);
-
-    if (item) {
-        res.json(item);
-    } else {
-        res.status(404).json({ message: "Item do cardápio não encontrado (simulado)." });
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "ID de item inválido." });
     }
+    const menuItem = await MenuItem.findById(req.params.id);
+    if (menuItem) {
+      res.json(menuItem);
+    } else {
+      res.status(404).json({ message: "Item do cardápio não encontrado." });
+    }
+  } catch (error) {
+    console.error("Erro ao buscar item do cardápio por ID:", error);
+    res.status(500).json({ message: "Erro interno do servidor ao buscar item do cardápio." });
+  }
 };
 
-// @desc    Update a menu item (Simulated)
+// @desc    Update a menu item
 // @route   PUT /api/menu/:id
-// @access  Private (Placeholder)
+// @access  Private (once protect middleware is active)
 const updateMenuItem = async (req, res) => {
-    const itemId = req.params.id;
-    const ownerId = "sim_test_user_123"; // Get from token later
-    const updates = req.body;
-    console.log(`Simulating updating menu item ${itemId} for owner ${ownerId} with data:`, updates);
-
-    // Simulate finding and updating the item
-    const itemIndex = simulatedMenu.findIndex(i => i._id === itemId && i.owner === ownerId);
-
-    if (itemIndex !== -1) {
-        simulatedMenu[itemIndex] = { ...simulatedMenu[itemIndex], ...updates };
-        console.log("Simulated item updated:", simulatedMenu[itemIndex]);
-        res.json(simulatedMenu[itemIndex]);
-    } else {
-        res.status(404).json({ message: "Item do cardápio não encontrado (simulado)." });
+  const { name, description, price, category, imageUrl } = req.body;
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "ID de item inválido." });
     }
+    const menuItem = await MenuItem.findById(req.params.id);
+
+    if (menuItem) {
+      // Adicionar verificação de proprietário aqui se necessário, quando auth estiver completo
+      // if (menuItem.ownerId && menuItem.ownerId.toString() !== req.user.id) {
+      //   return res.status(401).json({ message: "Não autorizado a atualizar este item." });
+      // }
+
+      menuItem.name = name || menuItem.name;
+      menuItem.description = description || menuItem.description;
+      menuItem.price = price !== undefined ? price : menuItem.price;
+      menuItem.category = category || menuItem.category;
+      menuItem.imageUrl = imageUrl || menuItem.imageUrl;
+
+      const updatedItem = await menuItem.save();
+      res.json(updatedItem);
+    } else {
+      res.status(404).json({ message: "Item do cardápio não encontrado para atualização." });
+    }
+  } catch (error) {
+    console.error("Erro ao atualizar item do cardápio:", error);
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: "Erro de validação", errors: error.errors });
+    }
+    res.status(500).json({ message: "Erro interno do servidor ao atualizar item do cardápio." });
+  }
 };
 
-// @desc    Delete a menu item (Simulated)
+// @desc    Delete a menu item
 // @route   DELETE /api/menu/:id
-// @access  Private (Placeholder)
+// @access  Private (once protect middleware is active)
 const deleteMenuItem = async (req, res) => {
-    const itemId = req.params.id;
-    const ownerId = "sim_test_user_123"; // Get from token later
-    console.log(`Simulating deleting menu item ${itemId} for owner ${ownerId}`);
-
-    // Simulate finding and deleting the item
-    const initialLength = simulatedMenu.length;
-    simulatedMenu = simulatedMenu.filter(i => !(i._id === itemId && i.owner === ownerId));
-
-    if (simulatedMenu.length < initialLength) {
-        console.log("Simulated item deleted.");
-        res.json({ message: "Item do cardápio removido com sucesso (simulado)." });
-    } else {
-        res.status(404).json({ message: "Item do cardápio não encontrado (simulado)." });
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "ID de item inválido." });
     }
+    const menuItem = await MenuItem.findById(req.params.id);
+
+    if (menuItem) {
+      // Adicionar verificação de proprietário aqui se necessário
+      // if (menuItem.ownerId && menuItem.ownerId.toString() !== req.user.id) {
+      //   return res.status(401).json({ message: "Não autorizado a deletar este item." });
+      // }
+      await menuItem.deleteOne(); // Usar deleteOne() ou remove() dependendo da versão do Mongoose
+      res.json({ message: "Item do cardápio removido com sucesso." });
+    } else {
+      res.status(404).json({ message: "Item do cardápio não encontrado para remoção." });
+    }
+  } catch (error) {
+    console.error("Erro ao remover item do cardápio:", error);
+    res.status(500).json({ message: "Erro interno do servidor ao remover item do cardápio." });
+  }
 };
 
-module.exports = {
-    getAllMenuItems,
-    addMenuItem,
-    getMenuItemById,
-    updateMenuItem,
-    deleteMenuItem,
+module.exports = { 
+  getAllMenuItems, 
+  addMenuItem, 
+  getMenuItemById, 
+  updateMenuItem, 
+  deleteMenuItem 
 };
 
