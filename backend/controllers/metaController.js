@@ -4,14 +4,58 @@ const qs = require("querystring");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
-// ----------- SIMULAÇÕES -----------
+// ----------- CONEXÃO COM META ADS -----------
 
-exports.connectMetaAccount = (req, res) => {
-  res.json({ message: "Conexão simulada com Meta Ads." });
+exports.connectMetaAccount = async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "Usuário não autenticado." });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "Usuário não encontrado." });
+    }
+
+    // Gerar token JWT para ser usado como state no fluxo OAuth
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    
+    // Redirecionar para o endpoint de login com Facebook
+    const redirectUrl = `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/meta/facebook/login?token=${token}`;
+    
+    res.json({ 
+      message: "Iniciando conexão com Meta Ads", 
+      redirectUrl 
+    });
+  } catch (err) {
+    console.error("❌ Erro ao iniciar conexão com Meta Ads:", err.message);
+    res.status(500).json({ message: "Erro ao iniciar conexão com Meta Ads" });
+  }
 };
 
-exports.getMetaConnectionStatus = (req, res) => {
-  res.json({ connected: false, message: "Simulação de status de conexão com Meta Ads." });
+exports.getMetaConnectionStatus = async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "Usuário não autenticado." });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "Usuário não encontrado." });
+    }
+
+    const connected = user.metaConnectionStatus === "connected" && user.metaAccessToken;
+    const adAccountId = user.metaAdAccountId || null;
+    
+    res.json({ 
+      connected, 
+      adAccountId,
+      message: connected ? "Conectado ao Meta Ads" : "Não conectado ao Meta Ads" 
+    });
+  } catch (err) {
+    console.error("❌ Erro ao verificar status de conexão com Meta Ads:", err.message);
+    res.status(500).json({ message: "Erro ao verificar status de conexão com Meta Ads" });
+  }
 };
 
 exports.generateAdCaption = (req, res) => {
@@ -167,11 +211,7 @@ exports.facebookCallback = async (req, res) => {
 exports.getAdAccounts = async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
-<<<<<<< HEAD
-        return res.status(401).json({ message: "Usuário não autenticado."})S
-=======
-        return res.status(401).json({ message: "Usuário não autenticado."});
->>>>>>> 1e8ba970 (Refactor: Remove backend folders (middleware, models, routes) from root and ensure .gitignore)
+        return res.status(401).json({ message: "Usuário não autenticado."})
     }
     // Busca o usuário mais recente do DB para garantir que temos o metaAccessToken atualizado
     const currentUser = await User.findById(req.user.id);

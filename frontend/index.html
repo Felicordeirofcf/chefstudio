@@ -5,29 +5,12 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ChefiaStudio - Automação Meta Ads</title>
+    <script type="module" crossorigin src="/assets/index-C4LUJIku.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-B-DXLEj-.js">
+    <link rel="stylesheet" crossorigin href="/assets/vendor-Dgihpmma.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-CPtU9K3u.css">
   </head>
   <body>
-    <!-- Inicialização do SDK do Facebook -->
-    
-    <!-- Botão de login do Facebook -->
-    <div id="fb-root"></div>
-    <button onclick="loginWithFacebook()">Login com Facebook</button>
-
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-
-    <script>
-      // Função de login com o Facebook
-      function loginWithFacebook() {
-        FB.login(function(response) {
-          if (response.authResponse) {
-            console.log('Usuário logado com sucesso:', response);
-            // Aqui você pode chamar o seu backend para trocar o token e realizar a autenticação no seu sistema
-          } else {
-            console.log('O usuário não logou.');
-          }
-        }, {scope: 'ads_management,business_management,pages_show_list'});
-      }
-    </script>
   </body>
 </html>

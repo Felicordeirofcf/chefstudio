@@ -1,51 +1,33 @@
-const jwt = require("jsonwebtoken");
-const User = require("../models/User");
-
-// -------------------- 🔒 Middleware de autenticação --------------------
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 exports.protect = async (req, res, next) => {
-  try {
-    // Verifica se o cabeçalho Authorization está presente
-    const authHeader = req.headers.authorization;
+  let token;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({
-        message: "Token JWT ausente ou malformado no cabeçalho Authorization.",
-      });
-    }
-
-    // Extrai o token
-    const token = authHeader.split(" ")[1];
-
-    // Verifica e decodifica o token
-    let decoded;
+  // Verificar se o token está no header Authorization
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      // Obter o token do header
+      token = req.headers.authorization.split(' ')[1];
+
+      // Verificar o token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+      // Buscar o usuário pelo ID e não incluir a senha
+      req.user = await User.findById(decoded.id).select('-password');
+
+      if (!req.user) {
+        return res.status(401).json({ message: 'Usuário não encontrado' });
+      }
+
+      next();
     } catch (error) {
-      return res.status(401).json({
-        message: "Token inválido ou expirado.",
-        error: error.message,
-      });
+      console.error('❌ Erro de autenticação:', error.message);
+      return res.status(401).json({ message: 'Token inválido ou expirado' });
     }
+  }
 
-    // Verifica se o usuário existe no banco de dados
-    const user = await User.findById(decoded.id).select("-password");
-    if (!user) {
-      return res.status(401).json({
-        message: "Usuário associado ao token não encontrado no banco de dados.",
-      });
-    }
-
-    // Injeta o usuário na requisição para uso nas próximas etapas
-    req.user = user;
-
-    // Passa para a próxima função de middleware ou rota
-    next();
-  } catch (err) {
-    console.error("❌ Erro ao verificar token JWT:", err);
-    return res.status(500).json({
-      message: "Erro interno na autenticação.",
-      error: err.message,
-    });
+  if (!token) {
+    return res.status(401).json({ message: 'Acesso não autorizado, token não fornecido' });
   }
 };
