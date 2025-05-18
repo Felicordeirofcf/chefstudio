@@ -167,7 +167,11 @@ exports.facebookCallback = async (req, res) => {
 exports.getAdAccounts = async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
+<<<<<<< HEAD
         return res.status(401).json({ message: "Usuário não autenticado."})S
+=======
+        return res.status(401).json({ message: "Usuário não autenticado."});
+>>>>>>> 1e8ba970 (Refactor: Remove backend folders (middleware, models, routes) from root and ensure .gitignore)
     }
     // Busca o usuário mais recente do DB para garantir que temos o metaAccessToken atualizado
     const currentUser = await User.findById(req.user.id);
