@@ -27,7 +27,6 @@ exports.loginUser = async (req, res) => {
       name: user.name,
       email: user.email,
       metaUserId: user.metaUserId,
-      metaAdAccountId: user.metaAdAccountId, // Incluir adAccountId na resposta do login
       metaConnectionStatus: user.metaConnectionStatus,
     });
   } catch (err) {
@@ -48,6 +47,7 @@ exports.registerUser = async (req, res) => {
       return res.status(400).json({ message: "Email já cadastrado" });
     }
 
+    // Criptografando a senha antes de salvar
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new User({ name, email, password: hashedPassword });
@@ -61,7 +61,6 @@ exports.registerUser = async (req, res) => {
       name: newUser.name,
       email: newUser.email,
       metaUserId: newUser.metaUserId,
-      metaAdAccountId: newUser.metaAdAccountId, // Incluir adAccountId na resposta do registro
       metaConnectionStatus: newUser.metaConnectionStatus,
     });
   } catch (err) {
@@ -84,7 +83,6 @@ exports.getProfile = async (req, res) => {
       name: user.name,
       email: user.email,
       metaUserId: user.metaUserId,
-      metaAdAccountId: user.metaAdAccountId, // Incluir adAccountId no perfil
       metaConnectionStatus: user.metaConnectionStatus,
       plan: user.plan || null,
     });
@@ -100,20 +98,24 @@ exports.getProfile = async (req, res) => {
 exports.facebookCallback = async (req, res) => {
   const { code, state } = req.query;
 
+  // Verificando se o código e o state foram passados corretamente
   if (!code || !state) {
-    const frontendConnectMetaUrl = process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/connect-meta?error=callback_error` : "/connect-meta?error=callback_error";
-    return res.redirect(frontendConnectMetaUrl);
+    return res.status(400).json({ message: "Código ou token ausente no callback" });
   }
 
   try {
+    // Validar o estado (token JWT) passado para garantir que a resposta é autêntica
     const decoded = jwt.verify(state, process.env.JWT_SECRET);
     const userId = decoded.id;
 
+    // Adicionando o console.log para verificar o valor do FACEBOOK_APP_ID
+    console.log("FACEBOOK_APP_ID:", process.env.FACEBOOK_APP_ID);  // Verifique se o ID está sendo carregado corretamente
+
     const redirectUri = process.env.FACEBOOK_REDIRECT_URI || "https://chefstudio-production.up.railway.app/api/auth/facebook/callback";
 
-    const tokenResponse = await axios.get("https://graph.facebook.com/v19.0/oauth/access_token", {
+    const tokenResponse = await axios.get("https://graph.facebook.com/v18.0/oauth/access_token", {
       params: {
-        client_id: process.env.FACEBOOK_APP_ID,
+        client_id: process.env.FACEBOOK_APP_ID,  // Certifique-se de que esta variável está correta
         client_secret: process.env.FACEBOOK_APP_SECRET,
         redirect_uri: redirectUri,
         code,
@@ -125,52 +127,38 @@ exports.facebookCallback = async (req, res) => {
 
     const { access_token } = tokenResponse.data;
 
-    // Buscar o ID do usuário do Meta
-    const meResponse = await axios.get("https://graph.facebook.com/v19.0/me", {
+    // Obtenção das informações do usuário do Facebook
+    const meResponse = await axios.get("https://graph.facebook.com/v18.0/me", {
       params: { access_token },
     });
+
     const metaUserId = meResponse.data.id;
 
-    // Buscar as contas de anúncios do usuário
-    let adAccountId = null;
-    try {
-      const adAccountsResponse = await axios.get(`https://graph.facebook.com/v19.0/${metaUserId}/adaccounts`, {
-        params: { 
-          access_token,
-          fields: 'account_id' // Solicitar apenas o ID da conta de anúncios
-        },
-      });
-
-      if (adAccountsResponse.data && adAccountsResponse.data.data && adAccountsResponse.data.data.length > 0) {
-        // Pegar o ID da primeira conta de anúncios encontrada
-        adAccountId = adAccountsResponse.data.data[0].account_id;
-      } else {
-        console.warn("Nenhuma conta de anúncios encontrada para o usuário Meta:", metaUserId);
-      }
-    } catch (adAccountError) {
-      console.error("❌ Erro ao buscar contas de anúncios do Facebook:", adAccountError.response?.data || adAccountError.message);
-      // Não interromper o fluxo se a busca de contas de anúncios falhar, mas registrar o erro.
-    }
-
-    // Atualizar o usuário no banco de dados
-    await User.findByIdAndUpdate(
+    // Atualização do usuário no banco de dados com o Meta ID e token
+    const updatedUser = await User.findByIdAndUpdate(
       userId,
       {
         metaAccessToken: access_token,
         metaUserId,
-        metaAdAccountId: adAccountId, // Salvar o ID da conta de anúncios
         metaConnectionStatus: "connected",
       },
       { new: true }
     );
 
-    const frontendDashboardUrl = process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/dashboard?meta_connected=true` : "/dashboard?meta_connected=true";
-    res.redirect(frontendDashboardUrl);
-
+    res.status(200).json({
+      message: "Conta Meta conectada com sucesso!",
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      metaUserId: updatedUser.metaUserId,
+      metaConnectionStatus: updatedUser.metaConnectionStatus,
+    });
   } catch (error) {
     console.error("❌ Erro ao conectar Meta Ads:", error.response?.data || error.message);
-    const frontendConnectMetaErrorUrl = process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/connect-meta?error=connection_failed` : "/connect-meta?error=connection_failed";
-    res.redirect(frontendConnectMetaErrorUrl);
+    res.status(500).json({ 
+      message: "Erro ao conectar com a conta Meta Ads", 
+      error: error.response?.data || error.message 
+    });
   }
 };
 
@@ -179,17 +167,17 @@ exports.facebookCallback = async (req, res) => {
 //
 exports.facebookLogout = async (req, res) => {
   try {
-    const user = req.user;
+    const user = req.user; // O usuário autenticado
     if (!user.metaUserId) {
       return res.status(400).json({ message: "Nenhuma conta Meta conectada" });
     }
 
+    // Remover as informações de conexão do Meta
     const updatedUser = await User.findByIdAndUpdate(
       user._id,
       {
         metaAccessToken: null,
         metaUserId: null,
-        metaAdAccountId: null, // Limpar o ID da conta de anúncios ao desconectar
         metaConnectionStatus: "disconnected",
       },
       { new: true }
@@ -200,7 +188,6 @@ exports.facebookLogout = async (req, res) => {
       _id: updatedUser._id,
       name: updatedUser.name,
       email: updatedUser.email,
-      metaAdAccountId: updatedUser.metaAdAccountId,
       metaConnectionStatus: updatedUser.metaConnectionStatus,
     });
   } catch (error) {
@@ -223,4 +210,3 @@ exports.facebookLogout = async (req, res) => {
  *       401:
  *         description: Não autorizado
  */
-

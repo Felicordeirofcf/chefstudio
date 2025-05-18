@@ -15,62 +15,17 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Mongo URI seguro
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/chefstudio';
+const MONGO_URI = process.env.MONGODB_URI || `mongodb+srv://${process.env.MONGODB_USERNAME}:${process.env.MONGODB_PASSWORD}@cluster0.hebh3d1.mongodb.net/chefia_studio_db?retryWrites=true&w=majority`;
 
 // BASE_URL dinâmica
 const BASE_URL = process.env.BASE_URL || (process.env.NODE_ENV === "production" 
   ? "https://chefstudio-production.up.railway.app"
   : `http://localhost:${PORT}`);
 
-// Conexão com MongoDB simulada para ambiente de desenvolvimento
+// Conexão com MongoDB
 mongoose.connect(MONGO_URI)
   .then(() => console.log("🟢 MongoDB conectado com sucesso"))
-  .catch(err => {
-    console.error("🟡 Erro ao conectar com o MongoDB:", err);
-    console.log("⚠️ Continuando sem persistência de dados. Algumas funcionalidades podem ser limitadas.");
-    
-    // Simulação de MongoDB quando a conexão falha
-    console.log("🔄 Ativando modo de simulação do MongoDB");
-    
-    // Sobrescrevendo métodos do Mongoose para simulação
-    const originalModel = mongoose.model;
-    mongoose.model = function(name, schema) {
-      const Model = originalModel.call(this, name, schema);
-      
-      // Sobrescrevendo métodos para simular operações no banco
-      Model.findOne = () => Promise.resolve({
-        _id: "simulado123456789",
-        name: "Usuário Teste",
-        email: "teste@chefstudio.com",
-        password: "$2a$10$XYZ123ABC456DEF789GHI", // Hash simulado
-        metaUserId: "meta123456789",
-        metaAccessToken: "EAABnNjZB...",
-        metaConnectionStatus: "connected",
-        metaAdAccountId: "act_123456789",
-        comparePassword: () => Promise.resolve(true)
-      });
-      
-      Model.findById = () => Promise.resolve({
-        _id: "simulado123456789",
-        name: "Usuário Teste",
-        email: "teste@chefstudio.com",
-        password: "$2a$10$XYZ123ABC456DEF789GHI", // Hash simulado
-        metaUserId: "meta123456789",
-        metaAccessToken: "EAABnNjZB...",
-        metaConnectionStatus: "connected",
-        metaAdAccountId: "act_123456789",
-        comparePassword: () => Promise.resolve(true),
-        save: () => Promise.resolve()
-      });
-      
-      Model.prototype.save = function() {
-        console.log("🔵 Simulando salvamento no banco:", this);
-        return Promise.resolve(this);
-      };
-      
-      return Model;
-    };
-  });
+  .catch(err => console.error("🟡 Erro ao conectar com o MongoDB:", err));
 
 // Configuração do Swagger
 const swaggerOptions = {
@@ -103,8 +58,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 const allowedOrigins = [
   "http://localhost:5173",
   "https://chefstudio.vercel.app",
-  "https://chefstudio-production.up.railway.app",
-  "https://koohybdk.manus.space"
+  "https://chefstudio-production.up.railway.app"
 ];
 
 app.use(cors({

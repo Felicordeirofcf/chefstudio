@@ -1,4 +1,5 @@
 const fetch = require("node-fetch");
+const User = require("../models/User");
 
 // ----------- CAMPANHAS REAL META ADS -----------
 
@@ -132,9 +133,9 @@ exports.getCampaignMetrics = async (req, res) => {
   }
 };
 
-// ----------- LOCALIZAÇÃO (simulado) -----------
+// ----------- LOCALIZAÇÃO REAL -----------
 
-exports.saveLocationSettings = (req, res) => {
+exports.saveLocationSettings = async (req, res) => {
   const { latitude, longitude, radius } = req.body;
 
   if (
@@ -145,16 +146,56 @@ exports.saveLocationSettings = (req, res) => {
     return res.status(400).json({ message: "Latitude, longitude e raio devem ser números." });
   }
 
-  res.status(201).json({
-    message: "Localização salva com sucesso (simulada)",
-    data: { latitude, longitude, radius }
-  });
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "Usuário não autenticado." });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "Usuário não encontrado." });
+    }
+
+    // Salvar configurações de localização no perfil do usuário
+    user.locationSettings = {
+      latitude,
+      longitude,
+      radius
+    };
+    
+    await user.save();
+
+    res.status(201).json({
+      message: "Localização salva com sucesso",
+      data: user.locationSettings
+    });
+  } catch (err) {
+    console.error("❌ Erro ao salvar configurações de localização:", err.message);
+    res.status(500).json({ message: "Erro ao salvar configurações de localização" });
+  }
 };
 
-exports.getLocationSettings = (req, res) => {
-  res.json({
-    latitude: -23.5505,
-    longitude: -46.6333,
-    radius: 5
-  });
+exports.getLocationSettings = async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "Usuário não autenticado." });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "Usuário não encontrado." });
+    }
+
+    // Se o usuário não tiver configurações de localização, retornar valores padrão
+    const locationSettings = user.locationSettings || {
+      latitude: -23.5505,  // São Paulo como padrão
+      longitude: -46.6333,
+      radius: 5
+    };
+
+    res.json(locationSettings);
+  } catch (err) {
+    console.error("❌ Erro ao obter configurações de localização:", err.message);
+    res.status(500).json({ message: "Erro ao obter configurações de localização" });
+  }
 };
