@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const RefreshToken = require('../models/RefreshToken');
-const User = require('../models/User');
+const RefreshToken = require('../models/refreshToken');
+const User = require('../models/user');
 const { BusinessManager } = require('facebook-nodejs-business-sdk');
 
 // Função para gerar token JWT
