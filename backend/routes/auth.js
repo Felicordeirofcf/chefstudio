@@ -1,44 +1,67 @@
 const express = require('express');
 const router = express.Router();
-const passport = require('passport');
+const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const passport = require('passport');
 const User = require('../models/user');
-const RefreshToken = require('../models/refreshToken');
-const { 
-  decryptToken, 
-  generateToken, 
-  generateRefreshToken, 
-  encryptToken,
-  authMiddleware 
-} = require('../middleware/auth');
+const RefreshToken = require('../models/refreshtoken');
+const auth = require('../middleware/auth');
+const crypto = require('crypto');
 
-// Iniciar fluxo de autenticação com Facebook
-router.get('/facebook', passport.authenticate('facebook', { 
-  scope: ['email', 'public_profile', 'ads_management', 'ads_read', 'business_management', 'instagram_basic', 'instagram_content_publish'] 
-}));
-
-// Callback após autenticação no Facebook
-router.get('/facebook/callback', 
-  passport.authenticate('facebook', { session: false, failureRedirect: '/login' }),
-  async (req, res) => {
-    try {
-      // Gerar JWT para o usuário autenticado
-      const token = generateToken(req.user._id);
-      
-      // Gerar refresh token
-      const refreshToken = await generateRefreshToken(req.user._id);
-
-      // Redirecionar para o frontend com o token
-      const redirectUrl = `${process.env.BASE_URL}/auth-success?token=${token}&refreshToken=${refreshToken}`;
-      res.redirect(redirectUrl);
-    } catch (error) {
-      console.error('Erro no callback do Facebook:', error);
-      res.redirect('/login?error=auth_failed');
+// Registrar novo usuário
+router.post('/register', async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    
+    // Verificar se o usuário já existe
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email já cadastrado' });
     }
+    
+    // Criar novo usuário
+    const hashedPassword = await bcryptjs.hash(password, 10);
+    const user = new User({
+      name,
+      email,
+      password: hashedPassword
+    });
+    
+    await user.save();
+    
+    // Gerar tokens
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '1h' }
+    );
+    
+    const refreshToken = crypto.randomBytes(40).toString('hex');
+    const refreshTokenDoc = new RefreshToken({
+      token: refreshToken,
+      user: user._id,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 dias
+    });
+    
+    await refreshTokenDoc.save();
+    
+    res.status(201).json({
+      message: 'Usuário registrado com sucesso',
+      token,
+      refreshToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao registrar usuário:', error);
+    res.status(500).json({ message: 'Erro ao registrar usuário' });
   }
-);
+});
 
-// Rota para login tradicional com email/senha
+// Login de usuário
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -50,77 +73,48 @@ router.post('/login', async (req, res) => {
     }
     
     // Verificar senha
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
+    const isPasswordValid = await bcryptjs.compare(password, user.password);
+    if (!isPasswordValid) {
       return res.status(401).json({ message: 'Credenciais inválidas' });
     }
     
-    // Gerar JWT
-    const token = generateToken(user._id);
+    // Gerar tokens
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '1h' }
+    );
     
-    // Gerar refresh token
-    const refreshToken = await generateRefreshToken(user._id);
+    const refreshToken = crypto.randomBytes(40).toString('hex');
+    const refreshTokenDoc = new RefreshToken({
+      token: refreshToken,
+      user: user._id,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 dias
+    });
     
-    res.json({ 
-      token, 
+    await refreshTokenDoc.save();
+    
+    res.status(200).json({
+      message: 'Login realizado com sucesso',
+      token,
       refreshToken,
-      user: { 
-        id: user._id, 
-        name: user.name, 
+      user: {
+        id: user._id,
+        name: user.name,
         email: user.email,
-        role: user.role,
-        hasMetaAdsConnection: !!user.adsAccountId
+        facebookConnected: !!user.facebookId,
+        adsAccountId: user.adsAccountId || null,
+        adsAccountName: user.adsAccountName || null,
+        instagramAccounts: user.instagramAccounts || []
       }
     });
   } catch (error) {
-    console.error('Erro no login:', error);
-    res.status(500).json({ message: 'Erro no servidor' });
+    console.error('Erro ao fazer login:', error);
+    res.status(500).json({ message: 'Erro ao fazer login' });
   }
 });
 
-// Rota para registro tradicional
-router.post('/register', async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
-    
-    // Verificar se o email já está em uso
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email já está em uso' });
-    }
-    
-    // Criar novo usuário
-    const user = new User({
-      name,
-      email,
-      password
-    });
-    
-    await user.save();
-    
-    // Gerar JWT
-    const token = generateToken(user._id);
-    
-    // Gerar refresh token
-    const refreshToken = await generateRefreshToken(user._id);
-    
-    res.status(201).json({ 
-      token, 
-      refreshToken,
-      user: { 
-        id: user._id, 
-        name: user.name, 
-        email: user.email,
-        role: user.role
-      }
-    });
-  } catch (error) {
-    console.error('Erro no registro:', error);
-    res.status(500).json({ message: 'Erro no servidor' });
-  }
-});
-
-// Rota para renovar token JWT usando refresh token
+// Renovar token
 router.post('/refresh-token', async (req, res) => {
   try {
     const { refreshToken } = req.body;
@@ -130,68 +124,111 @@ router.post('/refresh-token', async (req, res) => {
     }
     
     // Verificar se o refresh token existe e é válido
-    const storedToken = await RefreshToken.findOne({ token: refreshToken });
+    const refreshTokenDoc = await RefreshToken.findOne({
+      token: refreshToken,
+      expiresAt: { $gt: new Date() }
+    });
     
-    if (!storedToken) {
-      return res.status(401).json({ message: 'Refresh token inválido' });
-    }
-    
-    // Verificar se o token expirou
-    if (storedToken.expiresAt < new Date()) {
-      await RefreshToken.deleteOne({ _id: storedToken._id });
-      return res.status(401).json({ message: 'Refresh token expirado' });
+    if (!refreshTokenDoc) {
+      return res.status(401).json({ message: 'Refresh token inválido ou expirado' });
     }
     
     // Buscar usuário
-    const user = await User.findById(storedToken.userId);
+    const user = await User.findById(refreshTokenDoc.user);
     if (!user) {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
+      return res.status(401).json({ message: 'Usuário não encontrado' });
     }
     
-    // Gerar novo token JWT
-    const newToken = generateToken(user._id);
+    // Gerar novo token
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '1h' }
+    );
     
-    // Opcionalmente, gerar novo refresh token e invalidar o antigo
-    await RefreshToken.deleteOne({ _id: storedToken._id });
-    const newRefreshToken = await generateRefreshToken(user._id);
-    
-    res.json({ 
-      token: newToken, 
-      refreshToken: newRefreshToken,
-      user: { 
-        id: user._id, 
-        name: user.name, 
+    res.status(200).json({
+      message: 'Token renovado com sucesso',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
         email: user.email,
-        role: user.role,
-        hasMetaAdsConnection: !!user.adsAccountId
+        facebookConnected: !!user.facebookId,
+        adsAccountId: user.adsAccountId || null,
+        adsAccountName: user.adsAccountName || null,
+        instagramAccounts: user.instagramAccounts || []
       }
     });
   } catch (error) {
     console.error('Erro ao renovar token:', error);
-    res.status(500).json({ message: 'Erro no servidor' });
+    res.status(500).json({ message: 'Erro ao renovar token' });
   }
 });
 
-// Rota para obter informações do usuário atual
-router.get('/me', authMiddleware, async (req, res) => {
+// Iniciar autenticação com Facebook
+router.get('/facebook', passport.authenticate('facebook', {
+  scope: ['email', 'ads_management', 'ads_read', 'business_management', 'instagram_basic', 'instagram_content_publish']
+}));
+
+// Callback de autenticação do Facebook
+router.get('/facebook/callback', passport.authenticate('facebook', { session: false }), async (req, res) => {
   try {
-    res.json({ 
-      id: req.user._id, 
-      name: req.user.name, 
-      email: req.user.email,
-      role: req.user.role,
-      hasMetaAdsConnection: !!req.user.adsAccountId,
-      adsAccountId: req.user.adsAccountId,
-      adsAccountName: req.user.adsAccountName
+    // Usuário autenticado está disponível em req.user
+    const user = req.user;
+    
+    // Gerar tokens
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '1h' }
+    );
+    
+    const refreshToken = crypto.randomBytes(40).toString('hex');
+    const refreshTokenDoc = new RefreshToken({
+      token: refreshToken,
+      user: user._id,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 dias
+    });
+    
+    await refreshTokenDoc.save();
+    
+    // Redirecionar para o frontend com os tokens
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/auth/callback?token=${token}&refreshToken=${refreshToken}`);
+  } catch (error) {
+    console.error('Erro no callback do Facebook:', error);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/auth/error`);
+  }
+});
+
+// Obter informações do usuário atual
+router.get('/me', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'Usuário não encontrado' });
+    }
+    
+    res.status(200).json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        facebookConnected: !!user.facebookId,
+        adsAccountId: user.adsAccountId || null,
+        adsAccountName: user.adsAccountName || null,
+        instagramAccounts: user.instagramAccounts || []
+      }
     });
   } catch (error) {
-    console.error('Erro ao obter usuário:', error);
-    res.status(500).json({ message: 'Erro no servidor' });
+    console.error('Erro ao obter informações do usuário:', error);
+    res.status(500).json({ message: 'Erro ao obter informações do usuário' });
   }
 });
 
-// Rota para logout (invalidar refresh token)
-router.post('/logout', async (req, res) => {
+// Logout
+router.post('/logout', auth, async (req, res) => {
   try {
     const { refreshToken } = req.body;
     
@@ -200,10 +237,10 @@ router.post('/logout', async (req, res) => {
       await RefreshToken.deleteOne({ token: refreshToken });
     }
     
-    res.json({ message: 'Logout realizado com sucesso' });
+    res.status(200).json({ message: 'Logout realizado com sucesso' });
   } catch (error) {
     console.error('Erro ao fazer logout:', error);
-    res.status(500).json({ message: 'Erro no servidor' });
+    res.status(500).json({ message: 'Erro ao fazer logout' });
   }
 });
 

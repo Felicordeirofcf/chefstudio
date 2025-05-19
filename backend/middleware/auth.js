@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const RefreshToken = require('../models/refreshToken');
+const RefreshToken = require('../models/refreshtoken');
 const User = require('../models/user');
 const { BusinessManager } = require('facebook-nodejs-business-sdk');
 
