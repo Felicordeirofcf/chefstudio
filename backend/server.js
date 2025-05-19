@@ -19,23 +19,26 @@ const app = express();
 // Middleware para parsing de JSON
 app.use(express.json());
 
-// Configurar CORS
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',') 
-  : ['http://localhost:5173', 'http://localhost:3000', 'https://chefstudio.vercel.app'];
+// Configurar CORS com múltiplas origens válidas
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://chefstudio.vercel.app',
+  'https://chefstudio-production.up.railway.app',
+];
 
+// Middleware de CORS com log para debug
 app.use(cors({
-  origin: function(origin, callback) {
-    // Permitir requisições sem origin (como apps mobile ou curl)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'A política CORS para este site não permite acesso da origem especificada.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
+  origin: function (origin, callback) {
+    console.log('🌐 Origem da requisição:', origin);
+
+    if (!origin) return callback(null, true); // permitir chamadas sem origin
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+
+    const msg = 'A política CORS para este site não permite acesso da origem especificada.';
+    return callback(new Error(msg), false);
   },
-  credentials: true
+  credentials: true,
 }));
 
 // Inicializar Passport
@@ -43,10 +46,10 @@ app.use(passport.initialize());
 
 // Conectar ao MongoDB
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Conectado ao MongoDB'))
-  .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
+  .then(() => console.log('✅ Conectado ao MongoDB'))
+  .catch(err => console.error('❌ Erro ao conectar ao MongoDB:', err));
 
-// Configurar Swagger
+// Configurar Swagger (se swagger.json existir)
 const swaggerFile = path.resolve(__dirname, 'swagger.json');
 if (fs.existsSync(swaggerFile)) {
   const swaggerDocument = require(swaggerFile);
@@ -65,11 +68,9 @@ app.get('/api/health', (req, res) => {
 
 // Servir frontend em produção
 if (process.env.NODE_ENV === 'production') {
-  // Verificar se a pasta dist existe
   const distPath = path.join(__dirname, '../frontend/dist');
   if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));
-    
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
@@ -79,5 +80,5 @@ if (process.env.NODE_ENV === 'production') {
 // Iniciar servidor
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
