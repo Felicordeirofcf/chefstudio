@@ -13,21 +13,23 @@ dotenv.config();
 // Importar rotas
 const authRoutes = require('./routes/auth');
 const adsRoutes = require('./routes/ads');
+const notificationsRoutes = require('./routes/notifications');
 
-// Importar configuração do Passport
-const { passport: passportConfig } = require('./middleware/passport');
+// Importar configuração do passport
+require('./middleware/passport');
 
-// Inicializar o app Express
+// Inicializar app
 const app = express();
+const PORT = process.env.PORT || 3001;
 
-// Configurar middleware
+// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Configurar CORS
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',') 
-  : ['http://localhost:5173', 'https://chefstudio.vercel.app'];
+  : ['http://localhost:5173', 'http://localhost:3000'];
 
 app.use(cors({
   origin: function(origin, callback) {
@@ -35,21 +37,14 @@ app.use(cors({
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'A política de CORS para este site não permite acesso da origem especificada.';
+      const msg = 'A política CORS para este site não permite acesso da origem especificada.';
       return callback(new Error(msg), false);
     }
     return callback(null, true);
   },
-  credentials: true
+  credentials: true,
+  exposedHeaders: ['X-New-Token']
 }));
-
-// Inicializar Passport
-app.use(passport.initialize());
-
-// Conectar ao MongoDB
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Conectado ao MongoDB'))
-  .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
 
 // Configurar Swagger
 const swaggerOptions = {
@@ -72,13 +67,22 @@ const swaggerOptions = {
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
-// Definir rotas
+// Conectar ao MongoDB
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('Conectado ao MongoDB'))
+  .catch(err => {
+    console.error('Erro ao conectar ao MongoDB:', err);
+    process.exit(1);
+  });
+
+// Rotas
 app.use('/api/auth', authRoutes);
 app.use('/api/ads', adsRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
-// Rota de teste para verificar se a API está funcionando
+// Rota de verificação de saúde
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'API do ChefStudio está funcionando!' });
+  res.json({ status: 'ok', timestamp: new Date() });
 });
 
 // Servir arquivos estáticos em produção
@@ -90,9 +94,17 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Iniciar o servidor
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, '0.0.0.0', () => {
+// Middleware de tratamento de erros
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ 
+    message: 'Erro interno do servidor',
+    error: process.env.NODE_ENV === 'production' ? {} : err
+  });
+});
+
+// Iniciar servidor
+app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
 

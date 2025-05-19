@@ -4,7 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --config vite.config.ts --logLevel warn",
+    "dev:silent": "cross-env NODE_ENV=production vite --config vite.config.ts",
+    "build:dev": "vite build --mode development",
+    "build:prod": "vite build --mode production",
+    "build:analyze": "vite build --mode production --report",
+    "build:analyze:report": "vite build --mode production --report",
+    "build:analyze:report:json": "vite build --mode production --report --report-json",
+    "build:analyze:report:json:html": "vite build --mode production --report --report-json --report-html",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint ."
@@ -71,6 +78,7 @@
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
     "autoprefixer": "^10.4.21",
+    "cross-env": "^7.0.3",
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",

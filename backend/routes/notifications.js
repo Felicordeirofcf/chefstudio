@@ -1,28 +1,30 @@
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
-const Notification = require('../models/notification');
+const Notification = require('../models/Notification');
 
-// Obter notificações do usuário
+// Rota para obter notificações do usuário
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user._id;
-    const { limit = 20, offset = 0, unreadOnly = false } = req.query;
+    const { limit = 20, skip = 0, read } = req.query;
     
-    // Construir query
-    const query = { userId };
-    if (unreadOnly === 'true') {
-      query.read = false;
+    // Construir filtro
+    const filter = { userId: req.user._id };
+    if (read !== undefined) {
+      filter.read = read === 'true';
     }
     
-    // Buscar notificações
-    const notifications = await Notification.find(query)
+    // Obter notificações
+    const notifications = await Notification.find(filter)
       .sort({ createdAt: -1 })
-      .skip(parseInt(offset))
+      .skip(parseInt(skip))
       .limit(parseInt(limit));
     
-    // Contar total de não lidas
-    const unreadCount = await Notification.countDocuments({ userId, read: false });
+    // Contar total de notificações não lidas
+    const unreadCount = await Notification.countDocuments({ 
+      userId: req.user._id, 
+      read: false 
+    });
     
     res.json({
       notifications,
@@ -34,14 +36,17 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-// Marcar notificação como lida
+// Rota para marcar notificação como lida
 router.patch('/:id/read', authMiddleware, async (req, res) => {
   try {
-    const notificationId = req.params.id;
-    const userId = req.user._id;
+    const { id } = req.params;
     
-    // Verificar se a notificação pertence ao usuário
-    const notification = await Notification.findOne({ _id: notificationId, userId });
+    // Verificar se a notificação existe e pertence ao usuário
+    const notification = await Notification.findOne({ 
+      _id: id, 
+      userId: req.user._id 
+    });
+    
     if (!notification) {
       return res.status(404).json({ message: 'Notificação não encontrada' });
     }
@@ -57,38 +62,39 @@ router.patch('/:id/read', authMiddleware, async (req, res) => {
   }
 });
 
-// Marcar todas as notificações como lidas
+// Rota para marcar todas as notificações como lidas
 router.patch('/read-all', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user._id;
-    
-    // Atualizar todas as notificações não lidas
+    // Marcar todas as notificações do usuário como lidas
     await Notification.updateMany(
-      { userId, read: false },
+      { userId: req.user._id, read: false },
       { $set: { read: true } }
     );
     
     res.json({ message: 'Todas as notificações marcadas como lidas' });
   } catch (error) {
-    console.error('Erro ao marcar todas notificações como lidas:', error);
-    res.status(500).json({ message: 'Erro ao marcar todas notificações como lidas' });
+    console.error('Erro ao marcar todas as notificações como lidas:', error);
+    res.status(500).json({ message: 'Erro ao marcar todas as notificações como lidas' });
   }
 });
 
-// Excluir notificação
+// Rota para excluir notificação
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    const notificationId = req.params.id;
-    const userId = req.user._id;
+    const { id } = req.params;
     
-    // Verificar se a notificação pertence ao usuário
-    const notification = await Notification.findOne({ _id: notificationId, userId });
+    // Verificar se a notificação existe e pertence ao usuário
+    const notification = await Notification.findOne({ 
+      _id: id, 
+      userId: req.user._id 
+    });
+    
     if (!notification) {
       return res.status(404).json({ message: 'Notificação não encontrada' });
     }
     
     // Excluir notificação
-    await Notification.deleteOne({ _id: notificationId });
+    await notification.deleteOne();
     
     res.json({ message: 'Notificação excluída com sucesso' });
   } catch (error) {
@@ -97,24 +103,19 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Criar notificação (para testes e uso interno)
+// Rota para criar notificação (para testes)
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { type, title, message, data } = req.body;
-    const userId = req.user._id;
-    
-    // Verificar se o usuário é admin
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Acesso negado' });
-    }
+    const { title, message, type, entityType, entityId } = req.body;
     
     // Criar notificação
     const notification = new Notification({
-      userId,
-      type,
+      userId: req.user._id,
       title,
       message,
-      data
+      type: type || 'info',
+      entityType: entityType || 'system',
+      entityId
     });
     
     await notification.save();
