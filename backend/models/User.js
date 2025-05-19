@@ -1,85 +1,85 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Por favor, informe seu nome']
+    required: true,
+    trim: true
   },
   email: {
     type: String,
-    required: [true, 'Por favor, informe seu email'],
+    required: true,
     unique: true,
-    match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Por favor, informe um email válido']
+    trim: true,
+    lowercase: true
   },
   password: {
     type: String,
-    required: [true, 'Por favor, informe uma senha'],
-    minlength: 6
+    required: function() {
+      // Senha é obrigatória apenas se não houver facebookId
+      return !this.facebookId;
+    }
   },
-  metaUserId: {
+  role: {
     type: String,
-    default: null
-  },
-  metaAccessToken: {
-    type: String,
-    default: null
-  },
-  metaConnectionStatus: {
-    type: String,
-    enum: ['connected', 'disconnected', 'pending'],
-    default: 'disconnected'
-  },
-  metaAdAccountId: {
-    type: String,
-    default: null
-  },
-  metaEmail: {
-    type: String,
-    default: null
-  },
-  metaName: {
-    type: String,
-    default: null
-  },
-  plan: {
-    type: String,
-    enum: ['free', 'basic', 'premium'],
-    default: 'free'
+    enum: ['user', 'admin'],
+    default: 'user'
   },
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  // Campos para integração com Facebook/Meta
+  facebookId: {
+    type: String,
+    sparse: true,
+    unique: true
+  },
+  facebookAccessToken: {
+    type: String
+  },
+  facebookTokenExpiry: {
+    type: Date
+  },
+  adsAccountId: {
+    type: String // formato act_xxxxxxxxxx
+  },
+  adsAccountName: {
+    type: String
+  },
+  adsAccountCurrency: {
+    type: String
+  },
+  lastSyncDate: {
+    type: Date
   }
 });
 
-// Método para criar usuário de teste
-userSchema.statics.createTestUser = async function() {
+// Método para comparar senha
+userSchema.methods.comparePassword = async function(candidatePassword) {
   try {
-    const testUser = {
-      name: 'Usuário Teste',
-      email: 'teste@chefstudio.com',
-      password: await bcrypt.hash('ChefStudio2025', 10),
-      plan: 'premium',
-      metaConnectionStatus: 'connected'
-    };
-    
-    const existingUser = await this.findOne({ email: testUser.email });
-    if (existingUser) {
-      return existingUser;
-    }
-    
-    return await this.create(testUser);
+    return await bcrypt.compare(candidatePassword, this.password);
   } catch (error) {
-    console.error('Erro ao criar usuário de teste:', error);
-    return null;
+    throw new Error(error);
   }
 };
 
-// Método para comparar senha
-userSchema.methods.comparePassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
+// Middleware para hash da senha antes de salvar
+userSchema.pre('save', async function(next) {
+  try {
+    // Só faz hash da senha se ela foi modificada ou é nova
+    if (!this.isModified('password') || !this.password) {
+      return next();
+    }
+    
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 const User = mongoose.model('User', userSchema);
 
