@@ -18,7 +18,7 @@ router.post('/register', async (req, res) => {
     console.log('Dados recebidos:', JSON.stringify(req.body));
     
     // Validação de campos obrigatórios
-    const { name, email, password } = req.body;
+    const { name, email, password, establishmentName, businessType, whatsapp, menuLink, address, cep } = req.body;
     if (!name || !email || !password) {
       console.log('Erro de validação: campos obrigatórios ausentes', { name: !!name, email: !!email, password: !!password });
       return res.status(400).json({ 
@@ -60,7 +60,13 @@ router.post('/register', async (req, res) => {
     const user = new User({
       name,
       email,
-      password: hashedPassword
+      password: hashedPassword,
+      establishmentName,
+      businessType,
+      whatsapp,
+      menuLink,
+      address,
+      cep
     });
     
     console.log('Salvando usuário no banco de dados');
@@ -90,15 +96,18 @@ router.post('/register', async (req, res) => {
     console.log('Refresh token salvo com sucesso');
     
     console.log('Registro concluído com sucesso');
+    
+    // Formato alinhado com o que o frontend espera
     res.status(201).json({
       message: 'Usuário registrado com sucesso',
       token,
       refreshToken: refreshTokenString,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email
-      }
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      metaUserId: user.facebookId || null,
+      metaConnectionStatus: user.facebookId ? "connected" : "disconnected",
+      plan: user.plan || "free"
     });
   } catch (error) {
     console.error('Erro ao registrar usuário:', error);
@@ -197,19 +206,21 @@ router.post('/login', async (req, res) => {
     console.log('Refresh token salvo com sucesso');
     
     console.log('Login concluído com sucesso');
+    
+    // Formato alinhado com o que o frontend espera
     res.status(200).json({
       message: 'Login realizado com sucesso',
       token,
       refreshToken: refreshTokenString,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        facebookConnected: !!user.facebookId,
-        adsAccountId: user.adsAccountId || null,
-        adsAccountName: user.adsAccountName || null,
-        instagramAccounts: user.instagramAccounts || []
-      }
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      metaUserId: user.facebookId || null,
+      metaConnectionStatus: user.facebookId ? "connected" : "disconnected",
+      adsAccountId: user.adsAccountId || null,
+      adsAccountName: user.adsAccountName || null,
+      instagramAccounts: user.instagramAccounts || [],
+      plan: user.plan || "free"
     });
   } catch (error) {
     console.error('Erro ao fazer login:', error);
@@ -270,18 +281,20 @@ router.post('/refresh-token', async (req, res) => {
     );
     
     console.log('Token renovado com sucesso');
+    
+    // Formato alinhado com o que o frontend espera
     res.status(200).json({
       message: 'Token renovado com sucesso',
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        facebookConnected: !!user.facebookId,
-        adsAccountId: user.adsAccountId || null,
-        adsAccountName: user.adsAccountName || null,
-        instagramAccounts: user.instagramAccounts || []
-      }
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      metaUserId: user.facebookId || null,
+      metaConnectionStatus: user.facebookId ? "connected" : "disconnected",
+      adsAccountId: user.adsAccountId || null,
+      adsAccountName: user.adsAccountName || null,
+      instagramAccounts: user.instagramAccounts || [],
+      plan: user.plan || "free"
     });
   } catch (error) {
     console.error('Erro ao renovar token:', error);
@@ -356,7 +369,7 @@ router.get('/facebook/callback', passport.authenticate('facebook', { session: fa
 });
 
 // Obter informações do usuário atual
-router.get('/me', authMiddleware, async (req, res) => {
+router.get('/profile', authMiddleware, async (req, res) => {
   try {
     console.log('Obtendo informações do usuário atual, ID:', req.user.userId);
     
@@ -367,16 +380,24 @@ router.get('/me', authMiddleware, async (req, res) => {
     }
     
     console.log('Informações do usuário obtidas com sucesso');
+    
+    // Formato alinhado com o que o frontend espera
     res.status(200).json({
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        facebookConnected: !!user.facebookId,
-        adsAccountId: user.adsAccountId || null,
-        adsAccountName: user.adsAccountName || null,
-        instagramAccounts: user.instagramAccounts || []
-      }
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      metaUserId: user.facebookId || null,
+      metaConnectionStatus: user.facebookId ? "connected" : "disconnected",
+      adsAccountId: user.adsAccountId || null,
+      adsAccountName: user.adsAccountName || null,
+      instagramAccounts: user.instagramAccounts || [],
+      plan: user.plan || "free",
+      establishmentName: user.establishmentName,
+      businessType: user.businessType,
+      whatsapp: user.whatsapp,
+      menuLink: user.menuLink,
+      address: user.address,
+      cep: user.cep
     });
   } catch (error) {
     console.error('Erro ao obter informações do usuário:', error);
@@ -390,6 +411,96 @@ router.get('/me', authMiddleware, async (req, res) => {
     
     res.status(500).json({ 
       message: 'Erro ao obter informações do usuário',
+      error: error.message
+    });
+  }
+});
+
+// Atualizar perfil do usuário
+router.put('/profile', authMiddleware, async (req, res) => {
+  try {
+    console.log('Atualizando perfil do usuário, ID:', req.user.userId);
+    console.log('Dados recebidos:', JSON.stringify(req.body));
+    
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      console.log('Usuário não encontrado:', req.user.userId);
+      return res.status(404).json({ message: 'Usuário não encontrado' });
+    }
+    
+    // Campos que podem ser atualizados
+    const { name, establishmentName, businessType, whatsapp, menuLink, address, cep } = req.body;
+    
+    // Atualizar campos
+    if (name) user.name = name;
+    if (establishmentName) user.establishmentName = establishmentName;
+    if (businessType) user.businessType = businessType;
+    if (whatsapp) user.whatsapp = whatsapp;
+    if (menuLink) user.menuLink = menuLink;
+    if (address) user.address = address;
+    if (cep) user.cep = cep;
+    
+    await user.save();
+    console.log('Perfil atualizado com sucesso');
+    
+    // Formato alinhado com o que o frontend espera
+    res.status(200).json({
+      message: 'Perfil atualizado com sucesso',
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      metaUserId: user.facebookId || null,
+      metaConnectionStatus: user.facebookId ? "connected" : "disconnected",
+      adsAccountId: user.adsAccountId || null,
+      adsAccountName: user.adsAccountName || null,
+      instagramAccounts: user.instagramAccounts || [],
+      plan: user.plan || "free",
+      establishmentName: user.establishmentName,
+      businessType: user.businessType,
+      whatsapp: user.whatsapp,
+      menuLink: user.menuLink,
+      address: user.address,
+      cep: user.cep
+    });
+  } catch (error) {
+    console.error('Erro ao atualizar perfil:', error);
+    res.status(500).json({ 
+      message: 'Erro ao atualizar perfil',
+      error: error.message
+    });
+  }
+});
+
+// Atualizar plano do usuário
+router.put('/plan', authMiddleware, async (req, res) => {
+  try {
+    console.log('Atualizando plano do usuário, ID:', req.user.userId);
+    console.log('Dados recebidos:', JSON.stringify(req.body));
+    
+    const { planName } = req.body;
+    if (!planName) {
+      return res.status(400).json({ message: 'Nome do plano é obrigatório' });
+    }
+    
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      console.log('Usuário não encontrado:', req.user.userId);
+      return res.status(404).json({ message: 'Usuário não encontrado' });
+    }
+    
+    // Atualizar plano
+    user.plan = planName;
+    await user.save();
+    console.log('Plano atualizado com sucesso');
+    
+    res.status(200).json({
+      message: 'Plano atualizado com sucesso',
+      plan: user.plan
+    });
+  } catch (error) {
+    console.error('Erro ao atualizar plano:', error);
+    res.status(500).json({ 
+      message: 'Erro ao atualizar plano',
       error: error.message
     });
   }
