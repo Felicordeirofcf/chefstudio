@@ -3,10 +3,11 @@ const router = express.Router();
 const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const passport = require('passport');
-// Usando path absoluto para garantir resolução correta
-const User = require(require('path').resolve(__dirname, '../models/user'));
-const refreshToken = require(require('path').resolve(__dirname, '../models/refreshToken'));
-const auth = require('../middleware/auth');
+// Usando import relativo padrão
+const User = require('../models/user');
+const refreshToken = require('../models/refreshtoken');
+// Importando especificamente a função authMiddleware
+const { authMiddleware } = require('../middleware/auth');
 const crypto = require('crypto');
 
 // Registrar novo usuário
@@ -204,7 +205,7 @@ router.get('/facebook/callback', passport.authenticate('facebook', { session: fa
 });
 
 // Obter informações do usuário atual
-router.get('/me', auth, async (req, res) => {
+router.get('/me', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select('-password');
     if (!user) {
@@ -229,7 +230,7 @@ router.get('/me', auth, async (req, res) => {
 });
 
 // Logout
-router.post('/logout', auth, async (req, res) => {
+router.post('/logout', authMiddleware, async (req, res) => {
   try {
     const { refreshTokenString } = req.body;
     
