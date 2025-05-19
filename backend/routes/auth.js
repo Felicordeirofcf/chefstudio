@@ -5,8 +5,8 @@ const jwt = require('jsonwebtoken');
 const passport = require('passport');
 // Usando import relativo padrão
 const User = require('../models/user');
-// Importando do mesmo diretório para evitar problemas de path
-const refreshToken = require('./refreshtoken');
+// Importando do diretório models
+const refreshToken = require('../models/refreshtoken');
 // Importando especificamente a função authMiddleware
 const { authMiddleware } = require('../middleware/auth');
 const crypto = require('crypto');

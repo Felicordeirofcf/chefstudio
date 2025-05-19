@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-// Importando o modelo diretamente do mesmo diretório para evitar problemas de path
-const refreshToken = require('./refreshtoken');
+// Importando o modelo do diretório models
+const refreshToken = require('../models/refreshtoken');
 const User = require('../models/user');
 const { BusinessManager } = require('facebook-nodejs-business-sdk');
 
