@@ -16,8 +16,9 @@ dotenv.config();
 // Inicializar app Express
 const app = express();
 
-// Middleware para parsing de JSON
-app.use(express.json());
+// Middleware para parsing de JSON com limite aumentado
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Configuração CORS universal - aceita qualquer origem para garantir funcionamento
 app.use(cors({
@@ -48,13 +49,74 @@ app.use((req, res, next) => {
   next();
 });
 
+// Middleware para logging de requisições
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  
+  // Log do corpo da requisição para rotas de autenticação
+  if (req.path.startsWith('/api/auth') && req.method !== 'GET') {
+    const sanitizedBody = { ...req.body };
+    // Remover dados sensíveis dos logs
+    if (sanitizedBody.password) sanitizedBody.password = '[REDACTED]';
+    if (sanitizedBody.refreshToken) sanitizedBody.refreshToken = '[REDACTED]';
+    console.log('Request Body:', JSON.stringify(sanitizedBody));
+  }
+  
+  // Capturar e logar a resposta
+  const originalSend = res.send;
+  res.send = function(body) {
+    // Log da resposta para rotas de autenticação
+    if (req.path.startsWith('/api/auth')) {
+      let responseBody;
+      try {
+        responseBody = JSON.parse(body);
+        // Remover dados sensíveis dos logs
+        if (responseBody.token) responseBody.token = '[REDACTED]';
+        if (responseBody.refreshToken) responseBody.refreshToken = '[REDACTED]';
+        console.log(`Response (${res.statusCode}):`, JSON.stringify(responseBody));
+      } catch (e) {
+        console.log(`Response (${res.statusCode}): [Non-JSON response]`);
+      }
+    }
+    
+    originalSend.call(this, body);
+    return this;
+  };
+  
+  next();
+});
+
 // Inicializar Passport
 app.use(passport.initialize());
 
-// Conectar ao MongoDB
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Conectado ao MongoDB'))
-  .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
+// Conectar ao MongoDB com opções de conexão melhoradas
+mongoose.connect(process.env.MONGODB_URI, {
+  serverSelectionTimeoutMS: 5000, // Timeout após 5 segundos
+  socketTimeoutMS: 45000, // Tempo limite para operações de socket
+  family: 4 // Forçar IPv4
+})
+.then(() => {
+  console.log('Conectado ao MongoDB com sucesso');
+  console.log('URI do MongoDB:', process.env.MONGODB_URI.replace(/\/\/([^:]+):([^@]+)@/, '//[USERNAME]:[PASSWORD]@'));
+})
+.catch(err => {
+  console.error('Erro ao conectar ao MongoDB:', err);
+  console.error('Detalhes do erro de conexão:', {
+    message: err.message,
+    name: err.name,
+    code: err.code,
+    stack: err.stack
+  });
+  
+  // Tentar novamente com opções diferentes se falhar
+  console.log('Tentando conexão alternativa ao MongoDB...');
+  mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  })
+  .then(() => console.log('Conectado ao MongoDB com opções alternativas'))
+  .catch(err => console.error('Falha na segunda tentativa de conexão ao MongoDB:', err));
+});
 
 // Configurar Swagger
 const swaggerFile = path.resolve(__dirname, 'swagger.json');
@@ -93,7 +155,12 @@ app.use('/api/notifications', notificationsRoutes);
 
 // Rota de verificação de saúde
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date(),
+    mongodb: mongoose.connection.readyState === 1 ? 'conectado' : 'desconectado',
+    environment: process.env.NODE_ENV || 'development'
+  });
 });
 
 // Rota para verificar configuração CORS
@@ -105,6 +172,72 @@ app.get('/api/cors-test', (req, res) => {
     requestOrigin: req.headers.origin || 'undefined (provavelmente Swagger UI ou requisição interna)',
     headers: req.headers,
     environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Rota para testar a conexão com o MongoDB
+app.get('/api/db-test', async (req, res) => {
+  try {
+    const status = mongoose.connection.readyState;
+    let statusText;
+    
+    switch (status) {
+      case 0: statusText = 'desconectado'; break;
+      case 1: statusText = 'conectado'; break;
+      case 2: statusText = 'conectando'; break;
+      case 3: statusText = 'desconectando'; break;
+      default: statusText = 'desconhecido';
+    }
+    
+    // Testar operação real no banco
+    let dbOperationSuccess = false;
+    let dbOperationError = null;
+    
+    if (status === 1) {
+      try {
+        // Tentar uma operação simples no banco
+        const result = await mongoose.connection.db.admin().ping();
+        dbOperationSuccess = result.ok === 1;
+      } catch (error) {
+        dbOperationSuccess = false;
+        dbOperationError = {
+          message: error.message,
+          name: error.name,
+          code: error.code
+        };
+      }
+    }
+    
+    res.json({
+      status: statusText,
+      readyState: status,
+      dbOperationSuccess,
+      dbOperationError,
+      connectionOptions: mongoose.connection.config || 'Não disponível',
+      timestamp: new Date()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'erro',
+      error: error.message,
+      timestamp: new Date()
+    });
+  }
+});
+
+// Middleware para tratamento de erros
+app.use((err, req, res, next) => {
+  console.error('Erro não tratado:', err);
+  console.error('Detalhes do erro:', {
+    message: err.message,
+    stack: err.stack,
+    name: err.name,
+    code: err.code
+  });
+  
+  res.status(500).json({
+    message: 'Erro interno do servidor',
+    error: process.env.NODE_ENV === 'production' ? 'Detalhes omitidos em produção' : err.message
   });
 });
 
@@ -128,5 +261,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Ambiente: ${process.env.NODE_ENV || 'development'}`);
   console.log(`CORS configurado para aceitar qualquer origem`);
   console.log(`Documentação Swagger disponível em: http://localhost:${PORT}/api-docs`);
-  console.log(`Rota de teste CORS: http://localhost:${PORT}/api-cors-test`);
+  console.log(`Rota de teste CORS: http://localhost:${PORT}/api/cors-test`);
+  console.log(`Rota de teste de banco de dados: http://localhost:${PORT}/api/db-test`);
+  console.log(`Rota de teste de autenticação: http://localhost:${PORT}/api/auth/test`);
 });

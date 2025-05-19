@@ -1,233 +1,119 @@
+const { authMiddleware } = require('../middleware/auth');
 const express = require('express');
 const router = express.Router();
-const { authMiddleware } = require('../middleware/auth');
-const User = require('../models/user');
 
-// Obter contas de anúncios do usuário
-router.get('/accounts', authMiddleware, async (req, res) => {
+// Rota para obter campanhas de anúncios do usuário
+router.get('/', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId);
+    console.log('Obtendo campanhas de anúncios do usuário:', req.user.userId);
     
-    if (!user.facebookId || !user.facebookToken) {
-      return res.status(400).json({ message: 'Usuário não conectado ao Facebook' });
-    }
-    
-    // Em um ambiente real, aqui faríamos uma chamada para a API do Facebook
-    // para obter as contas de anúncios do usuário
-    // Como exemplo, retornaremos dados simulados
-    
-    const accounts = [
-      {
-        id: 'act_123456789',
-        name: 'Conta de Anúncios Principal'
-      },
-      {
-        id: 'act_987654321',
-        name: 'Conta de Anúncios Secundária'
-      }
-    ];
-    
-    res.status(200).json({ accounts });
-  } catch (error) {
-    console.error('Erro ao obter contas de anúncios:', error);
-    res.status(500).json({ message: 'Erro ao obter contas de anúncios' });
-  }
-});
-
-// Selecionar conta de anúncios
-router.post('/accounts/select', authMiddleware, async (req, res) => {
-  try {
-    const { accountId, accountName } = req.body;
-    
-    if (!accountId) {
-      return res.status(400).json({ message: 'ID da conta de anúncios não fornecido' });
-    }
-    
-    const user = await User.findById(req.user.userId);
-    
-    if (!user) {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
-    }
-    
-    user.adsAccountId = accountId;
-    user.adsAccountName = accountName || accountId;
-    
-    await user.save();
-    
-    res.status(200).json({
-      message: 'Conta de anúncios selecionada com sucesso',
-      account: {
-        id: accountId,
-        name: accountName || accountId
-      }
-    });
-  } catch (error) {
-    console.error('Erro ao selecionar conta de anúncios:', error);
-    res.status(500).json({ message: 'Erro ao selecionar conta de anúncios' });
-  }
-});
-
-// Obter campanhas
-router.get('/campaigns', authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.userId);
-    
-    if (!user.adsAccountId) {
-      return res.status(400).json({ message: 'Nenhuma conta de anúncios selecionada' });
-    }
-    
-    // Em um ambiente real, aqui faríamos uma chamada para a API do Facebook
-    // para obter as campanhas da conta de anúncios selecionada
-    // Como exemplo, retornaremos dados simulados
-    
+    // Simulação de campanhas para teste
     const campaigns = [
       {
-        id: '123456789',
-        name: 'Campanha de Verão',
+        id: '1',
+        name: 'Campanha de Teste',
         status: 'ACTIVE',
-        objective: 'CONVERSIONS',
-        daily_budget: 5000,
-        lifetime_budget: 0,
-        start_time: '2023-06-01T00:00:00Z',
-        end_time: '2023-08-31T23:59:59Z'
-      },
-      {
-        id: '987654321',
-        name: 'Campanha de Inverno',
-        status: 'PAUSED',
-        objective: 'TRAFFIC',
-        daily_budget: 3000,
-        lifetime_budget: 0,
-        start_time: '2023-12-01T00:00:00Z',
-        end_time: '2024-02-28T23:59:59Z'
+        budget: 100.00,
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        createdAt: new Date()
       }
     ];
     
     res.status(200).json({ campaigns });
   } catch (error) {
-    console.error('Erro ao obter campanhas:', error);
-    res.status(500).json({ message: 'Erro ao obter campanhas' });
+    console.error('Erro ao obter campanhas de anúncios:', error);
+    res.status(500).json({ 
+      message: 'Erro ao obter campanhas de anúncios',
+      error: error.message
+    });
   }
 });
 
-// Criar campanha
-router.post('/campaigns', authMiddleware, async (req, res) => {
+// Criar nova campanha de anúncios
+router.post('/', authMiddleware, async (req, res) => {
   try {
-    const {
-      name,
-      objective,
-      status = 'PAUSED',
-      daily_budget,
-      lifetime_budget,
-      start_time,
-      end_time
-    } = req.body;
+    console.log('Criando nova campanha de anúncios');
+    console.log('Dados recebidos:', JSON.stringify(req.body));
     
-    if (!name || !objective) {
-      return res.status(400).json({ message: 'Nome e objetivo são obrigatórios' });
+    // Validação de campos obrigatórios
+    const { name, budget, startDate, endDate } = req.body;
+    if (!name || !budget) {
+      console.log('Erro de validação: campos obrigatórios ausentes');
+      return res.status(400).json({ 
+        message: 'Nome e orçamento são obrigatórios',
+        details: {
+          name: name ? 'válido' : 'ausente ou inválido',
+          budget: budget ? 'válido' : 'ausente ou inválido'
+        }
+      });
     }
     
-    const user = await User.findById(req.user.userId);
-    
-    if (!user.adsAccountId) {
-      return res.status(400).json({ message: 'Nenhuma conta de anúncios selecionada' });
-    }
-    
-    // Em um ambiente real, aqui faríamos uma chamada para a API do Facebook
-    // para criar a campanha na conta de anúncios selecionada
-    // Como exemplo, retornaremos dados simulados
-    
+    // Simulação de criação para teste
     const campaign = {
-      id: Math.floor(Math.random() * 1000000000).toString(),
+      id: Date.now().toString(),
       name,
-      objective,
-      status,
-      daily_budget: daily_budget || 0,
-      lifetime_budget: lifetime_budget || 0,
-      start_time: start_time || new Date().toISOString(),
-      end_time: end_time || null
+      status: 'ACTIVE',
+      budget: parseFloat(budget),
+      startDate: startDate ? new Date(startDate) : new Date(),
+      endDate: endDate ? new Date(endDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      createdAt: new Date()
     };
     
-    res.status(201).json({ campaign });
+    res.status(201).json({ 
+      message: 'Campanha criada com sucesso',
+      campaign
+    });
   } catch (error) {
-    console.error('Erro ao criar campanha:', error);
-    res.status(500).json({ message: 'Erro ao criar campanha' });
+    console.error('Erro ao criar campanha de anúncios:', error);
+    res.status(500).json({ 
+      message: 'Erro ao criar campanha de anúncios',
+      error: error.message
+    });
   }
 });
 
-// Obter métricas de uma campanha
-router.get('/campaigns/:campaignId/insights', authMiddleware, async (req, res) => {
+// Obter detalhes de uma campanha específica
+router.get('/:id', authMiddleware, async (req, res) => {
   try {
-    const { campaignId } = req.params;
-    const { timeRange = 'last_30d' } = req.query;
+    const { id } = req.params;
+    console.log('Obtendo detalhes da campanha:', id);
     
-    const user = await User.findById(req.user.userId);
-    
-    if (!user.adsAccountId) {
-      return res.status(400).json({ message: 'Nenhuma conta de anúncios selecionada' });
-    }
-    
-    // Em um ambiente real, aqui faríamos uma chamada para a API do Facebook
-    // para obter as métricas da campanha
-    // Como exemplo, retornaremos dados simulados
-    
-    const data = [
-      {
-        date_start: '2023-05-01',
-        date_stop: '2023-05-31',
-        impressions: '12345',
-        clicks: '234',
-        spend: '45.67',
-        cpc: '0.19',
-        ctr: '1.89',
-        conversions: '12',
-        cost_per_conversion: '3.81'
+    // Simulação de campanha para teste
+    const campaign = {
+      id,
+      name: 'Campanha de Teste',
+      status: 'ACTIVE',
+      budget: 100.00,
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      createdAt: new Date(),
+      metrics: {
+        impressions: 1000,
+        clicks: 50,
+        conversions: 5,
+        ctr: 5.0,
+        cpc: 2.0
       }
-    ];
-    
-    const summary = {
-      impressions: '12345',
-      clicks: '234',
-      spend: '45.67',
-      cpc: '0.19',
-      ctr: '1.89',
-      conversions: '12',
-      cost_per_conversion: '3.81'
     };
     
-    res.status(200).json({ data, summary });
+    res.status(200).json({ campaign });
   } catch (error) {
-    console.error('Erro ao obter métricas:', error);
-    res.status(500).json({ message: 'Erro ao obter métricas' });
+    console.error('Erro ao obter detalhes da campanha:', error);
+    res.status(500).json({ 
+      message: 'Erro ao obter detalhes da campanha',
+      error: error.message
+    });
   }
 });
 
-// Obter contas de Instagram conectadas
-router.get('/instagram-accounts', authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.userId);
-    
-    if (!user.facebookId || !user.facebookToken) {
-      return res.status(400).json({ message: 'Usuário não conectado ao Facebook' });
-    }
-    
-    // Em um ambiente real, aqui faríamos uma chamada para a API do Facebook
-    // para obter as contas de Instagram conectadas
-    // Como exemplo, retornaremos dados simulados ou os dados armazenados no usuário
-    
-    const accounts = user.instagramAccounts || [
-      {
-        id: '123456789',
-        username: 'instagram_account_1',
-        name: 'Conta de Instagram 1'
-      }
-    ];
-    
-    res.status(200).json({ accounts });
-  } catch (error) {
-    console.error('Erro ao obter contas de Instagram:', error);
-    res.status(500).json({ message: 'Erro ao obter contas de Instagram' });
-  }
+// Rota de teste para verificar se a autenticação está funcionando
+router.get('/test', (req, res) => {
+  console.log('Rota de teste de anúncios acessada');
+  res.status(200).json({ 
+    message: 'Rota de teste de anúncios funcionando corretamente',
+    timestamp: new Date()
+  });
 });
 
 module.exports = router;

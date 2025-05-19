@@ -9,17 +9,18 @@ const RefreshToken = mongoose.models.RefreshToken || mongoose.model('RefreshToke
   },
   token: {
     type: String,
-    required: true
+    required: true,
+    unique: true // Garantir que tokens sejam únicos
   },
   expiresAt: {
     type: Date,
-    required: true
+    required: true,
+    index: { expires: 0 } // Usar TTL index para expiração automática
   },
   createdAt: {
     type: Date,
-    default: Date.now,
-    expires: '30d' // Documento será automaticamente removido após 30 dias
+    default: Date.now
   }
-}));
+}, { timestamps: true })); // Adicionar timestamps para melhor rastreamento
 
 module.exports = RefreshToken;
