@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
-const refreshTokenSchema = new mongoose.Schema({
+// Verificar se o modelo já existe para evitar erro de sobrescrita
+const RefreshToken = mongoose.models.RefreshToken || mongoose.model('RefreshToken', new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -19,8 +20,6 @@ const refreshTokenSchema = new mongoose.Schema({
     default: Date.now,
     expires: '30d' // Documento será automaticamente removido após 30 dias
   }
-});
-
-const RefreshToken = mongoose.model('RefreshToken', refreshTokenSchema);
+}));
 
 module.exports = RefreshToken;
