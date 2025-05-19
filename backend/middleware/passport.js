@@ -1,6 +1,7 @@
 const passport = require('passport');
 const FacebookStrategy = require('passport-facebook').Strategy;
-const User = require('../models/user');
+// Usando path absoluto para garantir resolução correta
+const User = require(require('path').resolve(__dirname, '../models/user'));
 const { encryptToken } = require('./auth');
 
 // Configurar estratégia do Facebook

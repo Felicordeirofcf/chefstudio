@@ -3,8 +3,9 @@ const router = express.Router();
 const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const passport = require('passport');
-const User = require('../models/user');
-const refreshToken = require('../models/refreshtoken');
+// Usando path absoluto para garantir resolução correta
+const User = require(require('path').resolve(__dirname, '../models/user'));
+const refreshToken = require(require('path').resolve(__dirname, '../models/refreshtoken'));
 const auth = require('../middleware/auth');
 const crypto = require('crypto');
 
