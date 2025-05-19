@@ -42,7 +42,7 @@ router.post('/register', async (req, res) => {
     const refreshTokenString = crypto.randomBytes(40).toString('hex');
     const refreshTokenDoc = new refreshToken({
       token: refreshTokenString,
-      user: user._id,
+      userId: user._id, // Corrigido: user -> userId
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 dias
     });
     
@@ -91,7 +91,7 @@ router.post('/login', async (req, res) => {
     const refreshTokenString = crypto.randomBytes(40).toString('hex');
     const refreshTokenDoc = new refreshToken({
       token: refreshTokenString,
-      user: user._id,
+      userId: user._id, // Corrigido: user -> userId
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 dias
     });
     
@@ -137,7 +137,7 @@ router.post('/refresh-token', async (req, res) => {
     }
     
     // Buscar usuário
-    const user = await User.findById(refreshTokenDoc.user);
+    const user = await User.findById(refreshTokenDoc.userId); // Corrigido: user -> userId
     if (!user) {
       return res.status(401).json({ message: 'Usuário não encontrado' });
     }
@@ -189,7 +189,7 @@ router.get('/facebook/callback', passport.authenticate('facebook', { session: fa
     const refreshTokenString = crypto.randomBytes(40).toString('hex');
     const refreshTokenDoc = new refreshToken({
       token: refreshTokenString,
-      user: user._id,
+      userId: user._id, // Corrigido: user -> userId
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 dias
     });
     
