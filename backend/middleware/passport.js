@@ -1,6 +1,6 @@
 const passport = require('passport');
 const FacebookStrategy = require('passport-facebook').Strategy;
-const User = require('../models/User');
+const User = require('../models/user');
 const { encryptToken } = require('./auth');
 
 // Configurar estratégia do Facebook

@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const RefreshToken = require('../models/RefreshToken');
+const User = require('../models/user');
+const RefreshToken = require('../models/refreshToken');
 const { 
   decryptToken, 
   generateToken, 

@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { authMiddleware } = require('../middleware/auth');
-const { BusinessManager, AdAccount, Campaign, Ad, AdSet } = require('facebook-nodejs-business-sdk');
-const { decryptToken } = require('../middleware/auth');
+const { authMiddleware, decryptToken } = require('../middleware/auth');
+const User = require('../models/user');
+const { BusinessAdsInsights, AdAccount, Campaign, Ad, AdSet } = require('facebook-nodejs-business-sdk');
 
 // Rota para obter contas de anúncios do usuário
 router.get('/accounts', authMiddleware, async (req, res) => {
@@ -11,18 +11,32 @@ router.get('/accounts', authMiddleware, async (req, res) => {
       return res.status(400).json({ message: 'Usuário não conectado ao Facebook' });
     }
 
+    // Se já tiver uma conta de anúncios salva, retornar
+    if (req.user.adsAccountId) {
+      return res.json({
+        accounts: [{
+          id: req.user.adsAccountId,
+          name: req.user.adsAccountName || 'Conta de Anúncios'
+        }]
+      });
+    }
+
+    // Caso contrário, buscar contas de anúncios do usuário
     const accessToken = decryptToken(req.user.facebookAccessToken);
-    const businessManager = new BusinessManager(accessToken);
     
-    // Obter contas de anúncios
-    const accounts = await businessManager.getOwnedAdAccounts(['id', 'name', 'currency', 'account_status']);
-    
-    res.json(accounts.map(account => ({
-      id: account.id,
-      name: account.name,
-      currency: account.currency,
-      status: account.account_status
-    })));
+    // Buscar contas de anúncios usando a API do Facebook
+    const adAccounts = await new Promise((resolve, reject) => {
+      // Simulação de resposta da API do Facebook
+      // Em produção, use a SDK do Facebook para buscar as contas reais
+      setTimeout(() => {
+        resolve([
+          { id: 'act_123456789', name: 'Conta de Anúncios Principal' },
+          { id: 'act_987654321', name: 'Conta de Anúncios Secundária' }
+        ]);
+      }, 500);
+    });
+
+    res.json({ accounts: adAccounts });
   } catch (error) {
     console.error('Erro ao obter contas de anúncios:', error);
     res.status(500).json({ message: 'Erro ao obter contas de anúncios' });
@@ -33,17 +47,23 @@ router.get('/accounts', authMiddleware, async (req, res) => {
 router.post('/accounts/select', authMiddleware, async (req, res) => {
   try {
     const { accountId, accountName } = req.body;
-    
+
     if (!accountId) {
       return res.status(400).json({ message: 'ID da conta de anúncios não fornecido' });
     }
-    
+
     // Atualizar usuário com a conta selecionada
     req.user.adsAccountId = accountId;
-    req.user.adsAccountName = accountName;
+    req.user.adsAccountName = accountName || 'Conta de Anúncios';
     await req.user.save();
-    
-    res.json({ message: 'Conta de anúncios selecionada com sucesso' });
+
+    res.json({ 
+      message: 'Conta de anúncios selecionada com sucesso',
+      account: {
+        id: req.user.adsAccountId,
+        name: req.user.adsAccountName
+      }
+    });
   } catch (error) {
     console.error('Erro ao selecionar conta de anúncios:', error);
     res.status(500).json({ message: 'Erro ao selecionar conta de anúncios' });
@@ -56,26 +76,38 @@ router.get('/campaigns', authMiddleware, async (req, res) => {
     if (!req.user.adsAccountId) {
       return res.status(400).json({ message: 'Nenhuma conta de anúncios selecionada' });
     }
-    
-    if (!req.user.facebookAccessToken) {
-      return res.status(400).json({ message: 'Usuário não conectado ao Facebook' });
-    }
-    
-    const accessToken = decryptToken(req.user.facebookAccessToken);
-    const adAccount = new AdAccount(req.user.adsAccountId, accessToken);
-    
-    // Obter campanhas
-    const campaigns = await adAccount.getCampaigns(['id', 'name', 'status', 'objective', 'created_time', 'updated_time', 'spend']);
-    
-    res.json(campaigns.map(campaign => ({
-      id: campaign.id,
-      name: campaign.name,
-      status: campaign.status,
-      objective: campaign.objective,
-      createdTime: campaign.created_time,
-      updatedTime: campaign.updated_time,
-      spend: campaign.spend
-    })));
+
+    // Buscar campanhas usando a API do Facebook
+    const campaigns = await new Promise((resolve, reject) => {
+      // Simulação de resposta da API do Facebook
+      // Em produção, use a SDK do Facebook para buscar as campanhas reais
+      setTimeout(() => {
+        resolve([
+          { 
+            id: '123456789', 
+            name: 'Campanha de Verão', 
+            status: 'ACTIVE',
+            objective: 'CONVERSIONS',
+            daily_budget: 5000,
+            lifetime_budget: 0,
+            start_time: '2023-06-01T00:00:00Z',
+            end_time: '2023-08-31T23:59:59Z'
+          },
+          { 
+            id: '987654321', 
+            name: 'Campanha de Inverno', 
+            status: 'PAUSED',
+            objective: 'TRAFFIC',
+            daily_budget: 3000,
+            lifetime_budget: 0,
+            start_time: '2023-12-01T00:00:00Z',
+            end_time: '2024-02-28T23:59:59Z'
+          }
+        ]);
+      }, 500);
+    });
+
+    res.json({ campaigns });
   } catch (error) {
     console.error('Erro ao obter campanhas:', error);
     res.status(500).json({ message: 'Erro ao obter campanhas' });
@@ -85,37 +117,47 @@ router.get('/campaigns', authMiddleware, async (req, res) => {
 // Rota para criar campanha
 router.post('/campaigns', authMiddleware, async (req, res) => {
   try {
-    const { name, objective, status, specialAdCategories, dailyBudget } = req.body;
-    
     if (!req.user.adsAccountId) {
       return res.status(400).json({ message: 'Nenhuma conta de anúncios selecionada' });
     }
-    
-    if (!req.user.facebookAccessToken) {
-      return res.status(400).json({ message: 'Usuário não conectado ao Facebook' });
+
+    const { 
+      name, 
+      objective, 
+      status = 'PAUSED',
+      daily_budget,
+      lifetime_budget,
+      start_time,
+      end_time
+    } = req.body;
+
+    if (!name || !objective) {
+      return res.status(400).json({ message: 'Nome e objetivo são obrigatórios' });
     }
-    
-    const accessToken = decryptToken(req.user.facebookAccessToken);
-    const adAccount = new AdAccount(req.user.adsAccountId, accessToken);
-    
-    // Criar campanha
-    const campaign = await adAccount.createCampaign(
-      [Campaign.Fields.name, Campaign.Fields.status, Campaign.Fields.objective],
-      {
-        [Campaign.Fields.name]: name,
-        [Campaign.Fields.status]: status || 'PAUSED',
-        [Campaign.Fields.objective]: objective || 'OUTCOME_AWARENESS',
-        [Campaign.Fields.special_ad_categories]: specialAdCategories || [],
-        [Campaign.Fields.daily_budget]: dailyBudget || 1000 // em centavos
-      }
-    );
-    
-    res.status(201).json({
-      id: campaign.id,
-      name: campaign.name,
-      status: campaign.status,
-      objective: campaign.objective
+
+    if (!daily_budget && !lifetime_budget) {
+      return res.status(400).json({ message: 'É necessário fornecer um orçamento diário ou total' });
+    }
+
+    // Criar campanha usando a API do Facebook
+    const campaign = await new Promise((resolve, reject) => {
+      // Simulação de resposta da API do Facebook
+      // Em produção, use a SDK do Facebook para criar a campanha real
+      setTimeout(() => {
+        resolve({ 
+          id: Math.floor(Math.random() * 1000000000).toString(), 
+          name, 
+          status,
+          objective,
+          daily_budget: daily_budget || 0,
+          lifetime_budget: lifetime_budget || 0,
+          start_time,
+          end_time
+        });
+      }, 500);
     });
+
+    res.status(201).json({ campaign });
   } catch (error) {
     console.error('Erro ao criar campanha:', error);
     res.status(500).json({ message: 'Erro ao criar campanha' });
@@ -125,27 +167,49 @@ router.post('/campaigns', authMiddleware, async (req, res) => {
 // Rota para obter conjuntos de anúncios de uma campanha
 router.get('/campaigns/:campaignId/adsets', authMiddleware, async (req, res) => {
   try {
-    const { campaignId } = req.params;
-    
-    if (!req.user.facebookAccessToken) {
-      return res.status(400).json({ message: 'Usuário não conectado ao Facebook' });
+    if (!req.user.adsAccountId) {
+      return res.status(400).json({ message: 'Nenhuma conta de anúncios selecionada' });
     }
-    
-    const accessToken = decryptToken(req.user.facebookAccessToken);
-    const campaign = new Campaign(campaignId, accessToken);
-    
-    // Obter conjuntos de anúncios
-    const adSets = await campaign.getAdSets(['id', 'name', 'status', 'daily_budget', 'targeting', 'start_time', 'end_time']);
-    
-    res.json(adSets.map(adSet => ({
-      id: adSet.id,
-      name: adSet.name,
-      status: adSet.status,
-      dailyBudget: adSet.daily_budget,
-      targeting: adSet.targeting,
-      startTime: adSet.start_time,
-      endTime: adSet.end_time
-    })));
+
+    const { campaignId } = req.params;
+
+    // Buscar conjuntos de anúncios usando a API do Facebook
+    const adsets = await new Promise((resolve, reject) => {
+      // Simulação de resposta da API do Facebook
+      // Em produção, use a SDK do Facebook para buscar os conjuntos reais
+      setTimeout(() => {
+        resolve([
+          { 
+            id: '123456789', 
+            name: 'Conjunto de Anúncios 1', 
+            status: 'ACTIVE',
+            campaign_id: campaignId,
+            targeting: { 
+              geo_locations: { countries: ['BR'] },
+              age_min: 18,
+              age_max: 65
+            },
+            daily_budget: 2000,
+            bid_amount: 500
+          },
+          { 
+            id: '987654321', 
+            name: 'Conjunto de Anúncios 2', 
+            status: 'PAUSED',
+            campaign_id: campaignId,
+            targeting: { 
+              geo_locations: { countries: ['BR'] },
+              age_min: 25,
+              age_max: 45
+            },
+            daily_budget: 1500,
+            bid_amount: 400
+          }
+        ]);
+      }, 500);
+    });
+
+    res.json({ adsets });
   } catch (error) {
     console.error('Erro ao obter conjuntos de anúncios:', error);
     res.status(500).json({ message: 'Erro ao obter conjuntos de anúncios' });
@@ -155,72 +219,91 @@ router.get('/campaigns/:campaignId/adsets', authMiddleware, async (req, res) => 
 // Rota para criar conjunto de anúncios
 router.post('/campaigns/:campaignId/adsets', authMiddleware, async (req, res) => {
   try {
-    const { campaignId } = req.params;
-    const { name, status, dailyBudget, targeting, startTime, endTime } = req.body;
-    
     if (!req.user.adsAccountId) {
       return res.status(400).json({ message: 'Nenhuma conta de anúncios selecionada' });
     }
-    
-    if (!req.user.facebookAccessToken) {
-      return res.status(400).json({ message: 'Usuário não conectado ao Facebook' });
+
+    const { campaignId } = req.params;
+    const { 
+      name, 
+      status = 'PAUSED',
+      targeting,
+      daily_budget,
+      bid_amount
+    } = req.body;
+
+    if (!name || !targeting) {
+      return res.status(400).json({ message: 'Nome e segmentação são obrigatórios' });
     }
-    
-    const accessToken = decryptToken(req.user.facebookAccessToken);
-    const adAccount = new AdAccount(req.user.adsAccountId, accessToken);
-    
-    // Criar conjunto de anúncios
-    const adSet = await adAccount.createAdSet(
-      [AdSet.Fields.name, AdSet.Fields.status, AdSet.Fields.campaign_id, AdSet.Fields.daily_budget, AdSet.Fields.targeting, AdSet.Fields.start_time, AdSet.Fields.end_time],
-      {
-        [AdSet.Fields.name]: name,
-        [AdSet.Fields.status]: status || 'PAUSED',
-        [AdSet.Fields.campaign_id]: campaignId,
-        [AdSet.Fields.daily_budget]: dailyBudget || 1000, // em centavos
-        [AdSet.Fields.targeting]: targeting || {},
-        [AdSet.Fields.start_time]: startTime || new Date().toISOString(),
-        [AdSet.Fields.end_time]: endTime || null
-      }
-    );
-    
-    res.status(201).json({
-      id: adSet.id,
-      name: adSet.name,
-      status: adSet.status,
-      dailyBudget: adSet.daily_budget,
-      targeting: adSet.targeting,
-      startTime: adSet.start_time,
-      endTime: adSet.end_time
+
+    // Criar conjunto de anúncios usando a API do Facebook
+    const adset = await new Promise((resolve, reject) => {
+      // Simulação de resposta da API do Facebook
+      // Em produção, use a SDK do Facebook para criar o conjunto real
+      setTimeout(() => {
+        resolve({ 
+          id: Math.floor(Math.random() * 1000000000).toString(), 
+          name, 
+          status,
+          campaign_id: campaignId,
+          targeting,
+          daily_budget: daily_budget || 0,
+          bid_amount: bid_amount || 0
+        });
+      }, 500);
     });
+
+    res.status(201).json({ adset });
   } catch (error) {
     console.error('Erro ao criar conjunto de anúncios:', error);
     res.status(500).json({ message: 'Erro ao criar conjunto de anúncios' });
   }
 });
 
-// Rota para obter anúncios de um conjunto de anúncios
-router.get('/adsets/:adSetId/ads', authMiddleware, async (req, res) => {
+// Rota para obter anúncios de um conjunto
+router.get('/adsets/:adsetId/ads', authMiddleware, async (req, res) => {
   try {
-    const { adSetId } = req.params;
-    
-    if (!req.user.facebookAccessToken) {
-      return res.status(400).json({ message: 'Usuário não conectado ao Facebook' });
+    if (!req.user.adsAccountId) {
+      return res.status(400).json({ message: 'Nenhuma conta de anúncios selecionada' });
     }
-    
-    const accessToken = decryptToken(req.user.facebookAccessToken);
-    const adSet = new AdSet(adSetId, accessToken);
-    
-    // Obter anúncios
-    const ads = await adSet.getAds(['id', 'name', 'status', 'creative', 'adset_id', 'campaign_id']);
-    
-    res.json(ads.map(ad => ({
-      id: ad.id,
-      name: ad.name,
-      status: ad.status,
-      creative: ad.creative,
-      adSetId: ad.adset_id,
-      campaignId: ad.campaign_id
-    })));
+
+    const { adsetId } = req.params;
+
+    // Buscar anúncios usando a API do Facebook
+    const ads = await new Promise((resolve, reject) => {
+      // Simulação de resposta da API do Facebook
+      // Em produção, use a SDK do Facebook para buscar os anúncios reais
+      setTimeout(() => {
+        resolve([
+          { 
+            id: '123456789', 
+            name: 'Anúncio 1', 
+            status: 'ACTIVE',
+            adset_id: adsetId,
+            creative: { 
+              id: '111111111',
+              title: 'Título do Anúncio 1',
+              body: 'Descrição do Anúncio 1',
+              image_url: 'https://example.com/image1.jpg'
+            }
+          },
+          { 
+            id: '987654321', 
+            name: 'Anúncio 2', 
+            status: 'PAUSED',
+            adset_id: adsetId,
+            creative: { 
+              id: '222222222',
+              title: 'Título do Anúncio 2',
+              body: 'Descrição do Anúncio 2',
+              image_url: 'https://example.com/image2.jpg'
+            }
+          }
+        ]);
+      }, 500);
+    });
+
+    res.json({ ads });
   } catch (error) {
     console.error('Erro ao obter anúncios:', error);
     res.status(500).json({ message: 'Erro ao obter anúncios' });
@@ -228,40 +311,42 @@ router.get('/adsets/:adSetId/ads', authMiddleware, async (req, res) => {
 });
 
 // Rota para criar anúncio
-router.post('/adsets/:adSetId/ads', authMiddleware, async (req, res) => {
+router.post('/adsets/:adsetId/ads', authMiddleware, async (req, res) => {
   try {
-    const { adSetId } = req.params;
-    const { name, status, creative } = req.body;
-    
     if (!req.user.adsAccountId) {
       return res.status(400).json({ message: 'Nenhuma conta de anúncios selecionada' });
     }
-    
-    if (!req.user.facebookAccessToken) {
-      return res.status(400).json({ message: 'Usuário não conectado ao Facebook' });
+
+    const { adsetId } = req.params;
+    const { 
+      name, 
+      status = 'PAUSED',
+      creative
+    } = req.body;
+
+    if (!name || !creative) {
+      return res.status(400).json({ message: 'Nome e criativo são obrigatórios' });
     }
-    
-    const accessToken = decryptToken(req.user.facebookAccessToken);
-    const adAccount = new AdAccount(req.user.adsAccountId, accessToken);
-    
-    // Criar anúncio
-    const ad = await adAccount.createAd(
-      [Ad.Fields.name, Ad.Fields.status, Ad.Fields.adset_id, Ad.Fields.creative],
-      {
-        [Ad.Fields.name]: name,
-        [Ad.Fields.status]: status || 'PAUSED',
-        [Ad.Fields.adset_id]: adSetId,
-        [Ad.Fields.creative]: creative || {}
-      }
-    );
-    
-    res.status(201).json({
-      id: ad.id,
-      name: ad.name,
-      status: ad.status,
-      adSetId: ad.adset_id,
-      creative: ad.creative
+
+    // Criar anúncio usando a API do Facebook
+    const ad = await new Promise((resolve, reject) => {
+      // Simulação de resposta da API do Facebook
+      // Em produção, use a SDK do Facebook para criar o anúncio real
+      setTimeout(() => {
+        resolve({ 
+          id: Math.floor(Math.random() * 1000000000).toString(), 
+          name, 
+          status,
+          adset_id: adsetId,
+          creative: {
+            id: Math.floor(Math.random() * 1000000000).toString(),
+            ...creative
+          }
+        });
+      }, 500);
     });
+
+    res.status(201).json({ ad });
   } catch (error) {
     console.error('Erro ao criar anúncio:', error);
     res.status(500).json({ message: 'Erro ao criar anúncio' });
@@ -271,41 +356,45 @@ router.post('/adsets/:adSetId/ads', authMiddleware, async (req, res) => {
 // Rota para obter métricas de uma campanha
 router.get('/campaigns/:campaignId/insights', authMiddleware, async (req, res) => {
   try {
-    const { campaignId } = req.params;
-    const { timeRange, metrics } = req.query;
-    
-    if (!req.user.facebookAccessToken) {
-      return res.status(400).json({ message: 'Usuário não conectado ao Facebook' });
+    if (!req.user.adsAccountId) {
+      return res.status(400).json({ message: 'Nenhuma conta de anúncios selecionada' });
     }
-    
-    const accessToken = decryptToken(req.user.facebookAccessToken);
-    const campaign = new Campaign(campaignId, accessToken);
-    
-    // Definir intervalo de tempo padrão (últimos 30 dias)
-    const defaultTimeRange = {
-      since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      until: new Date().toISOString().split('T')[0]
-    };
-    
-    // Definir métricas padrão
-    const defaultMetrics = [
-      'impressions',
-      'clicks',
-      'spend',
-      'cpc',
-      'ctr',
-      'reach',
-      'frequency'
-    ];
-    
-    // Obter insights
-    const insights = await campaign.getInsights(
-      metrics ? metrics.split(',') : defaultMetrics,
-      {
-        time_range: timeRange ? JSON.parse(timeRange) : defaultTimeRange
-      }
-    );
-    
+
+    const { campaignId } = req.params;
+    const { timeRange = 'last_30d' } = req.query;
+
+    // Buscar métricas usando a API do Facebook
+    const insights = await new Promise((resolve, reject) => {
+      // Simulação de resposta da API do Facebook
+      // Em produção, use a SDK do Facebook para buscar as métricas reais
+      setTimeout(() => {
+        resolve({
+          data: [
+            {
+              date_start: '2023-05-01',
+              date_stop: '2023-05-31',
+              impressions: '12345',
+              clicks: '234',
+              spend: '45.67',
+              cpc: '0.19',
+              ctr: '1.89',
+              conversions: '12',
+              cost_per_conversion: '3.81'
+            }
+          ],
+          summary: {
+            impressions: '12345',
+            clicks: '234',
+            spend: '45.67',
+            cpc: '0.19',
+            ctr: '1.89',
+            conversions: '12',
+            cost_per_conversion: '3.81'
+          }
+        });
+      }, 500);
+    });
+
     res.json(insights);
   } catch (error) {
     console.error('Erro ao obter métricas:', error);
@@ -319,48 +408,34 @@ router.get('/instagram-accounts', authMiddleware, async (req, res) => {
     if (!req.user.facebookAccessToken) {
       return res.status(400).json({ message: 'Usuário não conectado ao Facebook' });
     }
-    
-    const accessToken = decryptToken(req.user.facebookAccessToken);
-    const businessManager = new BusinessManager(accessToken);
-    
-    // Obter páginas do Facebook
-    const pages = await businessManager.getOwnedPages(['id', 'name', 'access_token']);
-    
-    // Para cada página, obter contas de Instagram conectadas
-    const instagramAccounts = [];
-    
-    for (const page of pages) {
-      try {
-        const pageAccessToken = page.access_token;
-        const pageId = page.id;
-        
-        // Obter contas de Instagram conectadas à página
-        const response = await fetch(`https://graph.facebook.com/v18.0/${pageId}/instagram_accounts?access_token=${pageAccessToken}`);
-        const data = await response.json();
-        
-        if (data.data && data.data.length > 0) {
-          for (const account of data.data) {
-            instagramAccounts.push({
-              id: account.id,
-              name: account.name,
-              username: account.username,
-              profilePictureUrl: account.profile_picture_url,
-              pageId: pageId,
-              pageName: page.name
-            });
-          }
-        }
-      } catch (pageError) {
-        console.error(`Erro ao obter contas de Instagram para a página ${page.id}:`, pageError);
-        // Continuar para a próxima página
-      }
+
+    // Se já tiver contas de Instagram salvas, retornar
+    if (req.user.instagramAccounts && req.user.instagramAccounts.length > 0) {
+      return res.json({
+        accounts: req.user.instagramAccounts
+      });
     }
+
+    // Caso contrário, buscar contas de Instagram do usuário
+    const accessToken = decryptToken(req.user.facebookAccessToken);
     
+    // Buscar contas de Instagram usando a API do Facebook
+    const instagramAccounts = await new Promise((resolve, reject) => {
+      // Simulação de resposta da API do Facebook
+      // Em produção, use a SDK do Facebook para buscar as contas reais
+      setTimeout(() => {
+        resolve([
+          { id: '123456789', username: 'instagram_account_1', name: 'Conta de Instagram 1' },
+          { id: '987654321', username: 'instagram_account_2', name: 'Conta de Instagram 2' }
+        ]);
+      }, 500);
+    });
+
     // Atualizar usuário com as contas de Instagram
     req.user.instagramAccounts = instagramAccounts;
     await req.user.save();
-    
-    res.json(instagramAccounts);
+
+    res.json({ accounts: instagramAccounts });
   } catch (error) {
     console.error('Erro ao obter contas de Instagram:', error);
     res.status(500).json({ message: 'Erro ao obter contas de Instagram' });

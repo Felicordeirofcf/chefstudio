@@ -2,29 +2,23 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const passport = require('passport');
+const passport = require('./middleware/passport');
+const authRoutes = require('./routes/auth');
+const adsRoutes = require('./routes/ads');
+const notificationsRoutes = require('./routes/notifications');
 const swaggerUi = require('swagger-ui-express');
-const swaggerJsDoc = require('swagger-jsdoc');
+const swaggerJsdoc = require('swagger-jsdoc');
 const path = require('path');
+const fs = require('fs');
 
 // Carregar variáveis de ambiente
 dotenv.config();
 
-// Importar rotas
-const authRoutes = require('./routes/auth');
-const adsRoutes = require('./routes/ads');
-const notificationsRoutes = require('./routes/notifications');
-
-// Importar configuração do passport
-require('./middleware/passport');
-
-// Inicializar app
+// Inicializar app Express
 const app = express();
-const PORT = process.env.PORT || 3001;
 
-// Middleware
+// Middleware para parsing de JSON
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 // Configurar CORS
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
@@ -42,9 +36,16 @@ app.use(cors({
     }
     return callback(null, true);
   },
-  credentials: true,
-  exposedHeaders: ['X-New-Token']
+  credentials: true
 }));
+
+// Inicializar Passport
+app.use(passport.initialize());
+
+// Conectar ao MongoDB
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('Conectado ao MongoDB'))
+  .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
 
 // Configurar Swagger
 const swaggerOptions = {
@@ -64,18 +65,10 @@ const swaggerOptions = {
   apis: ['./routes/*.js']
 };
 
-const swaggerDocs = swaggerJsDoc(swaggerOptions);
+const swaggerDocs = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
-// Conectar ao MongoDB
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Conectado ao MongoDB'))
-  .catch(err => {
-    console.error('Erro ao conectar ao MongoDB:', err);
-    process.exit(1);
-  });
-
-// Rotas
+// Rotas da API
 app.use('/api/auth', authRoutes);
 app.use('/api/ads', adsRoutes);
 app.use('/api/notifications', notificationsRoutes);
@@ -85,27 +78,21 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
-// Servir arquivos estáticos em produção
+// Servir frontend em produção
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../frontend/dist')));
-  
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
-  });
+  // Verificar se a pasta dist existe
+  const distPath = path.join(__dirname, '../frontend/dist');
+  if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+    
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
 }
 
-// Middleware de tratamento de erros
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ 
-    message: 'Erro interno do servidor',
-    error: process.env.NODE_ENV === 'production' ? {} : err
-  });
-});
-
 // Iniciar servidor
-app.listen(PORT, () => {
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
-
-module.exports = app;
