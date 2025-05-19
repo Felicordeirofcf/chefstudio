@@ -7,9 +7,8 @@ const authRoutes = require('./routes/auth');
 const adsRoutes = require('./routes/ads');
 const notificationsRoutes = require('./routes/notifications');
 const swaggerUi = require('swagger-ui-express');
-const swaggerJsdoc = require('swagger-jsdoc');
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
 
 // Carregar variáveis de ambiente
 dotenv.config();
@@ -23,7 +22,7 @@ app.use(express.json());
 // Configurar CORS
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',') 
-  : ['http://localhost:5173', 'http://localhost:3000'];
+  : ['http://localhost:5173', 'http://localhost:3000', 'https://chefstudio.vercel.app'];
 
 app.use(cors({
   origin: function(origin, callback) {
@@ -48,25 +47,11 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
 
 // Configurar Swagger
-const swaggerOptions = {
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'ChefStudio API',
-      version: '1.0.0',
-      description: 'Documentação da API do ChefStudio'
-    },
-    servers: [
-      {
-        url: '/api'
-      }
-    ]
-  },
-  apis: ['./routes/*.js']
-};
-
-const swaggerDocs = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+const swaggerFile = path.resolve(__dirname, 'swagger.json');
+if (fs.existsSync(swaggerFile)) {
+  const swaggerDocument = require(swaggerFile);
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+}
 
 // Rotas da API
 app.use('/api/auth', authRoutes);
