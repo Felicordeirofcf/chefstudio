@@ -1,12 +1,12 @@
 const fetch = require("node-fetch");
 const User = require("../models/User");
 
-// ----------- CAMPANHAS META ADS -----------
+// ----------- CAMPANHAS REAL META ADS -----------
 
 exports.getAllCampaigns = async (req, res) => {
   try {
     const token = req.user.metaAccessToken;
-    const adAccountId = req.query.adAccountId;
+    const adAccountId = req.query.adAccountId; // passado como query param
 
     if (!token || !adAccountId) {
       return res.status(400).json({ message: "Token ou adAccountId ausente." });
@@ -38,7 +38,12 @@ exports.createCampaign = async (req, res) => {
     const response = await fetch(`https://graph.facebook.com/v19.0/act_${adAccountId}/campaigns`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, objective, status, access_token: token })
+      body: JSON.stringify({
+        name,
+        objective,
+        status,
+        access_token: token
+      })
     });
 
     const data = await response.json();
@@ -88,7 +93,10 @@ exports.updateCampaignStatus = async (req, res) => {
     const response = await fetch(`https://graph.facebook.com/v19.0/${id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, access_token: token })
+      body: JSON.stringify({
+        status,
+        access_token: token
+      })
     });
 
     const data = await response.json();
@@ -125,7 +133,7 @@ exports.getCampaignMetrics = async (req, res) => {
   }
 };
 
-// ----------- LOCALIZAÇÃO DO USUÁRIO -----------
+// ----------- LOCALIZAÇÃO REAL -----------
 
 exports.saveLocationSettings = async (req, res) => {
   const { latitude, longitude, radius } = req.body;
@@ -139,7 +147,7 @@ exports.saveLocationSettings = async (req, res) => {
   }
 
   try {
-    if (!req.user?.id) {
+    if (!req.user || !req.user.id) {
       return res.status(401).json({ message: "Usuário não autenticado." });
     }
 
@@ -148,7 +156,13 @@ exports.saveLocationSettings = async (req, res) => {
       return res.status(404).json({ message: "Usuário não encontrado." });
     }
 
-    user.locationSettings = { latitude, longitude, radius };
+    // Salvar configurações de localização no perfil do usuário
+    user.locationSettings = {
+      latitude,
+      longitude,
+      radius
+    };
+    
     await user.save();
 
     res.status(201).json({
@@ -156,14 +170,14 @@ exports.saveLocationSettings = async (req, res) => {
       data: user.locationSettings
     });
   } catch (err) {
-    console.error("❌ Erro ao salvar localização:", err);
+    console.error("❌ Erro ao salvar configurações de localização:", err.message);
     res.status(500).json({ message: "Erro ao salvar configurações de localização" });
   }
 };
 
 exports.getLocationSettings = async (req, res) => {
   try {
-    if (!req.user?.id) {
+    if (!req.user || !req.user.id) {
       return res.status(401).json({ message: "Usuário não autenticado." });
     }
 
@@ -172,15 +186,16 @@ exports.getLocationSettings = async (req, res) => {
       return res.status(404).json({ message: "Usuário não encontrado." });
     }
 
+    // Se o usuário não tiver configurações de localização, retornar valores padrão
     const locationSettings = user.locationSettings || {
-      latitude: -23.5505,
+      latitude: -23.5505,  // São Paulo como padrão
       longitude: -46.6333,
       radius: 5
     };
 
-    res.status(200).json(locationSettings);
+    res.json(locationSettings);
   } catch (err) {
-    console.error("❌ Erro ao obter localização:", err);
+    console.error("❌ Erro ao obter configurações de localização:", err.message);
     res.status(500).json({ message: "Erro ao obter configurações de localização" });
   }
 };
