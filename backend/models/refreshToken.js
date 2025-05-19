@@ -1,13 +1,14 @@
 const mongoose = require('mongoose');
 
 const refreshTokenSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
   token: {
     type: String,
+    required: true,
+    unique: true
+  },
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
     required: true
   },
   expiresAt: {
@@ -16,11 +17,8 @@ const refreshTokenSchema = new mongoose.Schema({
   },
   createdAt: {
     type: Date,
-    default: Date.now,
-    expires: '30d' // Documento será automaticamente removido após 30 dias
+    default: Date.now
   }
 });
 
-const RefreshToken = mongoose.model('RefreshToken', refreshTokenSchema);
-
-module.exports = RefreshToken;
+module.exports = mongoose.model('RefreshToken', refreshTokenSchema);
