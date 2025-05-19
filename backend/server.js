@@ -19,50 +19,9 @@ const app = express();
 // Middleware para parsing de JSON
 app.use(express.json());
 
-// Configurar CORS - versão mais permissiva para resolver problemas com Swagger UI e requisições internas
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',') 
-  : ['http://localhost:5173', 'http://localhost:3000', 'https://chefstudio.vercel.app'];
-
-// Adicionar o próprio domínio do backend às origens permitidas
-const backendUrl = process.env.BASE_URL || 'https://chefstudio-production.up.railway.app';
-if (!allowedOrigins.includes(backendUrl)) {
-  allowedOrigins.push(backendUrl);
-}
-
-// Configuração CORS mais permissiva para todos os ambientes
+// Configuração CORS universal - aceita qualquer origem para garantir funcionamento
 app.use(cors({
-  origin: function(origin, callback) {
-    // Permitir requisições sem origin (como apps mobile, Postman, Swagger UI ou requisições internas)
-    if (!origin) return callback(null, true);
-    
-    // Verificar se a origem está na lista de permitidas
-    // Remover barras finais para comparação mais flexível
-    const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
-    
-    // Verificar se a origem é o próprio backend
-    if (normalizedOrigin.includes('railway.app') || normalizedOrigin.includes('localhost')) {
-      return callback(null, true);
-    }
-    
-    const originAllowed = allowedOrigins.some(allowed => {
-      const normalizedAllowed = allowed.endsWith('/') ? allowed.slice(0, -1) : allowed;
-      return normalizedOrigin === normalizedAllowed;
-    });
-    
-    if (!originAllowed) {
-      console.warn(`CORS bloqueou acesso de origem: ${origin}`);
-      console.warn(`Origens permitidas: ${allowedOrigins.join(', ')}`);
-      // Em vez de bloquear com erro, vamos permitir em modo de desenvolvimento
-      if (process.env.NODE_ENV === 'development') {
-        return callback(null, true);
-      }
-      const msg = 'A política CORS para este site não permite acesso da origem especificada.';
-      return callback(new Error(msg), false);
-    }
-    
-    return callback(null, true);
-  },
+  origin: true, // Permite qualquer origem
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -71,6 +30,21 @@ app.use(cors({
 // Adicionar middleware para debug de CORS em produção
 app.use((req, res, next) => {
   console.log('Origem da requisição:', req.headers.origin || 'undefined (provavelmente Swagger UI ou requisição interna)');
+  console.log('Método:', req.method);
+  console.log('Caminho:', req.path);
+  console.log('Headers:', JSON.stringify(req.headers));
+  
+  // Adicionar headers CORS manualmente para garantir
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  // Responder imediatamente a requisições OPTIONS (preflight)
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
   next();
 });
 
@@ -129,7 +103,7 @@ app.get('/api/cors-test', (req, res) => {
     success: true, 
     message: 'CORS está configurado corretamente',
     requestOrigin: req.headers.origin || 'undefined (provavelmente Swagger UI ou requisição interna)',
-    allowedOrigins: allowedOrigins,
+    headers: req.headers,
     environment: process.env.NODE_ENV || 'development'
   });
 });
@@ -152,7 +126,7 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor rodando na porta ${PORT}`);
   console.log(`Ambiente: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`CORS permitido para: ${allowedOrigins.join(', ')}`);
+  console.log(`CORS configurado para aceitar qualquer origem`);
   console.log(`Documentação Swagger disponível em: http://localhost:${PORT}/api-docs`);
   console.log(`Rota de teste CORS: http://localhost:${PORT}/api-cors-test`);
 });
