@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const bcryptjs = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -51,6 +52,26 @@ const userSchema = new mongoose.Schema({
   adsAccountCurrency: {
     type: String
   },
+  // Campos para integração com Instagram
+  instagramAccounts: [{
+    id: String,
+    name: String,
+    username: String,
+    profilePictureUrl: String
+  }],
+  // Campos para dashboard personalizado
+  dashboardSettings: {
+    favoriteMetrics: [String],
+    defaultTimeRange: {
+      type: String,
+      enum: ['today', 'yesterday', 'last_7_days', 'last_30_days', 'last_90_days'],
+      default: 'last_30_days'
+    },
+    showNotifications: {
+      type: Boolean,
+      default: true
+    }
+  },
   lastSyncDate: {
     type: Date
   }
@@ -59,7 +80,14 @@ const userSchema = new mongoose.Schema({
 // Método para comparar senha
 userSchema.methods.comparePassword = async function(candidatePassword) {
   try {
-    return await bcrypt.compare(candidatePassword, this.password);
+    // Tentar com bcrypt primeiro
+    try {
+      return await bcrypt.compare(candidatePassword, this.password);
+    } catch (bcryptError) {
+      // Fallback para bcryptjs se bcrypt falhar
+      console.log('Fallback para bcryptjs:', bcryptError.message);
+      return await bcryptjs.compare(candidatePassword, this.password);
+    }
   } catch (error) {
     throw new Error(error);
   }
@@ -73,9 +101,18 @@ userSchema.pre('save', async function(next) {
       return next();
     }
     
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
+    try {
+      // Tentar com bcrypt primeiro
+      const salt = await bcrypt.genSalt(10);
+      this.password = await bcrypt.hash(this.password, salt);
+      next();
+    } catch (bcryptError) {
+      // Fallback para bcryptjs se bcrypt falhar
+      console.log('Fallback para bcryptjs:', bcryptError.message);
+      const salt = await bcryptjs.genSalt(10);
+      this.password = await bcryptjs.hash(this.password, salt);
+      next();
+    }
   } catch (error) {
     next(error);
   }
