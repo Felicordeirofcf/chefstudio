@@ -13,25 +13,30 @@ const path = require('path');
 // Carregar variáveis de ambiente
 dotenv.config();
 
-// Inicializar app Express
+// Inicializar app
 const app = express();
 
-// Middleware para parsing de JSON
+// Parsing de JSON com limites seguros
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Lista de origens permitidas
+// Definir origens permitidas
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-  : ['https://chefstudio.vercel.app', 'http://localhost:5173', 'http://localhost:3000'];
+  : [
+      'https://chefstudio.vercel.app',
+      'https://chefstudio-production.up.railway.app',
+      'http://localhost:5173',
+      'http://localhost:3000'
+    ];
 
-// Middleware CORS com validação de origem
+// Middleware principal de CORS
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
       return callback(null, true);
     }
-    console.warn(`⛔ Bloqueado por CORS: ${origin}`);
+    console.warn(`🛑 Origem bloqueada por CORS: ${origin}`);
     return callback(new Error('Origem não permitida por CORS'));
   },
   credentials: true,
@@ -39,7 +44,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
-// Middleware extra para headers manuais
+// Headers manuais de CORS
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && (allowedOrigins.includes(origin) || allowedOrigins.includes('*'))) {
@@ -48,6 +53,7 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
+
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
@@ -55,18 +61,18 @@ app.use((req, res, next) => {
 // Inicializar autenticação
 app.use(passport.initialize());
 
-// Registrar rotas
+// Rotas da aplicação
 app.use('/api/auth', authRoutes);
 app.use('/api/ads', adsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 
-// Carregar Swagger
+// Swagger (Documentação da API)
 let swaggerSpec;
 try {
   const swaggerJson = fs.readFileSync(path.join(__dirname, 'swagger.json'), 'utf8');
   swaggerSpec = JSON.parse(swaggerJson);
 } catch (err) {
-  console.warn('⚠️ Swagger.json ausente ou inválido. API docs não serão exibidas.');
+  console.warn('⚠️ Arquivo swagger.json ausente ou inválido. Usando fallback.');
   swaggerSpec = {
     openapi: '3.0.0',
     info: {
@@ -79,10 +85,10 @@ try {
 }
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Rota raiz
+// Rota principal
 app.get('/', (req, res) => {
   res.json({
-    message: 'ChefStudio API está online',
+    message: 'ChefStudio API online',
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'development',
     documentation: '/api-docs',
@@ -90,19 +96,19 @@ app.get('/', (req, res) => {
   });
 });
 
-// Rota para testar CORS
+// Rota de teste de CORS
 app.options('/api/cors-test', cors());
 app.get('/api/cors-test', (req, res) => {
   res.json({
     success: true,
-    message: 'CORS ativo',
+    message: 'CORS validado com sucesso',
     origin: req.headers.origin || 'undefined',
     allowedOrigins,
     headers: req.headers
   });
 });
 
-// Teste de conexão com MongoDB
+// Rota de teste MongoDB
 app.get('/api/db-test', async (req, res) => {
   try {
     const status = mongoose.connection.readyState;
@@ -124,29 +130,29 @@ app.get('/api/db-test', async (req, res) => {
       statusText,
       dbSuccess,
       dbError,
-      uri: process.env.MONGODB_URI?.replace(/\/\/([^:]+):([^@]+)@/, '//[USERNAME]:[PASSWORD]@') || 'não definida'
+      uri: process.env.MONGODB_URI?.replace(/\/\/([^:]+):([^@]+)@/, '//[USERNAME]:[PASSWORD]@') || 'não configurada'
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Conectar ao MongoDB
+// Conexão com o MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
-    console.log('✅ Conectado ao MongoDB');
+    console.log('✅ Conectado ao MongoDB com sucesso');
     console.log('🔐 URI:', process.env.MONGODB_URI.replace(/\/\/([^:]+):([^@]+)@/, '//[USERNAME]:[PASSWORD]@'));
   })
   .catch(err => {
     console.error('❌ Erro ao conectar ao MongoDB:', err.message);
   });
 
-// Iniciar servidor
+// Inicialização do servidor
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Servidor iniciado na porta ${PORT}`);
+  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
   console.log(`🌐 Ambiente: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📘 Swagger: http://localhost:${PORT}/api-docs`);
   console.log(`🔄 Teste CORS: http://localhost:${PORT}/api/cors-test`);
-  console.log(`🧪 Teste Mongo: http://localhost:${PORT}/api/db-test`);
+  console.log(`🧪 Teste MongoDB: http://localhost:${PORT}/api/db-test`);
 });
