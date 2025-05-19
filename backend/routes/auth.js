@@ -4,7 +4,7 @@ const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const passport = require('passport');
 const User = require('../models/user');
-const RefreshToken = require('../models/refreshtoken');
+const refreshToken = require('../models/refreshtoken');
 const auth = require('../middleware/auth');
 const crypto = require('crypto');
 
@@ -36,9 +36,9 @@ router.post('/register', async (req, res) => {
       { expiresIn: '1h' }
     );
     
-    const refreshToken = crypto.randomBytes(40).toString('hex');
-    const refreshTokenDoc = new RefreshToken({
-      token: refreshToken,
+    const refreshTokenString = crypto.randomBytes(40).toString('hex');
+    const refreshTokenDoc = new refreshToken({
+      token: refreshTokenString,
       user: user._id,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 dias
     });
@@ -48,7 +48,7 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       message: 'Usuário registrado com sucesso',
       token,
-      refreshToken,
+      refreshToken: refreshTokenString,
       user: {
         id: user._id,
         name: user.name,
@@ -85,9 +85,9 @@ router.post('/login', async (req, res) => {
       { expiresIn: '1h' }
     );
     
-    const refreshToken = crypto.randomBytes(40).toString('hex');
-    const refreshTokenDoc = new RefreshToken({
-      token: refreshToken,
+    const refreshTokenString = crypto.randomBytes(40).toString('hex');
+    const refreshTokenDoc = new refreshToken({
+      token: refreshTokenString,
       user: user._id,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 dias
     });
@@ -97,7 +97,7 @@ router.post('/login', async (req, res) => {
     res.status(200).json({
       message: 'Login realizado com sucesso',
       token,
-      refreshToken,
+      refreshToken: refreshTokenString,
       user: {
         id: user._id,
         name: user.name,
@@ -117,15 +117,15 @@ router.post('/login', async (req, res) => {
 // Renovar token
 router.post('/refresh-token', async (req, res) => {
   try {
-    const { refreshToken } = req.body;
+    const { refreshTokenString } = req.body;
     
-    if (!refreshToken) {
+    if (!refreshTokenString) {
       return res.status(400).json({ message: 'Refresh token não fornecido' });
     }
     
     // Verificar se o refresh token existe e é válido
-    const refreshTokenDoc = await RefreshToken.findOne({
-      token: refreshToken,
+    const refreshTokenDoc = await refreshToken.findOne({
+      token: refreshTokenString,
       expiresAt: { $gt: new Date() }
     });
     
@@ -183,9 +183,9 @@ router.get('/facebook/callback', passport.authenticate('facebook', { session: fa
       { expiresIn: '1h' }
     );
     
-    const refreshToken = crypto.randomBytes(40).toString('hex');
-    const refreshTokenDoc = new RefreshToken({
-      token: refreshToken,
+    const refreshTokenString = crypto.randomBytes(40).toString('hex');
+    const refreshTokenDoc = new refreshToken({
+      token: refreshTokenString,
       user: user._id,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 dias
     });
@@ -194,7 +194,7 @@ router.get('/facebook/callback', passport.authenticate('facebook', { session: fa
     
     // Redirecionar para o frontend com os tokens
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    res.redirect(`${frontendUrl}/auth/callback?token=${token}&refreshToken=${refreshToken}`);
+    res.redirect(`${frontendUrl}/auth/callback?token=${token}&refreshToken=${refreshTokenString}`);
   } catch (error) {
     console.error('Erro no callback do Facebook:', error);
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -230,11 +230,11 @@ router.get('/me', auth, async (req, res) => {
 // Logout
 router.post('/logout', auth, async (req, res) => {
   try {
-    const { refreshToken } = req.body;
+    const { refreshTokenString } = req.body;
     
-    if (refreshToken) {
+    if (refreshTokenString) {
       // Remover refresh token do banco de dados
-      await RefreshToken.deleteOne({ token: refreshToken });
+      await refreshToken.deleteOne({ token: refreshTokenString });
     }
     
     res.status(200).json({ message: 'Logout realizado com sucesso' });

@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const RefreshToken = require('../models/refreshtoken');
+const refreshToken = require('../models/refreshtoken');
 const User = require('../models/user');
 const { BusinessManager } = require('facebook-nodejs-business-sdk');
 
@@ -16,20 +16,20 @@ const generateToken = (userId) => {
 // Função para gerar refresh token
 const generateRefreshToken = async (userId) => {
   // Criar token aleatório
-  const refreshToken = crypto.randomBytes(40).toString('hex');
+  const refreshTokenString = crypto.randomBytes(40).toString('hex');
   
   // Definir data de expiração (30 dias)
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 30);
   
   // Salvar no banco de dados
-  await RefreshToken.create({
+  await refreshToken.create({
     userId,
-    token: refreshToken,
+    token: refreshTokenString,
     expiresAt
   });
   
-  return refreshToken;
+  return refreshTokenString;
 };
 
 // Função para criptografar tokens sensíveis
@@ -81,8 +81,8 @@ const authMiddleware = async (req, res, next) => {
       // Se o token expirou, verificar se há refresh token
       if (error.name === 'TokenExpiredError') {
         // Verificar se o refresh token foi fornecido
-        const refreshToken = req.headers['x-refresh-token'];
-        if (!refreshToken) {
+        const refreshTokenString = req.headers['x-refresh-token'];
+        if (!refreshTokenString) {
           return res.status(401).json({ 
             message: 'Token expirado',
             code: 'TOKEN_EXPIRED'
@@ -90,7 +90,7 @@ const authMiddleware = async (req, res, next) => {
         }
         
         // Verificar se o refresh token é válido
-        const storedToken = await RefreshToken.findOne({ token: refreshToken });
+        const storedToken = await refreshToken.findOne({ token: refreshTokenString });
         if (!storedToken || storedToken.expiresAt < new Date()) {
           return res.status(401).json({ 
             message: 'Refresh token inválido ou expirado',
