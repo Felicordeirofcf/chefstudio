@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
 const Notification = require('../models/notification');
 
 // Obter notificações do usuário
-router.get('/', auth, async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
     const { limit = 20, skip = 0, read } = req.query;
     
@@ -34,7 +34,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 // Marcar notificação como lida
-router.patch('/:id/read', auth, async (req, res) => {
+router.patch('/:id/read', authMiddleware, async (req, res) => {
   try {
     const notification = await Notification.findOne({
       _id: req.params.id,
@@ -56,7 +56,7 @@ router.patch('/:id/read', auth, async (req, res) => {
 });
 
 // Marcar todas as notificações como lidas
-router.patch('/read-all', auth, async (req, res) => {
+router.patch('/read-all', authMiddleware, async (req, res) => {
   try {
     await Notification.updateMany(
       { user: req.user.userId, read: false },
