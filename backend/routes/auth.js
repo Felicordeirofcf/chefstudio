@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const passport = require('passport');
 // Usando path absoluto para garantir resolução correta
 const User = require(require('path').resolve(__dirname, '../models/user'));
-const refreshToken = require(require('path').resolve(__dirname, '../models/refreshtoken'));
+const refreshToken = require(require('path').resolve(__dirname, '../models/refreshToken'));
 const auth = require('../middleware/auth');
 const crypto = require('crypto');
 
