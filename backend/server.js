@@ -20,9 +20,23 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Configuração CORS para permitir qualquer origem
+// Configuração CORS para origens específicas
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',') 
+  : ['https://chefstudio.vercel.app', 'http://localhost:5173', 'http://localhost:3000'];
+
 app.use(cors({
-  origin: '*', // Permite qualquer origem
+  origin: function (origin, callback) {
+    // Permitir requisições sem origem (como apps mobile ou curl)
+    if (!origin) return callback(null, true);
+    
+    // Verificar se a origem está na lista de permitidas
+    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Não permitido por CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -30,7 +44,10 @@ app.use(cors({
 
 // Middleware para garantir headers CORS em todas as respostas
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (origin && (allowedOrigins.includes(origin) || allowedOrigins.includes('*'))) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -78,7 +95,8 @@ app.get('/', (req, res) => {
     message: 'ChefStudio API está funcionando!',
     version: '1.0.0',
     documentation: '/api-docs',
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    allowedOrigins: allowedOrigins
   });
 });
 
@@ -89,6 +107,7 @@ app.get('/api/cors-test', (req, res) => {
     success: true,
     message: 'CORS está configurado corretamente',
     requestOrigin: req.headers.origin || 'undefined',
+    allowedOrigins: allowedOrigins,
     headers: req.headers,
     environment: process.env.NODE_ENV || 'development'
   });
@@ -139,7 +158,7 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor rodando na porta ${PORT}`);
   console.log(`Ambiente: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`CORS configurado para aceitar qualquer origem`);
+  console.log(`CORS configurado para origens:`, allowedOrigins);
   console.log(`Documentação Swagger disponível em: http://localhost:${PORT}/api-docs`);
   console.log(`Rota de teste CORS: http://localhost:${PORT}/api/cors-test`);
   console.log(`Rota de teste de banco de dados: http://localhost:${PORT}/api/db-test`);
