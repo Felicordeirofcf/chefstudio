@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
 const User = require('../models/user');
 
 // Obter contas de anúncios do usuário
-router.get('/accounts', auth, async (req, res) => {
+router.get('/accounts', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
     
@@ -35,7 +35,7 @@ router.get('/accounts', auth, async (req, res) => {
 });
 
 // Selecionar conta de anúncios
-router.post('/accounts/select', auth, async (req, res) => {
+router.post('/accounts/select', authMiddleware, async (req, res) => {
   try {
     const { accountId, accountName } = req.body;
     
@@ -68,7 +68,7 @@ router.post('/accounts/select', auth, async (req, res) => {
 });
 
 // Obter campanhas
-router.get('/campaigns', auth, async (req, res) => {
+router.get('/campaigns', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
     
@@ -111,7 +111,7 @@ router.get('/campaigns', auth, async (req, res) => {
 });
 
 // Criar campanha
-router.post('/campaigns', auth, async (req, res) => {
+router.post('/campaigns', authMiddleware, async (req, res) => {
   try {
     const {
       name,
@@ -156,7 +156,7 @@ router.post('/campaigns', auth, async (req, res) => {
 });
 
 // Obter métricas de uma campanha
-router.get('/campaigns/:campaignId/insights', auth, async (req, res) => {
+router.get('/campaigns/:campaignId/insights', authMiddleware, async (req, res) => {
   try {
     const { campaignId } = req.params;
     const { timeRange = 'last_30d' } = req.query;
@@ -203,7 +203,7 @@ router.get('/campaigns/:campaignId/insights', auth, async (req, res) => {
 });
 
 // Obter contas de Instagram conectadas
-router.get('/instagram-accounts', auth, async (req, res) => {
+router.get('/instagram-accounts', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
     
