@@ -6,11 +6,6 @@ const notificationSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  type: {
-    type: String,
-    enum: ['campaign_status', 'budget_alert', 'performance_alert', 'account_alert', 'system'],
-    required: true
-  },
   title: {
     type: String,
     required: true
@@ -19,18 +14,27 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  data: {
-    type: Object,
-    default: {}
+  type: {
+    type: String,
+    enum: ['info', 'warning', 'error', 'success'],
+    default: 'info'
   },
   read: {
     type: Boolean,
     default: false
   },
+  entityType: {
+    type: String,
+    enum: ['campaign', 'adset', 'ad', 'account', 'system'],
+    default: 'system'
+  },
+  entityId: {
+    type: String
+  },
   createdAt: {
     type: Date,
     default: Date.now,
-    expires: '30d' // Notificações expiram após 30 dias
+    expires: '30d' // Documento será automaticamente removido após 30 dias
   }
 });
 

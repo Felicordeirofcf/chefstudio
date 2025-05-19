@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
 const bcryptjs = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
@@ -80,14 +79,7 @@ const userSchema = new mongoose.Schema({
 // Método para comparar senha
 userSchema.methods.comparePassword = async function(candidatePassword) {
   try {
-    // Tentar com bcrypt primeiro
-    try {
-      return await bcrypt.compare(candidatePassword, this.password);
-    } catch (bcryptError) {
-      // Fallback para bcryptjs se bcrypt falhar
-      console.log('Fallback para bcryptjs:', bcryptError.message);
-      return await bcryptjs.compare(candidatePassword, this.password);
-    }
+    return await bcryptjs.compare(candidatePassword, this.password);
   } catch (error) {
     throw new Error(error);
   }
@@ -101,18 +93,9 @@ userSchema.pre('save', async function(next) {
       return next();
     }
     
-    try {
-      // Tentar com bcrypt primeiro
-      const salt = await bcrypt.genSalt(10);
-      this.password = await bcrypt.hash(this.password, salt);
-      next();
-    } catch (bcryptError) {
-      // Fallback para bcryptjs se bcrypt falhar
-      console.log('Fallback para bcryptjs:', bcryptError.message);
-      const salt = await bcryptjs.genSalt(10);
-      this.password = await bcryptjs.hash(this.password, salt);
-      next();
-    }
+    const salt = await bcryptjs.genSalt(10);
+    this.password = await bcryptjs.hash(this.password, salt);
+    next();
   } catch (error) {
     next(error);
   }
