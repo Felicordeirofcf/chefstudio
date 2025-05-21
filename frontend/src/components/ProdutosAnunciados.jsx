@@ -1,14 +1,31 @@
-// Componente para exibir produtos anunciados usando componentes nativos
+// Componente para exibir produtos anunciados com tratamento de erros aprimorado
 // Arquivo: frontend/src/components/ProdutosAnunciados.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useAuth } from '../hooks/useAuth';
 
 const ProdutosAnunciados = () => {
-  const { user } = useAuth();
   const [anuncios, setAnuncios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Função segura para obter token do usuário
+  const getToken = () => {
+    try {
+      // Primeiro tenta obter o token diretamente
+      let token = localStorage.getItem('token');
+      
+      // Se não encontrar, tenta obter do userInfo
+      if (!token) {
+        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+        token = userInfo?.token;
+      }
+      
+      return token;
+    } catch (err) {
+      console.error('Erro ao obter token:', err);
+      return null;
+    }
+  };
 
   // Carregar anúncios ao inicializar o componente
   const carregarAnuncios = async () => {
@@ -16,32 +33,67 @@ const ProdutosAnunciados = () => {
       setLoading(true);
       setError(null);
       
-      if (!user || !user.token) {
+      const token = getToken();
+      if (!token) {
         throw new Error('Usuário não autenticado');
       }
       
-      const response = await axios.get('/api/meta/campaigns', {
-        headers: {
-          Authorization: `Bearer ${user.token}`
-        },
-        timeout: 8000 // Timeout para evitar requisições pendentes
-      });
-      
-      setAnuncios(response.data);
+      // Tentar primeiro endpoint
+      try {
+        const response = await axios.get('/api/meta/campaigns', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          timeout: 8000 // Timeout para evitar requisições pendentes
+        });
+        
+        // Garantir que o resultado seja um array
+        if (Array.isArray(response.data)) {
+          setAnuncios(response.data);
+        } else if (response.data && Array.isArray(response.data.campaigns)) {
+          // Caso a API retorne um objeto com propriedade campaigns
+          setAnuncios(response.data.campaigns);
+        } else {
+          // Caso a API retorne um formato inesperado, usar array vazio
+          console.warn('Formato de resposta inesperado:', response.data);
+          setAnuncios([]);
+        }
+      } catch (err) {
+        // Se o primeiro endpoint falhar, tentar endpoint alternativo
+        if (err.response && err.response.status === 404) {
+          const altResponse = await axios.get('/api/campaigns', {
+            headers: {
+              Authorization: `Bearer ${token}`
+            },
+            timeout: 8000
+          });
+          
+          // Garantir que o resultado seja um array
+          if (Array.isArray(altResponse.data)) {
+            setAnuncios(altResponse.data);
+          } else if (altResponse.data && Array.isArray(altResponse.data.campaigns)) {
+            setAnuncios(altResponse.data.campaigns);
+          } else {
+            setAnuncios([]);
+          }
+        } else {
+          throw err;
+        }
+      }
     } catch (err) {
       console.error('Erro ao carregar anúncios:', err);
       setError('Não foi possível carregar os anúncios. Por favor, tente novamente.');
+      // Garantir que anuncios seja sempre um array mesmo em caso de erro
+      setAnuncios([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Carregar anúncios ao inicializar e quando o usuário mudar
+  // Carregar anúncios ao inicializar
   useEffect(() => {
-    if (user) {
-      carregarAnuncios();
-    }
-  }, [user]);
+    carregarAnuncios();
+  }, []);
 
   // Ouvir evento de criação de anúncio para atualizar a lista
   useEffect(() => {
@@ -72,7 +124,7 @@ const ProdutosAnunciados = () => {
     );
   }
 
-  if (anuncios.length === 0) {
+  if (!Array.isArray(anuncios) || anuncios.length === 0) {
     return (
       <div className="mt-8">
         <h2 className="text-xl font-semibold mb-2">
@@ -95,26 +147,26 @@ const ProdutosAnunciados = () => {
       </p>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {anuncios.map((anuncio) => (
-          <div key={anuncio.id} className="border rounded-md overflow-hidden flex flex-col h-full bg-white shadow-sm">
+        {Array.isArray(anuncios) && anuncios.map((anuncio) => (
+          <div key={anuncio?.id || Math.random().toString(36)} className="border rounded-md overflow-hidden flex flex-col h-full bg-white shadow-sm">
             <img
-              src={anuncio.imageUrl || 'https://via.placeholder.com/300x140?text=Anúncio'}
-              alt={anuncio.name}
+              src={anuncio?.imageUrl || 'https://via.placeholder.com/300x140?text=Anúncio'}
+              alt={anuncio?.name || 'Anúncio'}
               className="h-36 w-full object-cover"
             />
             <div className="p-4 flex-grow">
               <h3 className="font-semibold text-lg mb-1 truncate">
-                {anuncio.name}
+                {anuncio?.name || 'Anúncio sem nome'}
               </h3>
               <p className="text-sm text-gray-600 line-clamp-2 mb-2">
-                {anuncio.adText}
+                {anuncio?.adText || 'Sem descrição'}
               </p>
               <div className="flex flex-wrap gap-2 mt-2">
                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  R$ {anuncio.budget}
+                  R$ {anuncio?.budget || 0}
                 </span>
                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  {anuncio.radius} km
+                  {anuncio?.radius || 0} km
                 </span>
               </div>
             </div>
