@@ -86,12 +86,13 @@ export default function MetaCallback() {
         const errorMsg = params.get("message");
         const userId = params.get("userId");
         const code = params.get("code");
+        const token = params.get("token") || params.get("state"); // Obter token do parâmetro token ou state
         
         console.log("MetaCallback: Parâmetros da URL:", { 
-          meta_connected, meta_error, errorMsg, userId, code,
+          meta_connected, meta_error, errorMsg, userId, code, token: token ? "presente" : "ausente",
           searchParams: location.search
         });
-        setDebugInfo(prev => prev + `\nParâmetros: ${JSON.stringify({ meta_connected, meta_error, userId, code })}`);
+        setDebugInfo(prev => prev + `\nParâmetros: ${JSON.stringify({ meta_connected, meta_error, userId, code, token: token ? "presente" : "ausente" })}`);
 
         // Verificar se há erro na URL
         if (meta_error === "true" && errorMsg) {
