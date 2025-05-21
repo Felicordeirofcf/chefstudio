@@ -2,16 +2,18 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/user');
-const metaRoutes = require('./routes/meta');
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
-// Carregar variáveis de ambiente
+// Importar rotas
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/user');
+const metaRoutes = require('./routes/meta');
+
+// Configuração do ambiente
 dotenv.config();
 
-// Inicializar app Express
+// Inicializar Express
 const app = express();
 
 // Middleware para parsing de JSON com limite aumentado

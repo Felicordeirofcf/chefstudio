@@ -1,7 +1,9 @@
+// Unificando os middlewares de autenticação para evitar duplicidade
 const jwt = require('jsonwebtoken');
+const User = require('../models/user');
 
 // Middleware para verificar token JWT
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   try {
     // Obter o token do header Authorization
     const authHeader = req.headers.authorization;
@@ -15,8 +17,20 @@ const authMiddleware = (req, res, next) => {
     // Verificar o token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     
-    // Adicionar o ID do usuário ao objeto de requisição
-    req.user = { userId: decoded.userId };
+    // Buscar o usuário pelo ID e não incluir a senha
+    const user = await User.findById(decoded.userId || decoded.id).select('-password');
+    if (!user) {
+      console.log('Usuário não encontrado após verificação do token');
+      return res.status(401).json({ message: 'Usuário não encontrado' });
+    }
+    
+    // Adicionar o usuário e ID ao objeto de requisição
+    req.user = { 
+      userId: user._id,
+      role: user.role,
+      email: user.email,
+      name: user.name
+    };
     
     next();
   } catch (error) {
@@ -34,4 +48,10 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-module.exports = { authMiddleware };
+// Para compatibilidade com código existente
+const protect = authMiddleware;
+
+module.exports = { 
+  authMiddleware,
+  protect
+};
