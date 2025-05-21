@@ -50,27 +50,36 @@ export default function MetaCallback() {
             description: "Sua conta Meta foi conectada com sucesso.",
           });
 
-          // Redirecionar para o dashboard
-          navigate("/dashboard");
+          // Redirecionar para o dashboard com um pequeno atraso para garantir que o toast seja exibido
+          setTimeout(() => {
+            console.log("Redirecionando para o dashboard após conexão bem-sucedida");
+            navigate("/dashboard");
+          }, 1500);
+          
           return;
         }
 
         // Se não houver parâmetros de sucesso ou erro, verificar se há código de autorização
         const code = params.get("code");
-        if (!code) {
-          throw new Error("Parâmetros de retorno inválidos");
+        if (code) {
+          // Mostrar mensagem de processamento
+          toast({
+            title: "Processando conexão",
+            description: "Estamos finalizando a conexão com sua conta Meta...",
+          });
+          
+          // Redirecionar para o dashboard após alguns segundos
+          setTimeout(() => {
+            console.log("Redirecionando para o dashboard após receber código de autorização");
+            navigate("/dashboard");
+          }, 2000);
+          
+          return;
         }
-
-        // Mostrar mensagem de processamento
-        toast({
-          title: "Processando conexão",
-          description: "Estamos finalizando a conexão com sua conta Meta...",
-        });
-
-        // Redirecionar para o dashboard após alguns segundos
-        setTimeout(() => {
-          navigate("/dashboard");
-        }, 3000);
+        
+        // Se chegou aqui, não há parâmetros válidos
+        throw new Error("Parâmetros de retorno inválidos");
+        
       } catch (err: any) {
         console.error("Erro ao processar callback do Meta:", err);
         setError(err.message || "Erro ao processar conexão com Meta");
