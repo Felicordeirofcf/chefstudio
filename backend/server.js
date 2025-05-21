@@ -26,20 +26,16 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   : ['https://chefstudio.vercel.app', 'http://localhost:5173', 'http://localhost:3000', 'https://chefstudio-production.up.railway.app'];
 
 app.use(cors({
-  origin: function (origin, callback) {
-    // Permitir requisições sem origem (como apps mobile ou curl)
-    if (!origin) return callback(null, true);
-    
-    // Verificar se a origem está na lista de permitidas
-    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+  origin: function (origin, callback ) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
       callback(null, true);
     } else {
       callback(new Error('Não permitido por CORS'));
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Middleware para garantir headers CORS em todas as respostas
