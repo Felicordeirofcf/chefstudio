@@ -9,6 +9,7 @@ import {
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import ConnectMeta from './components/auth/ConnectMeta';
+import MetaCallback from './components/auth/MetaCallback';
 import DashboardLayout from './components/layout/DashboardLayout';
 import DashboardHome from './components/dashboard/Dashboard';
 import ProfilePage from './components/dashboard/ProfilePage';
@@ -39,7 +40,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (
     userInfo.metaConnectionStatus !== "connected" &&
-    location.pathname !== "/connect-meta"
+    location.pathname !== "/connect-meta" &&
+    location.pathname !== "/meta-callback"
   ) {
     return <Navigate to="/connect-meta" state={{ from: location }} replace />;
   }
@@ -69,6 +71,14 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <ConnectMeta />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/meta-callback",
+    element: (
+      <ProtectedRoute>
+        <MetaCallback />
       </ProtectedRoute>
     ),
   },
