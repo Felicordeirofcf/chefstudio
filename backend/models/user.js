@@ -1,5 +1,8 @@
+// Modelo para usuário com integração Meta Ads
+// Arquivo: backend/models/user.js
+
 const mongoose = require('mongoose');
-const bcryptjs = require('bcryptjs');
+const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -12,43 +15,26 @@ const userSchema = new mongoose.Schema({
     unique: true
   },
   password: {
-    type: String
-  },
-  role: {
     type: String,
-    enum: ['user', 'admin'],
-    default: 'user'
+    required: function() {
+      // Senha não é obrigatória para usuários que fazem login com Facebook
+      return !this.metaUserId;
+    }
   },
-  establishmentName: {
+  // Campos para integração com Meta Ads
+  metaUserId: {
     type: String
   },
-  businessType: {
+  metaAccessToken: {
     type: String
   },
-  whatsapp: {
-    type: String
-  },
-  menuLink: {
-    type: String
-  },
-  address: {
-    type: String
-  },
-  cep: {
-    type: String
-  },
-  plan: {
-    type: String,
-    default: 'free'
-  },
-  facebookId: {
-    type: String
-  },
-  facebookAccessToken: {
-    type: String
-  },
-  facebookTokenExpiry: {
+  metaTokenExpires: {
     type: Date
+  },
+  metaConnectionStatus: {
+    type: String,
+    enum: ['connected', 'disconnected', 'expired'],
+    default: 'disconnected'
   },
   adsAccountId: {
     type: String
@@ -56,41 +42,44 @@ const userSchema = new mongoose.Schema({
   adsAccountName: {
     type: String
   },
-  instagramAccounts: {
-    type: Array,
-    default: []
+  adAccounts: [
+    {
+      id: String,
+      name: String,
+      status: Number,
+      amountSpent: Number,
+      currency: String
+    }
+  ],
+  // Outros campos do usuário
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
   },
   createdAt: {
     type: Date,
     default: Date.now
   }
+}, {
+  timestamps: true
 });
 
-// Hash da senha antes de salvar
-userSchema.pre('save', async function(next) {
-  // Só hash a senha se ela foi modificada (ou é nova)
-  if (!this.isModified('password') || !this.password) return next();
-  
-  try {
-    // Gerar salt
-    const salt = await bcryptjs.genSalt(10);
-    
-    // Hash da senha com o salt
-    this.password = await bcryptjs.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Método para comparar senha
-userSchema.methods.comparePassword = async function(candidatePassword) {
-  try {
-    return await bcryptjs.compare(candidatePassword, this.password);
-  } catch (error) {
-    throw error;
-  }
+// Método para verificar senha
+userSchema.methods.matchPassword = async function(enteredPassword) {
+  if (!this.password) return false;
+  return await bcrypt.compare(enteredPassword, this.password);
 };
+
+// Middleware para criptografar senha antes de salvar
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password') || !this.password) {
+    next();
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+});
 
 const User = mongoose.model('User', userSchema);
 
