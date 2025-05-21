@@ -1,180 +1,178 @@
-import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
-import { api } from '../lib/api';
-import { useToast } from '../hooks/use-toast';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
+import { FaFacebook, FaInstagram } from 'react-icons/fa';
+import { Loader2 } from 'lucide-react';
+import axios from 'axios';
 
 const MetaAdsConnection = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [accounts, setAccounts] = useState([]);
-  const [selectedAccount, setSelectedAccount] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState('disconnected');
-  const { toast } = useToast();
+  const [user, setUser] = useState(null);
+  const [error, setError] = useState(null);
 
-  // Verificar status da conexão ao carregar o componente
   useEffect(() => {
-    checkConnectionStatus();
+    // Carregar dados do usuário do localStorage
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
   }, []);
 
-  const checkConnectionStatus = async () => {
+  const handleMetaConnect = async () => {
     try {
+      setLoading(true);
+      setError(null);
+
+      // Obter token JWT do localStorage
       const token = localStorage.getItem('token');
-      if (!token) return;
-
-      const userInfo = await api.get('/auth/me', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      if (userInfo.data.hasMetaAdsConnection) {
-        setConnectionStatus('connected');
-        setSelectedAccount({
-          id: userInfo.data.adsAccountId,
-          name: userInfo.data.adsAccountName
-        });
-      } else {
-        // Se o usuário está logado com Facebook mas não tem conta selecionada
-        if (userInfo.data.facebookId) {
-          fetchAdAccounts();
-        }
+      if (!token) {
+        throw new Error('Usuário não autenticado');
       }
-    } catch (error) {
-      console.error('Erro ao verificar status da conexão:', error);
-    }
-  };
 
-  const fetchAdAccounts = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
-      const response = await api.get('/ads/accounts', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      setAccounts(response.data);
-      setConnectionStatus('accounts_available');
-    } catch (error) {
-      console.error('Erro ao buscar contas de anúncios:', error);
+      // Configurar URL da API
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://chefstudio-production.up.railway.app';
       
-      // Verificar se o erro é por falta de autenticação com Facebook
-      if (error.response?.data?.needsFacebookAuth) {
-        setConnectionStatus('disconnected');
-      }
-    } finally {
+      // Redirecionar para o endpoint de login do Meta com o token
+      window.location.href = `${apiUrl}/api/meta/login?token=${token}`;
+    } catch (error) {
+      console.error('Erro ao conectar com Meta:', error);
+      setError(error.message || 'Erro ao conectar com Meta');
       setLoading(false);
     }
   };
 
-  const handleSelectAccount = async (account) => {
-    setLoading(true);
+  const handleDisconnect = async () => {
     try {
+      setLoading(true);
+      setError(null);
+
+      // Obter token JWT do localStorage
       const token = localStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        throw new Error('Usuário não autenticado');
+      }
 
-      await api.post('/ads/accounts/select', {
-        accountId: account.id,
-        accountName: account.name,
-        accountCurrency: account.currency
-      }, {
-        headers: {
-          Authorization: `Bearer ${token}`
+      // Configurar URL da API
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://chefstudio-production.up.railway.app';
+      
+      // Fazer requisição para desconectar do Meta
+      const response = await axios.post(
+        `${apiUrl}/api/meta/disconnect`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
         }
-      });
+      );
 
-      setSelectedAccount(account);
-      setConnectionStatus('connected');
-      
-      toast({
-        title: 'Conta de anúncios conectada!',
-        description: `A conta "${account.name}" foi conectada com sucesso.`,
-        variant: 'success'
-      });
+      // Atualizar dados do usuário no localStorage
+      if (response.data && response.data.user) {
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        setUser(response.data.user);
+      }
+
+      setLoading(false);
     } catch (error) {
-      console.error('Erro ao selecionar conta de anúncios:', error);
-      
-      toast({
-        title: 'Erro ao conectar conta',
-        description: error.response?.data?.message || 'Não foi possível conectar a conta de anúncios.',
-        variant: 'destructive'
-      });
-    } finally {
+      console.error('Erro ao desconectar do Meta:', error);
+      setError(error.message || 'Erro ao desconectar do Meta');
       setLoading(false);
     }
   };
 
-  const handleConnectFacebook = () => {
-    // Redirecionar para o endpoint de autenticação do Facebook no backend
-    const backendUrl = import.meta.env.VITE_API_URL || 'https://chefstudio-production.up.railway.app';
-    window.location.href = `${backendUrl}/api/auth/facebook`;
-  };
-
-  const renderConnectionStatus = () => {
-    switch (connectionStatus) {
-      case 'connected':
-        return (
-          <div className="bg-green-50 p-4 rounded-md border border-green-200">
-            <h3 className="text-green-800 font-medium">Conectado ao Meta Ads</h3>
-            <p className="text-green-700 mt-1">
-              Conta conectada: <strong>{selectedAccount?.name}</strong> ({selectedAccount?.id})
-            </p>
-          </div>
-        );
-      
-      case 'accounts_available':
-        return (
-          <div className="space-y-4">
-            <h3 className="font-medium">Selecione uma conta de anúncios:</h3>
-            {accounts.length === 0 ? (
-              <p className="text-amber-700">Nenhuma conta de anúncios encontrada. Verifique se você tem acesso a contas de anúncios no Meta Ads.</p>
-            ) : (
-              <div className="grid gap-2">
-                {accounts.map(account => (
-                  <div 
-                    key={account.id} 
-                    className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
-                    onClick={() => handleSelectAccount(account)}
-                  >
-                    <p className="font-medium">{account.name}</p>
-                    <p className="text-sm text-gray-500">{account.id} • {account.currency}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      
-      case 'disconnected':
-      default:
-        return (
-          <div className="text-center space-y-4">
-            <p className="text-gray-600">
-              Conecte-se ao Meta Ads para gerenciar suas campanhas de anúncios diretamente pelo ChefStudio.
-            </p>
-            <Button 
-              onClick={handleConnectFacebook}
-              className="bg-[#1877F2] hover:bg-[#166FE5] text-white"
-              disabled={loading}
-            >
-              {loading ? 'Conectando...' : 'Conectar com Facebook'}
-            </Button>
-          </div>
-        );
-    }
-  };
+  const isConnected = user && user.metaConnectionStatus === 'connected';
 
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
-        <CardTitle>Conexão com Meta Ads</CardTitle>
+        <CardTitle className="text-xl">Conexão com Meta Ads</CardTitle>
+        <CardDescription>
+          Conecte sua conta do Facebook/Instagram para gerenciar seus anúncios
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        {renderConnectionStatus()}
+        <div className="space-y-4">
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+              {error}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FaFacebook size={24} className="text-[#1877F2]" />
+              <span>Facebook</span>
+            </div>
+            <div className="text-sm font-medium">
+              {isConnected ? (
+                <span className="text-green-600">Conectado</span>
+              ) : (
+                <span className="text-gray-400">Desconectado</span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FaInstagram size={24} className="text-[#E1306C]" />
+              <span>Instagram</span>
+            </div>
+            <div className="text-sm font-medium">
+              {isConnected ? (
+                <span className="text-green-600">Conectado</span>
+              ) : (
+                <span className="text-gray-400">Desconectado</span>
+              )}
+            </div>
+          </div>
+
+          {isConnected && user.adsAccountId && (
+            <div className="mt-4 p-3 bg-gray-50 rounded-md">
+              <h3 className="font-medium text-sm text-gray-700">Conta de Anúncios Conectada</h3>
+              <p className="text-sm text-gray-600 mt-1">{user.adsAccountName || user.adsAccountId}</p>
+            </div>
+          )}
+        </div>
       </CardContent>
+      <CardFooter>
+        {isConnected ? (
+          <Button
+            onClick={handleDisconnect}
+            variant="outline"
+            className="w-full"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Desconectando...
+              </>
+            ) : (
+              'Desconectar do Meta'
+            )}
+          </Button>
+        ) : (
+          <Button
+            onClick={handleMetaConnect}
+            className="w-full bg-[#1877F2] hover:bg-[#166FE5] text-white"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Conectando...
+              </>
+            ) : (
+              <>
+                <FaFacebook size={20} className="mr-2" />
+                Conectar Instagram / Facebook
+              </>
+            )}
+          </Button>
+        )}
+      </CardFooter>
     </Card>
   );
 };

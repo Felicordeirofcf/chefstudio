@@ -1,178 +1,139 @@
 # ChefStudio - Plataforma de Marketing Digital para Restaurantes
 
-## Visão Geral
-
 ChefStudio é uma plataforma completa de marketing digital desenvolvida especificamente para restaurantes e estabelecimentos gastronômicos. A plataforma permite que proprietários de restaurantes gerenciem sua presença online, conectem-se com clientes através de redes sociais, criem campanhas publicitárias automatizadas e monitorem o desempenho de suas estratégias de marketing.
 
-## Funcionalidades Atuais
+## Novidades: Integração com Meta Ads
 
-### 1. Autenticação e Gerenciamento de Usuários
-- **Registro de usuários** com informações do estabelecimento
-- **Login seguro** com JWT (JSON Web Token)
-- **Refresh token** para manter sessões ativas
-- **Recuperação de senha** via email
-- **Perfil de usuário** com informações do restaurante
+Agora o ChefStudio conta com integração completa com o Meta Ads (Facebook/Instagram), permitindo:
 
-### 2. Integração com Meta Ads
-- **Conexão OAuth** com Facebook/Instagram
-- **Autorização de contas** de anúncios
-- **Acesso a métricas** de campanhas existentes
-- **Visualização de contas** de anúncios disponíveis
-- **Gerenciamento de permissões** para publicação de conteúdo
+- **Login automático com Facebook**: Autenticação simplificada para seus clientes
+- **Coleta automática de permissões**: Todas as permissões necessárias são solicitadas automaticamente
+- **Obtenção do ID da conta de anúncio**: O sistema identifica e armazena automaticamente a conta de anúncio do usuário
+- **Métricas reais no dashboard**: Exibição de métricas reais do Meta Ads diretamente no dashboard
+- **Número de anúncios**: Visualização do total de anúncios e anúncios ativos
 
-### 3. Dashboard Interativo
-- **Visão geral** de métricas de marketing
-- **Gráficos de desempenho** de campanhas
-- **Mapa interativo** de alcance geográfico
-- **Indicadores de performance** (KPIs) em tempo real
-- **Filtros personalizáveis** por período e tipo de campanha
+## Funcionalidades Principais
 
-### 4. Gerenciamento de Cardápio
-- **Cadastro de itens** do cardápio
-- **Upload de imagens** dos pratos
-- **Categorização** de produtos
-- **Preços e descrições** detalhadas
-- **Destaque para itens** especiais ou sazonais
+### 1\. Autenticação e Gerenciamento de Usuários
 
-### 5. Campanhas Automatizadas
-- **Criação de campanhas** publicitárias
-- **Segmentação de público** por localização e interesses
-- **Definição de orçamento** e duração
-- **Seleção de objetivos** de marketing
-- **Templates pré-definidos** para diferentes tipos de promoções
+*   **Registro de usuários** com informações do estabelecimento
+*   **Login seguro** com JWT (JSON Web Token)
+*   **Login com Facebook** para acesso rápido e integração com Meta Ads
+*   **Refresh token** para manter sessões ativas
+*   **Recuperação de senha** via email
+*   **Perfil de usuário** com informações do restaurante
 
-### 6. API Documentada
-- **Swagger UI** para visualização e teste de endpoints
-- **Autenticação via Bearer Token**
-- **Endpoints RESTful** para todas as funcionalidades
-- **Respostas padronizadas** em formato JSON
-- **Tratamento de erros** consistente
+### 2\. Integração com Meta Ads
 
-### 7. Planos e Assinaturas
-- **Sistema de planos** (Free, Basic, Premium)
-- **Limitações por plano** (número de campanhas, recursos disponíveis)
-- **Upgrade de plano** dentro da plataforma
-- **Histórico de assinaturas**
+*   **Conexão OAuth** com Facebook/Instagram
+*   **Autorização de contas** de anúncios
+*   **Acesso a métricas** de campanhas existentes
+*   **Visualização de contas** de anúncios disponíveis
+*   **Gerenciamento de permissões** para publicação de conteúdo
+*   **Coleta automática** do ID da conta de anúncio
 
-## Funcionalidades Futuras Recomendadas
+### 3\. Dashboard de Métricas
 
-### 1. Inteligência Artificial para Criação de Conteúdo
-- **Geração automática de textos** para posts e anúncios
-- **Sugestões de imagens** baseadas no cardápio
-- **Análise de sentimento** de comentários de clientes
-- **Recomendações personalizadas** de estratégias de marketing
-- **Otimização automática** de campanhas baseada em desempenho
+*   **Visão geral** de métricas de marketing
+*   **Gráficos de desempenho** de campanhas
+*   **Mapa interativo** de alcance geográfico
+*   **Indicadores de performance** (KPIs) em tempo real
+*   **Filtros personalizáveis** por período e tipo de campanha
+*   **Número de anúncios** ativos e total
 
-### 2. Integração com Plataformas de Delivery
-- **Conexão com iFood, Uber Eats, Rappi** e outros
-- **Sincronização de cardápio** entre plataformas
-- **Análise unificada** de vendas por canal
-- **Promoções específicas** para cada plataforma
-- **Monitoramento de avaliações** em tempo real
+### 4\. Gerenciamento de Cardápio
 
-### 3. Sistema de Fidelidade e CRM
-- **Cadastro de clientes** com preferências e histórico
-- **Programas de pontos** e recompensas
-- **Campanhas de email marketing** segmentadas
-- **Notificações push** para ofertas especiais
-- **Análise de comportamento** e jornada do cliente
+*   **Cadastro de itens** do cardápio
+*   **Upload de imagens** dos pratos
+*   **Categorização** de produtos
+*   **Preços e descrições** detalhadas
+*   **Destaque para itens** especiais ou sazonais
 
-### 4. Reservas Online e Gestão de Mesas
-- **Sistema de reservas** integrado ao site
-- **Confirmação automática** por email/SMS
-- **Mapa interativo** de mesas do restaurante
-- **Histórico de reservas** por cliente
-- **Lembretes automáticos** para clientes e equipe
+### 5\. Campanhas Automatizadas
 
-### 5. Analytics Avançado
-- **Previsão de demanda** baseada em histórico e sazonalidade
-- **Análise de ROI** por campanha e canal
-- **Segmentação avançada** de clientes
-- **Relatórios personalizáveis** para diferentes áreas do negócio
-- **Exportação de dados** em múltiplos formatos
+*   **Criação de campanhas** publicitárias
+*   **Segmentação de público** por localização e interesses
+*   **Definição de orçamento** e duração
+*   **Seleção de objetivos** de marketing
+*   **Templates pré-definidos** para diferentes tipos de promoções
 
-### 6. Marketplace de Templates e Recursos
-- **Biblioteca de templates** para diferentes ocasiões
-- **Banco de imagens** específico para gastronomia
-- **Recursos gráficos** personalizáveis
-- **Compartilhamento de campanhas** de sucesso entre usuários
-- **Recursos educacionais** sobre marketing gastronômico
-
-### 7. Integração com Google Business Profile
-- **Sincronização de informações** com Google Meu Negócio
-- **Gestão de avaliações** do Google
-- **Publicação de posts** diretamente no perfil
-- **Atualização automática** de horários e informações
-- **Métricas unificadas** de desempenho
-
-### 8. Chatbot para Atendimento ao Cliente
-- **Assistente virtual** para responder perguntas frequentes
-- **Integração com WhatsApp** e Messenger
-- **Reservas automatizadas** via chat
-- **Pedidos e consultas** de cardápio
-- **Coleta de feedback** pós-atendimento
-
-### 9. Aplicativo Mobile para Gestão
-- **Versão mobile** completa para iOS e Android
-- **Notificações em tempo real** de campanhas e resultados
-- **Aprovação rápida** de anúncios e publicações
-- **Dashboard simplificado** para monitoramento constante
-- **Acesso offline** a relatórios importantes
-
-### 10. Segurança e Conformidade Avançadas
-- **Conformidade total com LGPD/GDPR**
-- **Criptografia avançada** de dados sensíveis
-- **Autenticação multifator** (MFA)
-- **Logs detalhados** de atividades e acessos
-- **Backups automáticos** e recuperação de desastres
-
-## Requisitos Técnicos
+## Tecnologias Utilizadas
 
 ### Backend
-- Node.js
-- Express.js
-- MongoDB
-- JWT para autenticação
-- Swagger para documentação da API
+*   Node.js
+*   Express.js
+*   MongoDB
+*   JWT para autenticação
+*   Swagger para documentação da API
 
 ### Frontend
-- React.js
-- TypeScript
-- Tailwind CSS
-- Shadcn UI
-- Vite
+*   React.js
+*   TypeScript
+*   Tailwind CSS
+*   Shadcn UI
+*   Vite
 
 ### Infraestrutura
-- Railway para hospedagem do backend
-- Vercel para hospedagem do frontend
-- MongoDB Atlas para banco de dados
-- GitHub para controle de versão
+*   Railway para hospedagem do backend
+*   Vercel para hospedagem do frontend
+*   MongoDB Atlas para banco de dados
+*   GitHub para controle de versão
 
 ## Instruções de Instalação e Deploy
 
 ### Backend
-1. Clone o repositório
-2. Instale as dependências: `npm install`
-3. Configure as variáveis de ambiente no arquivo `.env`
-4. Execute o servidor: `npm start`
-5. Acesse a documentação Swagger: `http://localhost:3001/api-docs`
+1.  Clone o repositório
+2.  Instale as dependências: `npm install`
+3.  Configure as variáveis de ambiente no arquivo `.env`:
+    ```
+    PORT=3001
+    MONGODB_URI=sua_string_de_conexao_mongodb
+    JWT_SECRET=sua_chave_secreta
+    FB_APP_ID=seu_app_id_do_facebook
+    FB_APP_SECRET=seu_app_secret_do_facebook
+    FACEBOOK_REDIRECT_URI=https://seu-backend.com/api/meta/callback
+    BASE_URL=https://seu-backend.com
+    FRONTEND_URL=https://seu-frontend.com
+    ALLOWED_ORIGINS=https://seu-frontend.com,http://localhost:5173
+    ```
+4.  Execute o servidor: `npm start`
+5.  Acesse a documentação Swagger: `http://localhost:3001/api-docs`
 
 ### Frontend
-1. Navegue até a pasta frontend: `cd frontend`
-2. Instale as dependências: `npm install`
-3. Configure as variáveis de ambiente no arquivo `.env`
-4. Execute o servidor de desenvolvimento: `npm run dev`
-5. Para build de produção: `npm run build`
+1.  Navegue até a pasta frontend: `cd frontend`
+2.  Instale as dependências: `npm install`
+3.  Configure as variáveis de ambiente no arquivo `.env`:
+    ```
+    VITE_API_URL=https://seu-backend.com
+    ```
+4.  Execute o servidor de desenvolvimento: `npm run dev`
+5.  Para build de produção: `npm run build`
+
+## Fluxo de Integração Meta Ads
+
+1. O usuário clica no botão "Conectar Instagram / Facebook" no componente MetaAdsConnection
+2. O sistema redireciona para a página de autenticação do Facebook, solicitando as permissões necessárias
+3. Após autorização, o Facebook redireciona para o callback do backend
+4. O backend processa o código de autorização e redireciona para o frontend
+5. O componente MetaCallback envia o código para o backend via POST /api/meta/connect
+6. O backend:
+   - Troca o código por um token de acesso
+   - Obtém informações do usuário do Facebook
+   - Obtém as contas de anúncio disponíveis
+   - Armazena o ID da primeira conta de anúncio
+   - Salva todas as informações no perfil do usuário
+7. O frontend atualiza o localStorage com os dados do usuário
+8. O dashboard exibe as métricas reais obtidas via API do Meta Ads
 
 ## Contribuição
 
 Para contribuir com o projeto, siga estas etapas:
 
-1. Faça um fork do repositório
-2. Crie uma branch para sua feature: `git checkout -b feature/nova-funcionalidade`
-3. Faça commit das alterações: `git commit -m 'Adiciona nova funcionalidade'`
-4. Envie para o branch: `git push origin feature/nova-funcionalidade`
-5. Abra um Pull Request
+1.  Faça um fork do repositório
+2.  Crie uma branch para sua feature: `git checkout -b feature/nova-funcionalidade`
+3.  Faça commit das alterações: `git commit -m 'Adiciona nova funcionalidade'`
+4.  Envie para o branch: `git push origin feature/nova-funcionalidade`
+5.  Abra um Pull Request
 
 ## Licença
 
@@ -181,5 +142,6 @@ Este projeto está licenciado sob a licença MIT - veja o arquivo LICENSE para d
 ## Contato
 
 Para mais informações, entre em contato com a equipe do ChefStudio:
-- Email: contato@chefstudio.com.br
-- Website: https://chefstudio.com.br
+
+*   Email: contato@chefstudio.com.br
+*   Website: https://chefstudio.com.br
