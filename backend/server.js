@@ -2,13 +2,11 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const passport = require('./middleware/passport');
 const authRoutes = require('./routes/auth');
-const adsRoutes = require('./routes/ads');
-const notificationsRoutes = require('./routes/notifications');
+const userRoutes = require('./routes/user');
+const metaRoutes = require('./routes/meta');
+const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
-const fs = require('fs');
-const path = require('path');
 
 // Carregar variáveis de ambiente
 dotenv.config();
@@ -23,7 +21,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Configuração CORS para origens específicas
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',') 
-  : ['https://chefstudio.vercel.app', 'http://localhost:5173', 'http://localhost:3000'];
+  : ['https://chefstudio.vercel.app', 'http://localhost:5173', 'http://localhost:3000', 'https://chefstudio-production.up.railway.app'];
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -60,34 +58,36 @@ app.use((req, res, next) => {
   next();
 });
 
-// Inicializar Passport
-app.use(passport.initialize());
+// Endpoint de healthcheck para Railway
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'Server is running' });
+});
 
-// Definir rotas
-app.use('/api/auth', authRoutes);
-app.use('/api/ads', adsRoutes);
-app.use('/api/notifications', notificationsRoutes);
-
-// Carregar e configurar Swagger
-let swaggerSpec;
-try {
-  const swaggerJson = fs.readFileSync(path.join(__dirname, 'swagger.json'), 'utf8');
-  swaggerSpec = JSON.parse(swaggerJson);
-} catch (err) {
-  console.warn('Arquivo swagger.json não encontrado ou inválido. Documentação API não estará disponível.');
-  swaggerSpec = {
+// Configuração do Swagger
+const swaggerOptions = {
+  definition: {
     openapi: '3.0.0',
     info: {
       title: 'ChefStudio API',
       version: '1.0.0',
-      description: 'API para o ChefStudio - Documentação não disponível'
+      description: 'API para o ChefStudio - Plataforma de Marketing Digital',
     },
-    paths: {}
-  };
-}
+    servers: [
+      {
+        url: process.env.BASE_URL || 'http://localhost:3000',
+      },
+    ],
+  },
+  apis: ['./routes/*.js'],
+};
 
-// Rota para documentação Swagger
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+const swaggerDocs = swaggerJsDoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
+// Rotas
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/meta', metaRoutes);
 
 // Rota raiz
 app.get('/', (req, res) => {
