@@ -11,7 +11,80 @@ const refreshToken = require('../models/refreshtoken');
 const { authMiddleware } = require('../middleware/auth');
 const crypto = require('crypto');
 
-// Registrar novo usuário
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Registra um novo usuário
+ *     tags: [Autenticação]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - password
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Nome do usuário
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email do usuário
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: Senha do usuário (mínimo 6 caracteres)
+ *               establishmentName:
+ *                 type: string
+ *                 description: Nome do estabelecimento
+ *               businessType:
+ *                 type: string
+ *                 description: Tipo de negócio
+ *               whatsapp:
+ *                 type: string
+ *                 description: Número de WhatsApp
+ *               menuLink:
+ *                 type: string
+ *                 description: Link para o cardápio
+ *               address:
+ *                 type: string
+ *                 description: Endereço do estabelecimento
+ *               cep:
+ *                 type: string
+ *                 description: CEP do estabelecimento
+ *     responses:
+ *       201:
+ *         description: Usuário registrado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Usuário registrado com sucesso
+ *                 _id:
+ *                   type: string
+ *                   example: 60d21b4667d0d8992e610c85
+ *                 name:
+ *                   type: string
+ *                   example: João Silva
+ *                 email:
+ *                   type: string
+ *                   example: joao@exemplo.com
+ *                 token:
+ *                   type: string
+ *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *       400:
+ *         description: Erro de validação ou email já cadastrado
+ *       500:
+ *         description: Erro interno do servidor
+ */
 router.post('/register', async (req, res) => {
   try {
     console.log('Iniciando registro de usuário');
@@ -133,7 +206,60 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Autentica um usuário
+ *     tags: [Autenticação]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email do usuário
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: Senha do usuário
+ *     responses:
+ *       200:
+ *         description: Login realizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Login realizado com sucesso
+ *                 _id:
+ *                   type: string
+ *                   example: 60d21b4667d0d8992e610c85
+ *                 name:
+ *                   type: string
+ *                   example: João Silva
+ *                 email:
+ *                   type: string
+ *                   example: joao@exemplo.com
+ *                 token:
+ *                   type: string
+ *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *       400:
+ *         description: Campos obrigatórios ausentes
+ *       401:
+ *         description: Credenciais inválidas
+ *       500:
+ *         description: Erro interno do servidor
+ */
 router.post('/login', async (req, res) => {
   try {
     console.log('Iniciando login');
@@ -226,7 +352,45 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Refresh token
+/**
+ * @swagger
+ * /api/auth/refresh-token:
+ *   post:
+ *     summary: Atualiza o token de acesso usando um refresh token
+ *     tags: [Autenticação]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshTokenString
+ *             properties:
+ *               refreshTokenString:
+ *                 type: string
+ *                 description: Refresh token obtido durante login ou registro
+ *     responses:
+ *       200:
+ *         description: Token atualizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Token atualizado com sucesso
+ *                 token:
+ *                   type: string
+ *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *       400:
+ *         description: Refresh token ausente
+ *       401:
+ *         description: Refresh token inválido ou expirado
+ *       500:
+ *         description: Erro interno do servidor
+ */
 router.post('/refresh-token', async (req, res) => {
   try {
     console.log('Iniciando refresh token');
@@ -317,7 +481,38 @@ router.post('/refresh-token', async (req, res) => {
   }
 });
 
-// Obter informações do usuário
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Obtém informações do usuário autenticado
+ *     tags: [Autenticação]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Informações do usuário obtidas com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 _id:
+ *                   type: string
+ *                   example: 60d21b4667d0d8992e610c85
+ *                 name:
+ *                   type: string
+ *                   example: João Silva
+ *                 email:
+ *                   type: string
+ *                   example: joao@exemplo.com
+ *       401:
+ *         description: Não autorizado, token ausente ou inválido
+ *       404:
+ *         description: Usuário não encontrado
+ *       500:
+ *         description: Erro interno do servidor
+ */
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     console.log('Obtendo informações do usuário, ID:', req.user.userId);
@@ -365,7 +560,60 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
-// Atualizar perfil do usuário
+/**
+ * @swagger
+ * /api/auth/profile:
+ *   put:
+ *     summary: Atualiza o perfil do usuário
+ *     tags: [Autenticação]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Nome do usuário
+ *               establishmentName:
+ *                 type: string
+ *                 description: Nome do estabelecimento
+ *               businessType:
+ *                 type: string
+ *                 description: Tipo de negócio
+ *               whatsapp:
+ *                 type: string
+ *                 description: Número de WhatsApp
+ *               menuLink:
+ *                 type: string
+ *                 description: Link para o cardápio
+ *               address:
+ *                 type: string
+ *                 description: Endereço do estabelecimento
+ *               cep:
+ *                 type: string
+ *                 description: CEP do estabelecimento
+ *     responses:
+ *       200:
+ *         description: Perfil atualizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Perfil atualizado com sucesso
+ *       401:
+ *         description: Não autorizado, token ausente ou inválido
+ *       404:
+ *         description: Usuário não encontrado
+ *       500:
+ *         description: Erro interno do servidor
+ */
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
     console.log('Atualizando perfil do usuário, ID:', req.user.userId);
@@ -420,7 +668,49 @@ router.put('/profile', authMiddleware, async (req, res) => {
   }
 });
 
-// Atualizar plano do usuário
+/**
+ * @swagger
+ * /api/auth/plan:
+ *   put:
+ *     summary: Atualiza o plano do usuário
+ *     tags: [Autenticação]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - planName
+ *             properties:
+ *               planName:
+ *                 type: string
+ *                 description: Nome do plano (free, premium, etc)
+ *     responses:
+ *       200:
+ *         description: Plano atualizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Plano atualizado com sucesso
+ *                 plan:
+ *                   type: string
+ *                   example: premium
+ *       400:
+ *         description: Nome do plano ausente
+ *       401:
+ *         description: Não autorizado, token ausente ou inválido
+ *       404:
+ *         description: Usuário não encontrado
+ *       500:
+ *         description: Erro interno do servidor
+ */
 router.put('/plan', authMiddleware, async (req, res) => {
   try {
     console.log('Atualizando plano do usuário, ID:', req.user.userId);
@@ -455,7 +745,40 @@ router.put('/plan', authMiddleware, async (req, res) => {
   }
 });
 
-// Logout
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Realiza o logout do usuário
+ *     tags: [Autenticação]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               refreshTokenString:
+ *                 type: string
+ *                 description: Refresh token a ser invalidado
+ *     responses:
+ *       200:
+ *         description: Logout realizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Logout realizado com sucesso
+ *       401:
+ *         description: Não autorizado, token ausente ou inválido
+ *       500:
+ *         description: Erro interno do servidor
+ */
 router.post('/logout', authMiddleware, async (req, res) => {
   try {
     console.log('Iniciando logout');
@@ -487,20 +810,6 @@ router.post('/logout', authMiddleware, async (req, res) => {
       error: error.message
     });
   }
-});
-
-// Rota de teste para verificar se a autenticação está funcionando
-router.get('/test', (req, res) => {
-  console.log('Rota de teste de autenticação acessada');
-  res.status(200).json({ 
-    message: 'Rota de teste de autenticação funcionando corretamente',
-    timestamp: new Date(),
-    env: {
-      nodeEnv: process.env.NODE_ENV || 'development',
-      mongodbUri: process.env.MONGODB_URI ? 'Configurado' : 'Não configurado',
-      jwtSecret: process.env.JWT_SECRET ? 'Configurado' : 'Não configurado'
-    }
-  });
 });
 
 module.exports = router;
