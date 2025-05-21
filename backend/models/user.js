@@ -19,6 +19,28 @@ const userSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user'
   },
+  establishmentName: {
+    type: String
+  },
+  businessType: {
+    type: String
+  },
+  whatsapp: {
+    type: String
+  },
+  menuLink: {
+    type: String
+  },
+  address: {
+    type: String
+  },
+  cep: {
+    type: String
+  },
+  plan: {
+    type: String,
+    default: 'free'
+  },
   facebookId: {
     type: String
   },
