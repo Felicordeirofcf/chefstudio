@@ -100,39 +100,18 @@ const MetaAdsConnection = () => {
         throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
       }
       
-      // Obter URL de autorização
+      // Obter URL de autorização - Simplificado para usar diretamente a rota de login
       try {
-        const response = await axios.get('/api/meta/auth-url', {
-          headers: {
-            Authorization: `Bearer ${userToken}`
-          }
-        });
+        // Usar diretamente a rota de login do Meta
+        const baseUrl = (import.meta.env.VITE_API_URL || window.location.origin).replace(/\/+$/, "");
+        const redirectUrl = `${baseUrl}/api/meta/login?token=${encodeURIComponent(userToken)}`;
         
-        // Redirecionar para página de autorização do Facebook
-        if (response.data && response.data.url) {
-          window.location.href = response.data.url;
-          return;
-        } else {
-          throw new Error('URL de autorização não recebida');
-        }
+        console.log("MetaAdsConnection: Redirecionando para autenticação Meta:", redirectUrl);
+        window.location.href = redirectUrl;
+        return;
       } catch (err) {
-        // Se o primeiro endpoint falhar, tentar endpoint alternativo
-        if (err.response && err.response.status === 404) {
-          const altResponse = await axios.get('/api/auth/meta-connect', {
-            headers: {
-              Authorization: `Bearer ${userToken}`
-            }
-          });
-          
-          if (altResponse.data && altResponse.data.url) {
-            window.location.href = altResponse.data.url;
-            return;
-          } else {
-            throw new Error('URL de autorização não recebida do endpoint alternativo');
-          }
-        } else {
-          throw err;
-        }
+        console.error("Erro ao redirecionar para autenticação Meta:", err);
+        throw err;
       }
     } catch (err) {
       console.error('Erro ao conectar com Meta Ads:', err);
