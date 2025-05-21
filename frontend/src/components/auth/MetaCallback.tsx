@@ -52,7 +52,8 @@ export default function MetaCallback() {
         });
 
         // Enviar o código para o backend para completar a integração
-        const response = await api.post("/auth/meta-connect", { code });
+        // Corrigido: alterado de /auth/meta-connect para /meta/connect
+        const response = await api.post("/meta/connect", { code });
 
         // Atualizar informações do usuário no localStorage
         const updatedUserInfo = {
