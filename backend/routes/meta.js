@@ -55,9 +55,15 @@ router.get('/login', async (req, res) => {
     }
     
     // Verificar se o usuário existe
-    const user = await User.findById(decoded.id);
+    // Corrigido: usar decoded.userId em vez de decoded.id
+    const user = await User.findById(decoded.userId);
     if (!user) {
-      return res.status(401).json({ message: 'Usuário não encontrado' });
+      return res.status(401).json({ 
+        message: 'Usuário não encontrado',
+        details: {
+          decodedToken: decoded
+        }
+      });
     }
     
     // Configuração do Facebook
