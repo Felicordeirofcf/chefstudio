@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "../hooks/use-toast";
 import axios from "axios";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
@@ -20,9 +19,10 @@ export default function CreateAdFromPost() {
   const [success, setSuccess] = useState(false);
   const [adDetails, setAdDetails] = useState(null);
   
+  // Pré-preencher com a URL fornecida pelo usuário
   const [formData, setFormData] = useState({
-    postUrl: "",
-    adName: "",
+    postUrl: "https://www.facebook.com/photo/?fbid=122102873852863870&set=a.122102873882863870",
+    adName: "Promoção ChefStudio",
     dailyBudget: "10",
     startDate: new Date(),
     endDate: null,
@@ -143,6 +143,40 @@ export default function CreateAdFromPost() {
     }
   };
 
+  // Verificar status de conexão Meta ao carregar o componente
+  useEffect(() => {
+    const checkMetaConnection = async () => {
+      try {
+        const userInfo = localStorage.getItem("userInfo");
+        const token = userInfo ? JSON.parse(userInfo).token : null;
+        
+        if (!token) return;
+        
+        const API_BASE_URL = `${(import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app").replace(/\/+$/, "")}/api`;
+        const api = axios.create({
+          baseURL: API_BASE_URL,
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        
+        const response = await api.get("/meta/connection-status");
+        
+        if (!response.data.connected) {
+          toast({
+            title: "Conexão Meta necessária",
+            description: "Você precisa conectar sua conta Meta para criar anúncios.",
+            variant: "destructive",
+          });
+        }
+      } catch (err) {
+        console.error("Erro ao verificar status de conexão Meta:", err);
+      }
+    };
+    
+    checkMetaConnection();
+  }, [toast]);
+
   return (
     <div className="container mx-auto py-8 max-w-3xl">
       <Card>
@@ -167,7 +201,7 @@ export default function CreateAdFromPost() {
                   required
                 />
                 <p className="text-sm text-gray-500">
-                  Cole a URL completa da publicação que deseja promover
+                  URL da publicação que você deseja promover
                 </p>
               </div>
               
@@ -374,8 +408,8 @@ export default function CreateAdFromPost() {
                     setSuccess(false);
                     setAdDetails(null);
                     setFormData({
-                      postUrl: "",
-                      adName: "",
+                      postUrl: "https://www.facebook.com/photo/?fbid=122102873852863870&set=a.122102873882863870",
+                      adName: "Promoção ChefStudio",
                       dailyBudget: "10",
                       startDate: new Date(),
                       endDate: null,
