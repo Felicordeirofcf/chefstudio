@@ -24,13 +24,34 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Interceptor para melhorar o tratamento de erros
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Melhorar mensagens de erro para o usuário
+    if (error.response) {
+      // O servidor respondeu com um status de erro
+      console.error('Erro na resposta da API:', error.response.status, error.response.data);
+      const errorMessage = error.response.data?.message || 'Erro na comunicação com o servidor';
+      return Promise.reject(new Error(errorMessage));
+    } else if (error.request) {
+      // A requisição foi feita mas não houve resposta
+      console.error('Sem resposta do servidor:', error.request);
+      return Promise.reject(new Error('Servidor não respondeu. Verifique sua conexão.'));
+    } else {
+      // Erro na configuração da requisição
+      console.error('Erro na configuração da requisição:', error.message);
+      return Promise.reject(new Error('Erro ao preparar requisição.'));
+    }
+  }
+);
+
 export const registerUser = async (userData: any) => {
   try {
     const response = await api.post(`/auth/register`, userData);
     const { token, _id, name, email, metaUserId, metaConnectionStatus, plan } = response.data || {};
-
     if (!token || !_id) throw new Error("Registro mal sucedido: token ou dados do usuário ausentes.");
-
+    
     const userInfo = {
       token,
       _id,
@@ -41,21 +62,26 @@ export const registerUser = async (userData: any) => {
       plan,
       isMetaConnected: metaConnectionStatus === "connected"
     };
-
+    
     localStorage.setItem('userInfo', JSON.stringify(userInfo));
     return userInfo;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "Erro ao registrar usuário.");
+    console.error('Erro no registro:', error);
+    throw error;
   }
 };
 
 export const loginUser = async (credentials: any) => {
   try {
+    console.log('Tentando login com:', credentials.email);
+    console.log('URL da API:', API_BASE_URL);
+    
     const response = await api.post(`/auth/login`, credentials);
+    console.log('Resposta do login:', response.data);
+    
     const { token, _id, name, email, metaUserId, metaConnectionStatus, plan } = response.data || {};
-
     if (!token || !_id) throw new Error("Login mal sucedido: token ou dados do usuário ausentes.");
-
+    
     const userInfo = {
       token,
       _id,
@@ -66,11 +92,12 @@ export const loginUser = async (credentials: any) => {
       plan,
       isMetaConnected: metaConnectionStatus === "connected"
     };
-
+    
     localStorage.setItem('userInfo', JSON.stringify(userInfo));
     return userInfo;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || "Erro ao fazer login.");
+    console.error('Erro detalhado no login:', error);
+    throw error;
   }
 };
 
@@ -81,29 +108,40 @@ export const getUserProfile = async () => {
     const response = await api.get(`/auth/profile`);
     return response.data;
   } catch (error: any) {
-    if (error.response?.status === 401) logoutUser();
-    throw new Error(error.response?.data?.message || "Erro ao buscar perfil.");
+    throw new Error(error.response?.data?.message || "Erro ao buscar perfil do usuário.");
   }
 };
 
-export const updateUserProfile = async (profileData: any) => {
+export const updateUserProfile = async (userData: any) => {
   try {
-    const response = await api.put(`/auth/profile`, profileData);
+    const userId = JSON.parse(localStorage.getItem('userInfo') || '{}')._id;
+    if (!userId) throw new Error("ID do usuário não encontrado.");
+    
+    const response = await api.put(`/users/${userId}`, userData);
+    
+    // Atualizar informações do usuário no localStorage
     const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
-    const updatedUser = { ...currentUser, ...response.data };
-    localStorage.setItem('userInfo', JSON.stringify(updatedUser));
+    const updatedUser = { ...currentUser, ...userData };
+    localStorage.setItem('userInfo', JSON.stringify(currentUser));
+    
     return response.data;
   } catch (error: any) {
     throw new Error(error.response?.data?.message || "Erro ao atualizar perfil.");
   }
 };
 
-export const updatePlan = async (planData: { planName: string }) => {
+export const updateUserPlan = async (planData: any) => {
   try {
-    const response = await api.put(`/auth/plan`, planData);
+    const userId = JSON.parse(localStorage.getItem('userInfo') || '{}')._id;
+    if (!userId) throw new Error("ID do usuário não encontrado.");
+    
+    const response = await api.put(`/users/${userId}/plan`, planData);
+    
+    // Atualizar informações do usuário no localStorage
     const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
-    currentUser.plan = response.data.plan;
+    currentUser.plan = planData.plan;
     localStorage.setItem('userInfo', JSON.stringify(currentUser));
+    
     return response.data;
   } catch (error: any) {
     throw new Error(error.response?.data?.message || "Erro ao atualizar plano.");
@@ -114,13 +152,12 @@ export const getFacebookLoginUrl = async (): Promise<void> => {
   try {
     const token = getToken();
     if (!token) throw new Error("Token JWT não encontrado. Faça login novamente.");
-
+    
     // The backend /api/meta/login is expected to return a redirect URL or handle the redirect itself.
     // For frontend, we can directly point the window.location.href to this backend endpoint.
     // The backend will then redirect to Facebook, and Facebook will redirect back to the specified callback URI.
     const backendFacebookLoginUrl = `${API_BASE_URL}/meta/login?token=${encodeURIComponent(token)}`;
     window.location.href = backendFacebookLoginUrl;
-
   } catch (error: any) {
     console.error("Error constructing Facebook login URL:", error);
     throw new Error(error.message || "Erro ao iniciar conexão com Facebook.");
@@ -218,4 +255,3 @@ export const getUserCampaigns = async () => {
         return []; // Return empty array on error to avoid UI crash
     }
 };
-

@@ -23,7 +23,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Configuração CORS para origens específicas
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',') 
-  : ['https://chefstudio.vercel.app', 'http://localhost:5173', 'http://localhost:3000'];
+  : ['https://chefstudio.vercel.app', 'http://localhost:5173', 'http://localhost:3000', 'https://chefstudio-production.up.railway.app'];
 
 app.use(cors({
   origin: function (origin, callback) {
