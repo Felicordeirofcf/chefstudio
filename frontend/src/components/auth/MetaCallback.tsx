@@ -15,64 +15,62 @@ export default function MetaCallback() {
       try {
         // Extrair parâmetros da URL
         const params = new URLSearchParams(location.search);
-        const code = params.get("code");
-        const token = params.get("token");
-        const errorMsg = params.get("error");
+        const meta_connected = params.get("meta_connected");
+        const meta_error = params.get("meta_error");
+        const errorMsg = params.get("message");
+        const userId = params.get("userId");
 
         // Verificar se há erro na URL
-        if (errorMsg) {
+        if (meta_error === "true" && errorMsg) {
           throw new Error(decodeURIComponent(errorMsg));
         }
 
-        // Verificar se o código de autorização está presente
-        if (!code) {
-          throw new Error("Código de autorização ausente");
-        }
-
-        // Verificar se o token está presente
-        if (!token) {
-          throw new Error("Token de autenticação ausente");
-        }
-
-        // Obter informações do usuário do localStorage
-        const userInfoStr = localStorage.getItem("userInfo");
-        if (!userInfoStr) {
-          throw new Error("Informações do usuário não encontradas");
-        }
-
-        const userInfo = JSON.parse(userInfoStr);
-
-        // Configurar o cliente axios com o token
-        const API_BASE_URL = `${(import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app").replace(/\/+$/, "")}/api`;
-        const api = axios.create({
-          baseURL: API_BASE_URL,
-          headers: {
-            Authorization: `Bearer ${token}`
+        // Verificar se a conexão foi bem-sucedida
+        if (meta_connected === "true" && userId) {
+          // Obter informações do usuário do localStorage
+          const userInfoStr = localStorage.getItem("userInfo");
+          if (!userInfoStr) {
+            throw new Error("Informações do usuário não encontradas");
           }
-        });
 
-        // Enviar o código para o backend para completar a integração
-        // Corrigido: alterado de /auth/meta-connect para /meta/connect
-        const response = await api.post("/meta/connect", { code });
+          const userInfo = JSON.parse(userInfoStr);
+          
+          // Atualizar informações do usuário no localStorage
+          const updatedUserInfo = {
+            ...userInfo,
+            metaConnectionStatus: "connected",
+            isMetaConnected: true
+          };
 
-        // Atualizar informações do usuário no localStorage
-        const updatedUserInfo = {
-          ...userInfo,
-          metaUserId: response.data.metaUserId || userInfo.metaUserId,
-          metaConnectionStatus: "connected",
-          isMetaConnected: true
-        };
+          localStorage.setItem("userInfo", JSON.stringify(updatedUserInfo));
 
-        localStorage.setItem("userInfo", JSON.stringify(updatedUserInfo));
+          // Mostrar mensagem de sucesso
+          toast({
+            title: "Conectado com sucesso!",
+            description: "Sua conta Meta foi conectada com sucesso.",
+          });
 
-        // Mostrar mensagem de sucesso
+          // Redirecionar para o dashboard
+          navigate("/dashboard");
+          return;
+        }
+
+        // Se não houver parâmetros de sucesso ou erro, verificar se há código de autorização
+        const code = params.get("code");
+        if (!code) {
+          throw new Error("Parâmetros de retorno inválidos");
+        }
+
+        // Mostrar mensagem de processamento
         toast({
-          title: "Conectado com sucesso!",
-          description: "Sua conta Meta foi conectada com sucesso.",
+          title: "Processando conexão",
+          description: "Estamos finalizando a conexão com sua conta Meta...",
         });
 
-        // Redirecionar para o dashboard
-        navigate("/dashboard");
+        // Redirecionar para o dashboard após alguns segundos
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 3000);
       } catch (err: any) {
         console.error("Erro ao processar callback do Meta:", err);
         setError(err.message || "Erro ao processar conexão com Meta");

@@ -32,7 +32,8 @@ export default function MetaConnect() {
 
       // ✅ Garante URL correta com token e estado único para prevenir CSRF
       const state = generateState();
-      const redirectUrl = `${baseUrl}/api/meta/login?token=${encodeURIComponent(token)}&state=${state}`;
+      // Corrigido: Alterado para usar a rota correta de login do Meta
+      const redirectUrl = `${baseUrl}/api/meta/facebook/login?token=${encodeURIComponent(token)}&state=${state}`;
 
       // Redireciona para o Meta
       window.location.href = redirectUrl;
