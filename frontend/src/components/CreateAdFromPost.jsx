@@ -1,0 +1,411 @@
+import { useState } from "react";
+import { useToast } from "../hooks/use-toast";
+import axios from "axios";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { CalendarIcon, InfoIcon, LoaderIcon } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar } from "./ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+
+export default function CreateAdFromPost() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const [adDetails, setAdDetails] = useState(null);
+  
+  const [formData, setFormData] = useState({
+    postUrl: "",
+    adName: "",
+    dailyBudget: "10",
+    startDate: new Date(),
+    endDate: null,
+    targetCountry: "BR"
+  });
+
+  const countries = [
+    { code: "BR", name: "Brasil" },
+    { code: "US", name: "Estados Unidos" },
+    { code: "AR", name: "Argentina" },
+    { code: "MX", name: "México" },
+    { code: "PT", name: "Portugal" },
+    { code: "ES", name: "Espanha" },
+    { code: "CO", name: "Colômbia" },
+    { code: "CL", name: "Chile" },
+    { code: "PE", name: "Peru" },
+  ];
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectChange = (name, value) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleDateChange = (name, date) => {
+    setFormData(prev => ({ ...prev, [name]: date }));
+  };
+
+  const validateForm = () => {
+    if (!formData.postUrl) {
+      setError("URL da publicação é obrigatória");
+      return false;
+    }
+    if (!formData.adName) {
+      setError("Nome do anúncio é obrigatório");
+      return false;
+    }
+    if (!formData.dailyBudget || isNaN(formData.dailyBudget) || parseFloat(formData.dailyBudget) < 1) {
+      setError("Orçamento diário deve ser um número maior que 1");
+      return false;
+    }
+    if (!formData.startDate) {
+      setError("Data de início é obrigatória");
+      return false;
+    }
+    if (formData.endDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
+      setError("Data de término deve ser posterior à data de início");
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(false);
+    setAdDetails(null);
+    
+    if (!validateForm()) return;
+    
+    setLoading(true);
+    
+    try {
+      // Obter token do localStorage
+      const userInfo = localStorage.getItem("userInfo");
+      const token = userInfo ? JSON.parse(userInfo).token : null;
+      
+      if (!token) {
+        throw new Error("Você precisa estar logado para criar anúncios");
+      }
+      
+      // Configurar cliente axios com o token
+      const API_BASE_URL = `${(import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app").replace(/\/+$/, "")}/api`;
+      const api = axios.create({
+        baseURL: API_BASE_URL,
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      // Enviar solicitação para criar anúncio
+      const response = await api.post("/meta/create-ad-from-post", {
+        postUrl: formData.postUrl,
+        adName: formData.adName,
+        dailyBudget: formData.dailyBudget,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        targetCountry: formData.targetCountry
+      });
+      
+      setSuccess(true);
+      setAdDetails(response.data.adDetails);
+      
+      toast({
+        title: "Anúncio criado com sucesso!",
+        description: "O anúncio foi criado e está pausado para revisão.",
+      });
+      
+    } catch (err) {
+      console.error("Erro ao criar anúncio:", err);
+      
+      if (err.response?.data?.message) {
+        setError(err.response.data.message);
+      } else {
+        setError(err.message || "Erro ao criar anúncio. Tente novamente.");
+      }
+      
+      toast({
+        title: "Erro ao criar anúncio",
+        description: err.response?.data?.message || err.message || "Ocorreu um erro ao criar o anúncio",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="container mx-auto py-8 max-w-3xl">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl">Criar Anúncio a partir de Publicação</CardTitle>
+          <CardDescription>
+            Promova uma publicação existente do Facebook como anúncio
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent>
+          {!success ? (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="postUrl">URL da Publicação do Facebook</Label>
+                <Input
+                  id="postUrl"
+                  name="postUrl"
+                  placeholder="https://www.facebook.com/photo/?fbid=123456789..."
+                  value={formData.postUrl}
+                  onChange={handleInputChange}
+                  required
+                />
+                <p className="text-sm text-gray-500">
+                  Cole a URL completa da publicação que deseja promover
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="adName">Nome do Anúncio</Label>
+                <Input
+                  id="adName"
+                  name="adName"
+                  placeholder="Promoção de Primavera"
+                  value={formData.adName}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="dailyBudget">Orçamento Diário (R$)</Label>
+                <Input
+                  id="dailyBudget"
+                  name="dailyBudget"
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  placeholder="10.00"
+                  value={formData.dailyBudget}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Data de Início</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.startDate ? (
+                          format(formData.startDate, "dd/MM/yyyy")
+                        ) : (
+                          <span>Selecione uma data</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={formData.startDate}
+                        onSelect={(date) => handleDateChange("startDate", date)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Data de Término (opcional)</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.endDate ? (
+                          format(formData.endDate, "dd/MM/yyyy")
+                        ) : (
+                          <span>Sem data de término</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={formData.endDate}
+                        onSelect={(date) => handleDateChange("endDate", date)}
+                        initialFocus
+                        disabled={(date) => date < new Date(formData.startDate)}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="targetCountry">País Alvo</Label>
+                <Select 
+                  value={formData.targetCountry} 
+                  onValueChange={(value) => handleSelectChange("targetCountry", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um país" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {countries.map((country) => (
+                      <SelectItem key={country.code} value={country.code}>
+                        {country.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {error && (
+                <Alert variant="destructive">
+                  <InfoIcon className="h-4 w-4" />
+                  <AlertTitle>Erro</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+            
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <LoaderIcon className="mr-2 h-4 w-4 animate-spin" />
+                    Criando anúncio...
+                  </>
+                ) : (
+                  "Criar Anúncio"
+                )}
+              </Button>
+            </form>
+          ) : (
+            <div className="space-y-6">
+              <Alert className="bg-green-50 border-green-200">
+                <InfoIcon className="h-4 w-4 text-green-600" />
+                <AlertTitle className="text-green-800">Anúncio criado com sucesso!</AlertTitle>
+                <AlertDescription className="text-green-700">
+                  Seu anúncio foi criado e está pausado para revisão.
+                </AlertDescription>
+              </Alert>
+              
+              {adDetails && (
+                <div className="space-y-4 mt-6">
+                  <h3 className="text-lg font-medium">Detalhes do Anúncio</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-gray-500">Nome do Anúncio</p>
+                      <p>{adDetails.name}</p>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-gray-500">Status</p>
+                      <p>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          Pausado
+                        </span>
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-gray-500">Orçamento Diário</p>
+                      <p>R$ {adDetails.dailyBudget.toFixed(2)}</p>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-gray-500">País Alvo</p>
+                      <p>{countries.find(c => c.code === formData.targetCountry)?.name || formData.targetCountry}</p>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-gray-500">Data de Início</p>
+                      <p>{format(new Date(adDetails.startDate), "dd/MM/yyyy")}</p>
+                    </div>
+                    
+                    {adDetails.endDate && (
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-gray-500">Data de Término</p>
+                        <p>{format(new Date(adDetails.endDate), "dd/MM/yyyy")}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-1 mt-4">
+                    <p className="text-sm font-medium text-gray-500">IDs do Facebook</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                      <div className="p-2 bg-gray-50 rounded">
+                        <span className="font-medium">Campanha:</span> {adDetails.campaignId}
+                      </div>
+                      <div className="p-2 bg-gray-50 rounded">
+                        <span className="font-medium">Conjunto:</span> {adDetails.adSetId}
+                      </div>
+                      <div className="p-2 bg-gray-50 rounded">
+                        <span className="font-medium">Anúncio:</span> {adDetails.adId}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex flex-col sm:flex-row gap-4 mt-6">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => {
+                    setSuccess(false);
+                    setAdDetails(null);
+                    setFormData({
+                      postUrl: "",
+                      adName: "",
+                      dailyBudget: "10",
+                      startDate: new Date(),
+                      endDate: null,
+                      targetCountry: "BR"
+                    });
+                  }}
+                >
+                  Criar Novo Anúncio
+                </Button>
+                
+                <Button 
+                  className="flex-1"
+                  onClick={() => {
+                    window.open("https://business.facebook.com/adsmanager", "_blank");
+                  }}
+                >
+                  Gerenciar no Facebook
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+        
+        <CardFooter className="flex flex-col items-start">
+          <p className="text-sm text-gray-500">
+            Nota: O anúncio será criado no estado "Pausado" para que você possa revisar antes de ativá-lo.
+            Após a criação, você pode gerenciar seus anúncios no Gerenciador de Anúncios do Facebook.
+          </p>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+}
