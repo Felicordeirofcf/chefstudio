@@ -113,9 +113,8 @@ const CampanhaManual = () => {
 
   // Função para conectar com Meta Ads
   const handleConnectMeta = () => {
-    // Usar o URL completo para garantir que funcione em produção
-    const baseUrl = window.location.origin;
-    window.location.href = `${baseUrl}/api/meta/connect`;
+    // Usar a URL absoluta do backend em vez de URL relativa
+    window.location.href = "https://chefstudio-production.up.railway.app/api/meta/connect";
   };
 
   // Função para criar a campanha
