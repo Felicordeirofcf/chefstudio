@@ -13,20 +13,21 @@ const MetaAdsConnection = () => {
   useEffect(() => {
     // Verificar token no localStorage (tanto 'token' quanto 'userInfo.token')
     const checkToken = () => {
-      // Primeiro tenta obter o token diretamente
-      let token = localStorage.getItem('token');
-      
-      // Se não encontrar, tenta obter do userInfo
-      if (!token) {
-        try {
+      try {
+        // Primeiro tenta obter o token diretamente
+        let token = localStorage.getItem('token');
+        
+        // Se não encontrar, tenta obter do userInfo
+        if (!token) {
           const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-          token = userInfo.token;
-        } catch (err) {
-          console.error('Erro ao obter token do userInfo:', err);
+          token = userInfo?.token;
         }
+        
+        return token;
+      } catch (err) {
+        console.error('Erro ao obter token:', err);
+        return null;
       }
-      
-      return token;
     };
 
     const token = checkToken();
@@ -39,18 +40,47 @@ const MetaAdsConnection = () => {
 
   // Função para verificar conexão com Meta Ads
   const checkConnection = async (token) => {
+    if (!token) return;
+    
     try {
       setLoading(true);
       
       // Verificar status da conexão com Meta Ads
-      const response = await axios.get('/api/meta/connection-status', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        timeout: 5000 // Timeout para evitar requisições pendentes
-      });
-      
-      setConnected(response.data?.connected || false);
+      try {
+        const response = await axios.get('/api/meta/connection-status', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          timeout: 5000 // Timeout para evitar requisições pendentes
+        });
+        
+        setConnected(response.data?.connected || response.data?.status === 'connected' || false);
+      } catch (err) {
+        // Se o primeiro endpoint falhar, tentar endpoint alternativo
+        if (err.response && err.response.status === 404) {
+          const altResponse = await axios.get('/api/users/meta-status', {
+            headers: {
+              Authorization: `Bearer ${token}`
+            },
+            timeout: 5000
+          });
+          
+          setConnected(altResponse.data?.connected || altResponse.data?.status === 'connected' || false);
+        } else {
+          // Se ambos falharem, verificar no localStorage
+          try {
+            const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+            setConnected(
+              userInfo?.metaConnectionStatus === 'connected' || 
+              userInfo?.isMetaConnected === true || 
+              false
+            );
+          } catch (localErr) {
+            console.error('Erro ao verificar status no localStorage:', localErr);
+            setConnected(false);
+          }
+        }
+      }
     } catch (err) {
       console.error('Erro ao verificar conexão com Meta Ads:', err);
       // Não mostrar erro ao usuário neste momento
@@ -67,45 +97,46 @@ const MetaAdsConnection = () => {
       setError(null);
       
       if (!userToken) {
-        // Se não houver token, tentar fazer login automático
-        try {
-          // Tentar obter credenciais salvas (implementação simplificada)
-          const email = localStorage.getItem('userEmail');
-          const password = localStorage.getItem('userPassword');
-          
-          if (email && password) {
-            const loginResponse = await axios.post('/api/auth/login', { email, password });
-            if (loginResponse.data && loginResponse.data.token) {
-              localStorage.setItem('token', loginResponse.data.token);
-              setUserToken(loginResponse.data.token);
-            } else {
-              throw new Error('Login automático falhou');
-            }
-          } else {
-            throw new Error('Credenciais não encontradas');
-          }
-        } catch (loginErr) {
-          throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
-        }
+        throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
       }
       
       // Obter URL de autorização
-      const response = await axios.get('/api/meta/auth-url', {
-        headers: {
-          Authorization: `Bearer ${userToken}`
+      try {
+        const response = await axios.get('/api/meta/auth-url', {
+          headers: {
+            Authorization: `Bearer ${userToken}`
+          }
+        });
+        
+        // Redirecionar para página de autorização do Facebook
+        if (response.data && response.data.url) {
+          window.location.href = response.data.url;
+          return;
+        } else {
+          throw new Error('URL de autorização não recebida');
         }
-      });
-      
-      // Redirecionar para página de autorização do Facebook
-      if (response.data && response.data.url) {
-        window.location.href = response.data.url;
-      } else {
-        throw new Error('URL de autorização não recebida');
+      } catch (err) {
+        // Se o primeiro endpoint falhar, tentar endpoint alternativo
+        if (err.response && err.response.status === 404) {
+          const altResponse = await axios.get('/api/auth/meta-connect', {
+            headers: {
+              Authorization: `Bearer ${userToken}`
+            }
+          });
+          
+          if (altResponse.data && altResponse.data.url) {
+            window.location.href = altResponse.data.url;
+            return;
+          } else {
+            throw new Error('URL de autorização não recebida do endpoint alternativo');
+          }
+        } else {
+          throw err;
+        }
       }
-      
     } catch (err) {
       console.error('Erro ao conectar com Meta Ads:', err);
-      setError('Não foi possível iniciar a conexão com Meta Ads. Por favor, faça login novamente.');
+      setError('Não foi possível iniciar a conexão com Meta Ads. Por favor, tente novamente mais tarde.');
     } finally {
       setLoading(false);
     }
@@ -121,13 +152,38 @@ const MetaAdsConnection = () => {
         throw new Error('Usuário não autenticado');
       }
       
-      await axios.post('/api/meta/disconnect', {}, {
-        headers: {
-          Authorization: `Bearer ${userToken}`
+      try {
+        await axios.post('/api/meta/disconnect', {}, {
+          headers: {
+            Authorization: `Bearer ${userToken}`
+          }
+        });
+        
+        setConnected(false);
+      } catch (err) {
+        // Se o primeiro endpoint falhar, tentar endpoint alternativo
+        if (err.response && err.response.status === 404) {
+          await axios.post('/api/users/meta-disconnect', {}, {
+            headers: {
+              Authorization: `Bearer ${userToken}`
+            }
+          });
+          
+          setConnected(false);
+        } else {
+          throw err;
         }
-      });
+      }
       
-      setConnected(false);
+      // Atualizar userInfo no localStorage
+      try {
+        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+        userInfo.metaConnectionStatus = 'disconnected';
+        userInfo.isMetaConnected = false;
+        localStorage.setItem('userInfo', JSON.stringify(userInfo));
+      } catch (localErr) {
+        console.error('Erro ao atualizar userInfo no localStorage:', localErr);
+      }
     } catch (err) {
       console.error('Erro ao desconectar do Meta Ads:', err);
       setError('Não foi possível desconectar do Meta Ads. Por favor, tente novamente.');
