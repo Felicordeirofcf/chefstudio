@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createCampaign, uploadCampaignMedia } from '../lib/api';
 
 // Configurações do Facebook OAuth
-const FB_APP_ID = '243094272395766'; // ID do app do Facebook mostrado na URL
+const FB_APP_ID = '2430942723957669'; // ID do app do Facebook corrigido
 const FB_REDIRECT_URI = window.location.origin + '/dashboard'; // Redireciona de volta para o dashboard
 const FB_SCOPE = 'ads_management,ads_read,business_management,pages_read_engagement,instagram_basic,public_profile';
 
