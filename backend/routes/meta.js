@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 /**
  * @swagger
@@ -8,6 +10,12 @@ const { authMiddleware } = require('../middleware/auth');
  *   get:
  *     summary: Inicia o processo de login com o Facebook/Meta
  *     tags: [Meta]
+ *     parameters:
+ *       - in: query
+ *         name: token
+ *         schema:
+ *           type: string
+ *         description: Token JWT do usuário (alternativa ao header Authorization)
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -18,8 +26,41 @@ const { authMiddleware } = require('../middleware/auth');
  *       500:
  *         description: Erro interno do servidor
  */
-router.get('/login', authMiddleware, (req, res) => {
+router.get('/login', async (req, res) => {
   try {
+    // Verificar token JWT (seja do header Authorization ou da query string)
+    let token = null;
+    
+    // Verificar se o token está no header Authorization
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
+    
+    // Se não estiver no header, verificar na query string
+    if (!token && req.query.token) {
+      token = req.query.token;
+    }
+    
+    if (!token) {
+      return res.status(401).json({ message: 'Token de autenticação não fornecido' });
+    }
+    
+    // Verificar validade do token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (error) {
+      return res.status(401).json({ message: 'Token inválido ou expirado' });
+    }
+    
+    // Verificar se o usuário existe
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(401).json({ message: 'Usuário não encontrado' });
+    }
+    
+    // Configuração do Facebook
     const appId = process.env.FB_APP_ID;
     const redirectUri = process.env.FACEBOOK_REDIRECT_URI;
     
@@ -35,7 +76,7 @@ router.get('/login', authMiddleware, (req, res) => {
     
     // Construir URL de login do Facebook
     const scopes = 'email,ads_management,ads_read,business_management,instagram_basic,instagram_content_publish,pages_read_engagement,pages_show_list';
-    const state = req.query.token || '';
+    const state = token; // Usar o token como state para recuperá-lo no callback
     
     const loginUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}&response_type=code`;
     
