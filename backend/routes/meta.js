@@ -1,329 +1,292 @@
-// Implementação para buscar automaticamente o ID da conta de anúncio do cliente
-// Arquivo: backend/routes/meta.js
-
 const express = require('express');
 const router = express.Router();
-const axios = require('axios');
 const { authMiddleware } = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
 const User = require('../models/user');
-
-// Configurações do Facebook
-const FACEBOOK_API_VERSION = 'v18.0'; // Atualize para a versão mais recente
-const FACEBOOK_GRAPH_URL = `https://graph.facebook.com/${FACEBOOK_API_VERSION}`;
+const axios = require('axios');
 
 /**
- * @route   GET /api/meta/adaccounts
- * @desc    Busca as contas de anúncio do usuário no Facebook
- * @access  Private
+ * @swagger
+ * /api/meta/login:
+ *   get:
+ *     summary: Inicia o processo de login com o Facebook/Meta
+ *     tags: [Meta]
+ *     parameters:
+ *       - in: query
+ *         name: token
+ *         schema:
+ *           type: string
+ *         description: Token JWT do usuário (alternativa ao header Authorization)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       302:
+ *         description: Redirecionamento para a página de login do Facebook
+ *       401:
+ *         description: Não autorizado
+ *       500:
+ *         description: Erro interno do servidor
+ */
+router.get('/login', async (req, res) => {
+  try {
+    // Verificar token JWT (seja do header Authorization ou da query string)
+    let token = null;
+    
+    // Verificar se o token está no header Authorization
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
+    
+    // Se não estiver no header, verificar na query string
+    if (!token && req.query.token) {
+      token = req.query.token;
+    }
+    
+    if (!token) {
+      return res.status(401).json({ message: 'Token de autenticação não fornecido' });
+    }
+    
+    // Verificar validade do token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (error) {
+      return res.status(401).json({ message: 'Token inválido ou expirado' });
+    }
+    
+    // Verificar se o usuário existe
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({ 
+        message: 'Usuário não encontrado',
+        details: {
+          decodedToken: decoded
+        }
+      });
+    }
+    
+    // Configuração do Facebook
+    const appId = process.env.FB_APP_ID;
+    const redirectUri = process.env.FACEBOOK_REDIRECT_URI;
+    
+    if (!appId || !redirectUri) {
+      return res.status(500).json({ 
+        message: 'Configuração do Facebook incompleta',
+        details: {
+          appId: !!appId,
+          redirectUri: !!redirectUri
+        }
+      });
+    }
+    
+    // Construir URL de login do Facebook
+    const scopes = 'email,ads_management,ads_read,business_management,instagram_basic,instagram_content_publish,pages_read_engagement,pages_show_list';
+    const state = token; // Usar o token como state para recuperá-lo no callback
+    
+    const loginUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}&response_type=code`;
+    
+    // Redirecionar para a página de login do Facebook
+    res.redirect(loginUrl);
+  } catch (error) {
+    console.error('Erro ao iniciar login com Facebook:', error);
+    res.status(500).json({ 
+      message: 'Erro ao iniciar login com Facebook',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/meta/callback:
+ *   get:
+ *     summary: Callback para o processo de login com o Facebook/Meta
+ *     tags: [Meta]
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *         description: Código de autorização do Facebook
+ *       - in: query
+ *         name: state
+ *         schema:
+ *           type: string
+ *         description: Estado (token JWT) passado na requisição inicial
+ *     responses:
+ *       302:
+ *         description: Redirecionamento para o frontend após processamento
+ *       400:
+ *         description: Parâmetros inválidos
+ *       500:
+ *         description: Erro interno do servidor
+ */
+router.get('/callback', async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    
+    if (!code) {
+      return res.status(400).json({ message: 'Código de autorização ausente' });
+    }
+    
+    // O state contém o token JWT do usuário
+    const token = state;
+    
+    // Redirecionar para o frontend com os parâmetros necessários
+    const frontendUrl = process.env.FRONTEND_URL || 'https://chefstudio.vercel.app';
+    res.redirect(`${frontendUrl}/meta-callback?code=${code}&token=${token}`);
+  } catch (error) {
+    console.error('Erro no callback do Facebook:', error);
+    
+    // Redirecionar para o frontend com mensagem de erro
+    const frontendUrl = process.env.FRONTEND_URL || 'https://chefstudio.vercel.app';
+    res.redirect(`${frontendUrl}/meta-callback?error=${encodeURIComponent(error.message)}`);
+  }
+});
+
+/**
+ * @swagger
+ * /api/meta/connect:
+ *   post:
+ *     summary: Conecta a conta do usuário com o Facebook/Meta
+ *     tags: [Meta]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 description: Código de autorização do Facebook
+ *     responses:
+ *       200:
+ *         description: Conexão realizada com sucesso
+ *       400:
+ *         description: Parâmetros inválidos
+ *       401:
+ *         description: Não autorizado
+ *       500:
+ *         description: Erro interno do servidor
+ */
+router.post('/connect', authMiddleware, async (req, res) => {
+  try {
+    const { code } = req.body;
+    
+    if (!code) {
+      return res.status(400).json({ message: 'Código de autorização ausente' });
+    }
+    
+    // Obter o usuário a partir do middleware de autenticação
+    const userId = req.user.userId;
+    
+    // Buscar o usuário no banco de dados
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Usuário não encontrado' });
+    }
+    
+    // Simular troca do código de autorização por token de acesso
+    // Em produção, isso seria feito com uma chamada real à API do Facebook
+    const mockAccessToken = `mock_access_token_${Date.now()}`;
+    
+    // Atualizar o usuário com as informações do Meta
+    user.metaConnectionStatus = 'connected';
+    user.metaAccessToken = mockAccessToken;
+    user.metaConnectedAt = new Date();
+    
+    // Salvar as alterações no usuário
+    await user.save();
+    
+    // Retornar sucesso
+    res.json({
+      success: true,
+      message: 'Conta conectada com sucesso ao Meta',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        metaConnectionStatus: user.metaConnectionStatus,
+        metaConnectedAt: user.metaConnectedAt
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao conectar com Meta:', error);
+    res.status(500).json({ 
+      message: 'Erro ao conectar com Meta',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/meta/adaccounts:
+ *   get:
+ *     summary: Obtém as contas de anúncios do usuário no Facebook/Meta
+ *     tags: [Meta]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de contas de anúncios obtida com sucesso
+ *       401:
+ *         description: Não autorizado
+ *       500:
+ *         description: Erro interno do servidor
  */
 router.get('/adaccounts', authMiddleware, async (req, res) => {
   try {
-    // Buscar usuário pelo ID
-    const user = await User.findById(req.user.userId);
-    
-    if (!user) {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
-    }
-    
-    // Verificar se o usuário tem um token de acesso do Facebook
-    if (!user.metaAccessToken) {
-      return res.status(400).json({ 
-        message: 'Usuário não conectado ao Facebook', 
-        metaConnectionStatus: 'disconnected' 
-      });
-    }
-    
-    // Buscar contas de anúncio do usuário no Facebook
-    const response = await axios.get(`${FACEBOOK_GRAPH_URL}/me/adaccounts`, {
-      params: {
-        access_token: user.metaAccessToken,
-        fields: 'id,name,account_status,amount_spent,currency,business_name'
-      }
-    });
-    
-    // Extrair contas de anúncio da resposta
-    const adAccounts = response.data.data || [];
-    
-    // Atualizar usuário com as contas de anúncio
-    user.adAccounts = adAccounts.map(account => ({
-      id: account.id,
-      name: account.name || account.business_name || 'Conta de Anúncio',
-      status: account.account_status,
-      amountSpent: account.amount_spent,
-      currency: account.currency
-    }));
-    
-    // Se houver pelo menos uma conta, definir a primeira como padrão
-    if (adAccounts.length > 0) {
-      user.adsAccountId = adAccounts[0].id;
-      user.adsAccountName = adAccounts[0].name || adAccounts[0].business_name || 'Conta de Anúncio';
-    }
-    
-    await user.save();
-    
-    // Retornar as contas de anúncio
-    res.json(user.adAccounts);
+    // Implementação futura: integração real com a API do Facebook
+    // Por enquanto, retornar dados simulados
+    res.json([
+      { id: "act_123456789", name: "Conta Principal de Anúncios" },
+      { id: "act_987654321", name: "Conta Secundária de Anúncios" }
+    ]);
   } catch (error) {
-    console.error('Erro ao buscar contas de anúncio:', error.response?.data || error.message);
+    console.error('Erro ao obter contas de anúncios:', error);
     res.status(500).json({ 
-      message: 'Erro ao buscar contas de anúncio', 
-      error: error.response?.data?.error?.message || error.message 
+      message: 'Erro ao obter contas de anúncios',
+      error: error.message
     });
   }
 });
 
 /**
- * @route   GET /api/meta/posts
- * @desc    Busca as publicações da página do Facebook do usuário
- * @access  Private
- */
-router.get('/posts', authMiddleware, async (req, res) => {
-  try {
-    // Buscar usuário pelo ID
-    const user = await User.findById(req.user.userId);
-    
-    if (!user) {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
-    }
-    
-    // Verificar se o usuário tem um token de acesso do Facebook
-    if (!user.metaAccessToken) {
-      return res.status(400).json({ 
-        message: 'Usuário não conectado ao Facebook', 
-        metaConnectionStatus: 'disconnected' 
-      });
-    }
-    
-    // Primeiro, buscar as páginas do usuário
-    const pagesResponse = await axios.get(`${FACEBOOK_GRAPH_URL}/me/accounts`, {
-      params: {
-        access_token: user.metaAccessToken,
-        fields: 'id,name,access_token'
-      }
-    });
-    
-    const pages = pagesResponse.data.data || [];
-    
-    if (pages.length === 0) {
-      return res.status(400).json({ message: 'Nenhuma página do Facebook encontrada' });
-    }
-    
-    // Usar a primeira página para buscar publicações
-    const page = pages[0];
-    
-    // Buscar publicações da página
-    const postsResponse = await axios.get(`${FACEBOOK_GRAPH_URL}/${page.id}/posts`, {
-      params: {
-        access_token: page.access_token,
-        fields: 'id,message,created_time,permalink_url,full_picture,attachments',
-        limit: 10 // Limitar a 10 publicações recentes
-      }
-    });
-    
-    const posts = postsResponse.data.data || [];
-    
-    // Formatar as publicações para o frontend
-    const formattedPosts = posts.map(post => ({
-      id: post.id,
-      message: post.message || 'Publicação sem texto',
-      created_time: post.created_time,
-      permalink_url: post.permalink_url,
-      picture: post.full_picture || (post.attachments?.data[0]?.media?.image?.src) || null
-    }));
-    
-    res.json(formattedPosts);
-  } catch (error) {
-    console.error('Erro ao buscar publicações do Facebook:', error.response?.data || error.message);
-    res.status(500).json({ 
-      message: 'Erro ao buscar publicações do Facebook', 
-      error: error.response?.data?.error?.message || error.message 
-    });
-  }
-});
-
-/**
- * @route   GET /api/meta/metrics
- * @desc    Busca métricas de anúncios do Facebook
- * @access  Private
+ * @swagger
+ * /api/meta/metrics:
+ *   get:
+ *     summary: Obtém métricas de campanhas do Facebook/Meta
+ *     tags: [Meta]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Métricas obtidas com sucesso
+ *       401:
+ *         description: Não autorizado
+ *       500:
+ *         description: Erro interno do servidor
  */
 router.get('/metrics', authMiddleware, async (req, res) => {
   try {
-    // Buscar usuário pelo ID
-    const user = await User.findById(req.user.userId);
-    
-    if (!user) {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
-    }
-    
-    // Verificar se o usuário tem um token de acesso do Facebook e uma conta de anúncio
-    if (!user.metaAccessToken || !user.adsAccountId) {
-      return res.status(400).json({ 
-        message: 'Usuário não conectado ao Facebook ou sem conta de anúncio', 
-        metaConnectionStatus: user.metaAccessToken ? 'connected' : 'disconnected',
-        hasAdsAccount: !!user.adsAccountId
-      });
-    }
-    
-    // Buscar métricas da conta de anúncio
-    const response = await axios.get(`${FACEBOOK_GRAPH_URL}/${user.adsAccountId}/insights`, {
-      params: {
-        access_token: user.metaAccessToken,
-        fields: 'impressions,clicks,spend,cpc,ctr',
-        date_preset: 'last_30_days',
-        level: 'account'
-      }
-    });
-    
-    const insights = response.data.data || [];
-    
-    // Buscar número de anúncios ativos
-    const adsResponse = await axios.get(`${FACEBOOK_GRAPH_URL}/${user.adsAccountId}/ads`, {
-      params: {
-        access_token: user.metaAccessToken,
-        fields: 'id,status',
-        limit: 1000 // Buscar até 1000 anúncios
-      }
-    });
-    
-    const ads = adsResponse.data.data || [];
-    const activeAds = ads.filter(ad => ad.status === 'ACTIVE').length;
-    const totalAds = ads.length;
-    
-    // Formatar métricas para o dashboard
-    const metrics = {
-      impressions: insights[0]?.impressions || 0,
-      clicks: insights[0]?.clicks || 0,
-      spend: insights[0]?.spend || 0,
-      cpc: insights[0]?.cpc || 0,
-      ctr: insights[0]?.ctr || 0,
-      activeAds,
-      totalAds
-    };
-    
-    res.json(metrics);
-  } catch (error) {
-    console.error('Erro ao buscar métricas do Facebook:', error.response?.data || error.message);
-    res.status(500).json({ 
-      message: 'Erro ao buscar métricas do Facebook', 
-      error: error.response?.data?.error?.message || error.message 
-    });
-  }
-});
-
-/**
- * @route   POST /api/meta/login
- * @desc    Inicia o processo de login com Facebook
- * @access  Public
- */
-router.post('/login', async (req, res) => {
-  try {
-    const { code, redirectUri } = req.body;
-    
-    if (!code || !redirectUri) {
-      return res.status(400).json({ message: 'Código de autorização e URI de redirecionamento são obrigatórios' });
-    }
-    
-    // Trocar o código de autorização por um token de acesso
-    const tokenResponse = await axios.get('https://graph.facebook.com/oauth/access_token', {
-      params: {
-        client_id: process.env.FACEBOOK_APP_ID,
-        client_secret: process.env.FACEBOOK_APP_SECRET,
-        code,
-        redirect_uri: redirectUri
-      }
-    });
-    
-    const { access_token, expires_in } = tokenResponse.data;
-    
-    // Buscar informações do usuário
-    const userResponse = await axios.get(`${FACEBOOK_GRAPH_URL}/me`, {
-      params: {
-        access_token,
-        fields: 'id,name,email'
-      }
-    });
-    
-    const { id: facebookId, name, email } = userResponse.data;
-    
-    // Buscar ou criar usuário
-    let user = await User.findOne({ email });
-    
-    if (!user) {
-      // Criar novo usuário
-      user = new User({
-        name,
-        email,
-        metaUserId: facebookId,
-        metaAccessToken: access_token,
-        metaTokenExpires: new Date(Date.now() + expires_in * 1000),
-        metaConnectionStatus: 'connected'
-      });
-    } else {
-      // Atualizar usuário existente
-      user.metaUserId = facebookId;
-      user.metaAccessToken = access_token;
-      user.metaTokenExpires = new Date(Date.now() + expires_in * 1000);
-      user.metaConnectionStatus = 'connected';
-    }
-    
-    await user.save();
-    
-    // Buscar contas de anúncio imediatamente após o login
-    try {
-      const adAccountsResponse = await axios.get(`${FACEBOOK_GRAPH_URL}/me/adaccounts`, {
-        params: {
-          access_token,
-          fields: 'id,name,account_status,amount_spent,currency,business_name'
-        }
-      });
-      
-      const adAccounts = adAccountsResponse.data.data || [];
-      
-      user.adAccounts = adAccounts.map(account => ({
-        id: account.id,
-        name: account.name || account.business_name || 'Conta de Anúncio',
-        status: account.account_status,
-        amountSpent: account.amount_spent,
-        currency: account.currency
-      }));
-      
-      // Se houver pelo menos uma conta, definir a primeira como padrão
-      if (adAccounts.length > 0) {
-        user.adsAccountId = adAccounts[0].id;
-        user.adsAccountName = adAccounts[0].name || adAccounts[0].business_name || 'Conta de Anúncio';
-      }
-      
-      await user.save();
-    } catch (error) {
-      console.error('Erro ao buscar contas de anúncio após login:', error);
-      // Não falhar o login se não conseguir buscar as contas de anúncio
-    }
-    
-    // Gerar token JWT para autenticação
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '1h' }
-    );
-    
+    // Implementação futura: integração real com a API do Facebook
+    // Por enquanto, retornar dados simulados
     res.json({
-      token,
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        metaUserId: user.metaUserId,
-        metaConnectionStatus: user.metaConnectionStatus,
-        adsAccountId: user.adsAccountId,
-        adsAccountName: user.adsAccountName,
-        adAccounts: user.adAccounts || []
-      }
+      reach: Math.floor(Math.random() * 1000 + 100),
+      clicks: Math.floor(Math.random() * 200 + 50),
+      spend: (Math.random() * 100 + 20).toFixed(2),
+      ctr: (Math.random() * 5 + 1).toFixed(2),
     });
   } catch (error) {
-    console.error('Erro no login com Facebook:', error.response?.data || error.message);
+    console.error('Erro ao obter métricas:', error);
     res.status(500).json({ 
-      message: 'Erro no login com Facebook', 
-      error: error.response?.data?.error?.message || error.message 
+      message: 'Erro ao obter métricas',
+      error: error.message
     });
   }
 });

@@ -1,46 +1,31 @@
-// Modelo para os itens do menu (menuItem.js)
-// Crie este arquivo se não existir
-
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const menuItemSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Nome do item é obrigatório']
-  },
-  price: {
-    type: Number,
-    required: [true, 'Preço do item é obrigatório'],
-    min: [0, 'Preço não pode ser negativo']
+    required: true,
   },
   description: {
     type: String,
-    default: ''
   },
-  imageUrl: {
-    type: String,
-    default: ''
+  price: {
+    type: Number,
+    required: true,
   },
   category: {
     type: String,
-    default: 'Geral'
   },
-  userId: {
+  imageUrl: {
+    type: String, // In real app, this might point to S3 or similar
+    default: "https://via.placeholder.com/150x100.png?text=Item+Sem+Imagem", // Placeholder
+  },
+  // Reference to the user who owns this item
+  owner: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: "User",
+    required: true,
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-}, {
-  timestamps: true
-});
+}, { timestamps: true });
 
-const MenuItem = mongoose.model('MenuItem', menuItemSchema);
+module.exports = mongoose.model("MenuItem", menuItemSchema);
 
-module.exports = MenuItem;
