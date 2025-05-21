@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
-import { User, CreditCard, LogOut, Menu as MenuIcon, X as XIcon, Settings, ChevronDown, ChevronUp, Zap } from 'lucide-react';
+import { User, CreditCard, LogOut, Menu as MenuIcon, X as XIcon, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getUserProfile, logoutUser } from "../../lib/api";
 import { useToast } from "../../hooks/use-toast";
@@ -40,10 +40,9 @@ const DashboardLayout: React.FC = () => {
   const managementSubItems = [
     { name: 'Meu Perfil', path: '/dashboard/profile', icon: User },
     { name: 'Planos', path: '/dashboard/plans', icon: CreditCard },
-    { name: 'Conectar com Ads', path: '/connect-meta', icon: Zap },
   ];
 
-  const isActive = (path: string) => location.pathname === path || (path === '/dashboard/profile' && location.pathname.startsWith('/dashboard/profile')) || (path === '/dashboard/plans' && location.pathname.startsWith('/dashboard/plans')) || (path === '/connect-meta' && location.pathname === '/connect-meta');
+  const isActive = (path: string) => location.pathname === path || (path === '/dashboard/profile' && location.pathname.startsWith('/dashboard/profile')) || (path === '/dashboard/plans' && location.pathname.startsWith('/dashboard/plans'));
   const isManagementActive = () => managementSubItems.some(item => isActive(item.path));
 
   return (

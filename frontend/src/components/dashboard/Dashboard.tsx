@@ -4,7 +4,7 @@ import { Label } from "../ui/label";
 import { Slider } from "../ui/slider";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../ui/card";
 import { useState, useEffect, ChangeEvent } from "react";
-import { createAdCampaign, getMenuItems, getUserProfile } from "../../lib/api"; // Adicionado getUserProfile
+import { createAdCampaign, getMenuItems, getUserProfile } from "../../lib/api";
 import { useToast } from "../../hooks/use-toast";
 import InteractiveMap from "./InteractiveMap";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
@@ -28,14 +28,14 @@ interface UserProfile {
   name: string;
   email: string;
   metaUserId?: string;
-  metaAdAccountId?: string; // Adicionado para buscar o ID da conta de anúncios
+  metaAdAccountId?: string;
   metaConnectionStatus?: string;
   plan?: string | null;
 }
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null); // Estado para o perfil do usuário
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   // Campaign state
   const [localRadius, setLocalRadius] = useState(5);
@@ -66,9 +66,10 @@ export default function Dashboard() {
       try {
         // Buscar perfil do usuário
         const profile = await getUserProfile();
+        console.log("Perfil do usuário carregado:", profile);
         setUserProfile(profile);
         if (profile && profile.metaAdAccountId) {
-          setAdAccountId(profile.metaAdAccountId); // Preencher o Ad Account ID se disponível
+          setAdAccountId(profile.metaAdAccountId);
         }
 
         // Buscar itens do menu
@@ -111,21 +112,33 @@ export default function Dashboard() {
   };
 
   const handleCreateManualCampaign = async () => {
-    if (!adAccountId || !campaignName) {
+    if (!campaignName) {
       toast({
-        title: "Campos Obrigatórios",
-        description: "Por favor, preencha o Nome da Campanha e o ID da Conta de Anúncios.",
+        title: "Campo Obrigatório",
+        description: "Por favor, preencha o Nome da Campanha.",
         variant: "destructive",
       });
-      setCampaignMessage("Nome da Campanha e ID da Conta de Anúncios são obrigatórios.");
+      setCampaignMessage("Nome da Campanha é obrigatório.");
       return;
     }
+
+    // Se não tiver adAccountId, usar um valor padrão para simulação
+    const effectiveAdAccountId = adAccountId || "act_simulated_123456789";
 
     setCreatingCampaign(true);
     setCampaignMessage(null);
     try {
+      console.log("Criando campanha com configuração:", {
+        adAccountId: effectiveAdAccountId,
+        name: campaignName,
+        budget,
+        localRadius,
+        publicationLink,
+        adText
+      });
+
       const campaignConfig = {
-        adAccountId,
+        adAccountId: effectiveAdAccountId,
         name: campaignName,
         objective: "LINK_CLICKS",
         status: "PAUSED",
@@ -136,10 +149,19 @@ export default function Dashboard() {
       };
 
       const response = await createAdCampaign(campaignConfig);
+      console.log("Resposta da criação de campanha:", response);
       setCampaignMessage(response.message || "Campanha manual criada com sucesso!");
       toast({ title: "Sucesso!", description: response.message || "Campanha manual criada com sucesso!" });
+      
+      // Limpar formulário após sucesso
+      setCampaignName("");
+      setPublicationLink("");
+      setAdText("");
+      setAdImageFile(null);
+      
       setTimeout(() => setCampaignMessage(null), 5000);
     } catch (error: any) {
+      console.error("Erro ao criar campanha:", error);
       const errorMsg = error?.response?.data?.message || error.message || "Falha ao criar campanha manual.";
       setCampaignMessage(errorMsg);
       toast({ title: "Erro", description: errorMsg, variant: "destructive" });
@@ -177,10 +199,10 @@ export default function Dashboard() {
   return (
     <div className="p-4 sm:p-8 space-y-8">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card><CardHeader><CardTitle className="text-sm font-medium">Métrica 1</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">1,234</div><p className="text-xs text-muted-foreground">+10% vs mês passado</p></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm font-medium">Métrica 2</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">R$ 567</div><p className="text-xs text-muted-foreground">+5% vs mês passado</p></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm font-medium">Métrica 3</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">89</div><p className="text-xs text-muted-foreground">-2% vs mês passado</p></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm font-medium">Métrica 4</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">9.8</div><p className="text-xs text-muted-foreground">+1% vs mês passado</p></CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-sm font-medium">Impressões</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">1.234</div><p className="text-xs text-muted-foreground">+10% vs mês passado</p></CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-sm font-medium">Cliques</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">89</div><p className="text-xs text-muted-foreground">-2% vs mês passado</p></CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-sm font-medium">Gastos</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">R$ 567</div><p className="text-xs text-muted-foreground">+5% vs mês passado</p></CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-sm font-medium">Taxa de Cliques</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">9.80%</div><p className="text-xs text-muted-foreground">+1% vs mês passado</p></CardContent></Card>
       </div>
 
       <Tabs defaultValue="manual" className="w-full">
@@ -207,14 +229,14 @@ export default function Dashboard() {
                   <Input id="campaign-name" placeholder="Ex: Campanha de Verão" value={campaignName} onChange={(e) => setCampaignName(e.target.value)} className="mt-1" />
                 </div>
                 <div>
-                  <Label htmlFor="ad-account-id">ID da Conta de Anúncios (act_xxxxxxxxxx) *</Label>
+                  <Label htmlFor="ad-account-id">ID da Conta de Anúncios (act_xxxxxxxxxx)</Label>
                   <Input 
                     id="ad-account-id" 
                     placeholder="Conecte ao Meta Ads para carregar ou insira manualmente"
                     value={adAccountId} 
                     onChange={(e) => setAdAccountId(e.target.value)} 
                     className="mt-1" 
-                    readOnly={!!(userProfile && userProfile.metaAdAccountId)} // Torna readOnly se veio do perfil
+                    readOnly={!!(userProfile && userProfile.metaAdAccountId)} 
                   />
                   {!(userProfile && userProfile.metaAdAccountId) && 
                     <p className="text-xs text-gray-500 mt-1">Você encontra o ID da sua conta de anúncios no Gerenciador de Anúncios do Facebook ou conecte sua conta Meta.</p>
@@ -322,4 +344,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

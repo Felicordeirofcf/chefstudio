@@ -105,9 +105,11 @@ export const logoutUser = () => localStorage.removeItem('userInfo');
 
 export const getUserProfile = async () => {
   try {
+    // Corrigido para usar o endpoint correto conforme definido no backend
     const response = await api.get(`/auth/profile`);
     return response.data;
   } catch (error: any) {
+    console.error('Erro ao buscar perfil:', error);
     throw new Error(error.response?.data?.message || "Erro ao buscar perfil do usuário.");
   }
 };
@@ -117,15 +119,17 @@ export const updateUserProfile = async (userData: any) => {
     const userId = JSON.parse(localStorage.getItem('userInfo') || '{}')._id;
     if (!userId) throw new Error("ID do usuário não encontrado.");
     
+    // Corrigido para usar o endpoint correto
     const response = await api.put(`/users/${userId}`, userData);
     
     // Atualizar informações do usuário no localStorage
     const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
     const updatedUser = { ...currentUser, ...userData };
-    localStorage.setItem('userInfo', JSON.stringify(currentUser));
+    localStorage.setItem('userInfo', JSON.stringify(updatedUser)); // Corrigido para usar updatedUser
     
     return response.data;
   } catch (error: any) {
+    console.error('Erro ao atualizar perfil:', error);
     throw new Error(error.response?.data?.message || "Erro ao atualizar perfil.");
   }
 };

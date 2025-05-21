@@ -38,12 +38,17 @@ const ProfilePage: React.FC = () => {
       setLoadingProfile(true);
       try {
         const profileData = await getUserProfile();
+        console.log("Perfil carregado com sucesso:", profileData);
         setUserProfile(profileData);
         setProfileFormData({
-          name: profileData.name || '', email: profileData.email || '',
-          establishmentName: profileData.establishmentName || '', businessType: profileData.businessType || '',
-          whatsapp: profileData.whatsapp || '', menuLink: profileData.menuLink || '',
-          address: profileData.address || '', cep: profileData.cep || '',
+          name: profileData.name || '', 
+          email: profileData.email || '',
+          establishmentName: profileData.establishmentName || '', 
+          businessType: profileData.businessType || '',
+          whatsapp: profileData.whatsapp || '', 
+          menuLink: profileData.menuLink || '',
+          address: profileData.address || '', 
+          cep: profileData.cep || '',
         });
       } catch (error: any) {
         console.error("Failed to fetch user profile:", error);
@@ -74,16 +79,22 @@ const ProfilePage: React.FC = () => {
     try {
       // Ensure required fields are present if necessary before sending
       const dataToSend = { ...profileFormData };
-      // Remove fields that shouldn't be sent or are empty if needed
+      console.log("Enviando dados de perfil:", dataToSend);
 
       const updatedProfile = await updateUserProfile(dataToSend);
+      console.log("Perfil atualizado com sucesso:", updatedProfile);
       setUserProfile(updatedProfile); // Update displayed profile
+      
       // Update form data to reflect saved state (important if backend modifies data)
       setProfileFormData({
-        name: updatedProfile.name || '', email: updatedProfile.email || '',
-        establishmentName: updatedProfile.establishmentName || '', businessType: updatedProfile.businessType || '',
-        whatsapp: updatedProfile.whatsapp || '', menuLink: updatedProfile.menuLink || '',
-        address: updatedProfile.address || '', cep: updatedProfile.cep || '',
+        name: updatedProfile.name || '', 
+        email: updatedProfile.email || '',
+        establishmentName: updatedProfile.establishmentName || '', 
+        businessType: updatedProfile.businessType || '',
+        whatsapp: updatedProfile.whatsapp || '', 
+        menuLink: updatedProfile.menuLink || '',
+        address: updatedProfile.address || '', 
+        cep: updatedProfile.cep || '',
       });
       setIsEditingProfile(false);
       toast({ title: "Sucesso!", description: "Seu perfil foi atualizado." });
@@ -141,7 +152,16 @@ const ProfilePage: React.FC = () => {
                 <Button type="button" variant="outline" onClick={() => {
                   setIsEditingProfile(false); setProfileError(null);
                   // Reset form data to original profile data
-                  setProfileFormData({ name: userProfile.name || '', email: userProfile.email || '', establishmentName: userProfile.establishmentName || '', businessType: userProfile.businessType || '', whatsapp: userProfile.whatsapp || '', menuLink: userProfile.menuLink || '', address: userProfile.address || '', cep: userProfile.cep || '' });
+                  setProfileFormData({ 
+                    name: userProfile.name || '', 
+                    email: userProfile.email || '', 
+                    establishmentName: userProfile.establishmentName || '', 
+                    businessType: userProfile.businessType || '', 
+                    whatsapp: userProfile.whatsapp || '', 
+                    menuLink: userProfile.menuLink || '', 
+                    address: userProfile.address || '', 
+                    cep: userProfile.cep || '' 
+                  });
                 }}>Cancelar</Button>
                 <Button type="submit" disabled={profileLoading}>{profileLoading ? "Salvando..." : "Salvar Alterações"}</Button>
               </div>
@@ -168,4 +188,3 @@ const ProfilePage: React.FC = () => {
 };
 
 export default ProfilePage;
-
