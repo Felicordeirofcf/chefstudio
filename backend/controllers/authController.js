@@ -52,6 +52,7 @@ exports.loginUser = async (req, res) => {
       email: user.email,
       metaUserId: user.facebookId,
       metaConnectionStatus: user.facebookId ? "connected" : "disconnected",
+      plan: user.plan || null,
     });
   } catch (err) {
     console.error("❌ Erro ao fazer login:", err);
@@ -127,6 +128,7 @@ exports.registerUser = async (req, res) => {
       email: newUser.email,
       metaUserId: newUser.facebookId,
       metaConnectionStatus: newUser.facebookId ? "connected" : "disconnected",
+      plan: newUser.plan || null,
     });
   } catch (err) {
     console.error("❌ Erro ao registrar:", err);
