@@ -3,7 +3,6 @@
 import React from 'react';
 import CampanhaManual from '../CampanhaManual';
 import ProdutosAnunciados from '../ProdutosAnunciados';
-import MetaAdsConnection from '../MetaAdsConnection';
 import DashboardMetrics from '../DashboardMetrics';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -15,11 +14,6 @@ const Dashboard = () => {
       {/* Métricas do Dashboard */}
       <div className="mb-8">
         <DashboardMetrics />
-      </div>
-
-      {/* Conexão com Meta Ads */}
-      <div className="mb-8">
-        <MetaAdsConnection />
       </div>
 
       {/* Seção de Criação de Anúncio Manual */}
