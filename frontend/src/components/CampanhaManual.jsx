@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { createCampaign, uploadCampaignMedia } from '../lib/api';
 
+// Configurações do Facebook OAuth
+const FB_APP_ID = '243094272395766'; // ID do app do Facebook mostrado na URL
+const FB_REDIRECT_URI = window.location.origin + '/dashboard'; // Redireciona de volta para o dashboard
+const FB_SCOPE = 'ads_management,ads_read,business_management,pages_read_engagement,instagram_basic,public_profile';
+
 const CampanhaManual = () => {
   // Estados para os campos do formulário
   const [nomeCampanha, setNomeCampanha] = useState('');
@@ -21,14 +26,75 @@ const CampanhaManual = () => {
   const [userInfo, setUserInfo] = useState(null);
   const [isMetaConnected, setIsMetaConnected] = useState(false);
 
+  // Verificar se há token do Facebook na URL (após redirecionamento)
+  useEffect(() => {
+    const checkFacebookRedirect = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const accessToken = urlParams.get('access_token');
+      const error = urlParams.get('error');
+      
+      if (accessToken) {
+        // Salvar token do Facebook
+        const metaInfo = {
+          accessToken,
+          connectedAt: new Date().toISOString(),
+          isMetaConnected: true
+        };
+        
+        // Atualizar localStorage
+        try {
+          const userInfoStr = localStorage.getItem('userInfo');
+          if (userInfoStr) {
+            const userInfo = JSON.parse(userInfoStr);
+            const updatedUserInfo = {
+              ...userInfo,
+              metaAccessToken: accessToken,
+              metaConnectionStatus: "connected",
+              isMetaConnected: true
+            };
+            localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
+            setUserInfo(updatedUserInfo);
+            setIsMetaConnected(true);
+          }
+          
+          // Salvar informações do Meta separadamente
+          localStorage.setItem('metaInfo', JSON.stringify(metaInfo));
+          
+          // Limpar URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (error) {
+          console.error('Erro ao salvar token do Facebook:', error);
+        }
+      } else if (error) {
+        setError(`Erro na autenticação com Facebook: ${error}`);
+      }
+    };
+    
+    checkFacebookRedirect();
+  }, []);
+
   // Buscar informações do usuário ao carregar o componente
   useEffect(() => {
     try {
+      // Verificar se há informações do Meta salvas
+      const metaInfoStr = localStorage.getItem('metaInfo');
+      if (metaInfoStr) {
+        const metaInfo = JSON.parse(metaInfoStr);
+        if (metaInfo.accessToken) {
+          setIsMetaConnected(true);
+        }
+      }
+      
+      // Verificar informações do usuário
       const storedUserInfo = localStorage.getItem('userInfo');
       if (storedUserInfo) {
         const parsedInfo = JSON.parse(storedUserInfo);
         setUserInfo(parsedInfo);
-        setIsMetaConnected(parsedInfo.isMetaConnected || parsedInfo.metaConnectionStatus === "connected");
+        setIsMetaConnected(
+          parsedInfo.isMetaConnected || 
+          parsedInfo.metaConnectionStatus === "connected" ||
+          parsedInfo.metaAccessToken
+        );
       }
     } catch (error) {
       console.error('Erro ao carregar informações do usuário:', error);
@@ -111,10 +177,13 @@ const CampanhaManual = () => {
     }
   };
 
-  // Função para conectar com Meta Ads
+  // Função para conectar com Meta Ads usando OAuth direto
   const handleConnectMeta = () => {
-    // Usar o endpoint correto conforme mostrado no Swagger UI
-    window.location.href = "https://chefstudio-production.up.railway.app/api/auth/meta-connect";
+    // Construir URL de autorização do Facebook
+    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&scope=${encodeURIComponent(FB_SCOPE)}&response_type=token`;
+    
+    // Redirecionar para a página de autorização do Facebook
+    window.location.href = authUrl;
   };
 
   // Função para criar a campanha
