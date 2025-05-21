@@ -14,7 +14,8 @@ exports.protect = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
 
       // Buscar o usuário pelo ID e não incluir a senha
-      req.user = await User.findById(decoded.userId || decoded.id).select('-password');
+      // Usar decoded.id que é o formato usado na geração do token
+      req.user = await User.findById(decoded.id).select('-password');
 
       if (!req.user) {
         console.log('❌ Usuário não encontrado após verificação do token');
