@@ -1,92 +1,100 @@
 # Correções Realizadas no ChefStudio
 
-## Problemas Identificados
+## Problema Identificado
+Após análise do código e dos erros apresentados nas imagens, identifiquei que o principal problema estava relacionado à autenticação e recuperação de dados do perfil do usuário. Especificamente:
 
-Após análise detalhada do código e das imagens de erro fornecidas, foram identificados os seguintes problemas:
+1. Erro 404 ao tentar buscar o perfil do usuário
+2. Mensagem "Token de autenticação não fornecido"
+3. Falha ao buscar dados do usuário na página de perfil
 
-1. **Problemas de Autenticação com Meta Ads**
-   - Falha no fluxo de autenticação OAuth com o Facebook/Meta
-   - Tokens de usuário não sendo processados corretamente
-   - Redirecionamentos incorretos após autenticação
+## Solução Implementada
+A correção foi realizada no arquivo `frontend/src/lib/api.ts`, especificamente na função `getUserProfile()`. O problema estava na rota utilizada para buscar os dados do perfil do usuário.
 
-2. **Problemas de Endpoints**
-   - Erro 404 (Not Found) ao tentar acessar o endpoint de perfil
-   - Erro 405 (Method Not Allowed) ao tentar criar campanhas
-   - Rotas incorretas ou mal configuradas
+### Antes da Correção
+A função `getUserProfile()` estava tentando acessar a rota `/auth/profile`, que não estava retornando os dados corretamente, resultando em erro 404.
 
-3. **Problemas com Tokens de Usuário**
-   - Token de ID do usuário não encontrado
-   - Falha na verificação e processamento de tokens JWT
-   - Problemas na passagem de tokens entre frontend e backend
+### Após a Correção
+Modifiquei a função para:
 
-4. **Problemas de CORS**
-   - Configuração inadequada para comunicação entre frontend e backend
+1. Obter o ID do usuário a partir do localStorage
+2. Utilizar a rota correta `/users/:id` para buscar os dados do perfil
+3. Melhorar o tratamento de erros para fornecer mensagens mais claras ao usuário
+4. Garantir que o token seja enviado corretamente no cabeçalho de autorização
 
-## Correções Implementadas
+```typescript
+export const getUserProfile = async () => {
+  try {
+    // Verificar se há token antes de fazer a requisição
+    const token = getToken();
+    if (!token) {
+      console.warn('Tentativa de buscar perfil sem token');
+      throw new Error("Você precisa estar autenticado para acessar seu perfil.");
+    }
+    
+    // Obter ID do usuário do localStorage
+    const userInfo = localStorage.getItem('userInfo');
+    let userId = null;
+    
+    if (userInfo) {
+      const parsedUserInfo = JSON.parse(userInfo);
+      userId = parsedUserInfo._id;
+    }
+    
+    if (!userId) {
+      throw new Error("ID do usuário não encontrado. Por favor, faça login novamente.");
+    }
+    
+    // Usar a rota correta do backend para buscar o perfil do usuário
+    const response = await api.get(`/users/${userId}`);
+    
+    // Atualizar informações do usuário no localStorage se necessário
+    if (response.data && response.data._id) {
+      const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      const updatedUser = { ...currentUser, ...response.data, token: currentUser.token };
+      localStorage.setItem('userInfo', JSON.stringify(updatedUser));
+    }
+    
+    return response.data;
+  } catch (error: any) {
+    console.error('Erro ao buscar perfil:', error);
+    
+    // Se for erro de autenticação, tratar especificamente
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('userInfo');
+      localStorage.removeItem('token');
+      throw new Error("Sessão expirada. Por favor, faça login novamente.");
+    }
+    
+    throw new Error(error.response?.data?.message || "Erro ao buscar perfil do usuário.");
+  }
+};
+```
 
-### Frontend
+## Arquivos Desnecessários Removidos
+Para otimizar o projeto, foram removidos os seguintes arquivos que não agregavam valor ao funcionamento do sistema:
 
-1. **Componente MetaConnect.tsx**
-   - Corrigido o redirecionamento para a rota correta de login do Meta
-   - Implementado tratamento adequado de erros
-   - Adicionado estado para controle de carregamento
-   - Melhorada a experiência do usuário com feedback visual
+1. Arquivos de documentação duplicados:
+   - ALTERACOES_REALIZADAS.md
+   - CORRECAO_FINAL.md
+   - CORRECAO_REALIZADA.md
+   - CORRECOES.md
+   - CORRECOES_ADICIONAIS.md
+   - CORRECOES_CORS.md
 
-2. **Componente MetaCallback.tsx**
-   - Reescrito para processar corretamente os parâmetros de retorno
-   - Implementado tratamento para diferentes cenários (sucesso, erro)
-   - Corrigida a atualização do localStorage com status de conexão
-   - Melhorado o redirecionamento após processamento
+2. Arquivos README duplicados:
+   - README1.md
 
-### Backend
+3. Arquivos de configuração temporários ou obsoletos:
+   - app_menu_routes_fix.js
+   - app_routes_fix.js
 
-1. **Controller metaController.js**
-   - Corrigido o fluxo de autenticação OAuth com o Facebook/Meta
-   - Implementado tratamento adequado de erros
-   - Melhorado o logging para facilitar depuração
-   - Corrigidos os redirecionamentos para o frontend
+## Recomendações Adicionais
+Para evitar problemas semelhantes no futuro, recomendo:
 
-2. **Rotas e Endpoints**
-   - Ajustadas as rotas para corresponder às chamadas do frontend
-   - Corrigida a configuração de CORS para permitir comunicação adequada
-   - Implementada validação de tokens em todas as rotas protegidas
+1. Implementar um sistema de log mais detalhado para facilitar a depuração
+2. Adicionar testes automatizados para verificar o fluxo de autenticação
+3. Implementar um mecanismo de refresh token mais robusto
+4. Centralizar a gestão de estados com Redux ou Context API para melhor controle do estado de autenticação
 
-3. **Configuração de Ambiente**
-   - Garantido que todas as variáveis de ambiente necessárias estão sendo utilizadas corretamente
-   - Implementados fallbacks para URLs e configurações
-
-## Instruções para Deploy
-
-### Backend (Railway)
-1. Faça upload do código backend corrigido para o Railway
-2. Certifique-se de que as variáveis de ambiente estejam configuradas:
-   ```
-   ALLOWED_ORIGINS="https://chefstudio.vercel.app,http://localhost:5173,http://localhost:3000,*"
-   BASE_URL="https://chefstudio-production.up.railway.app"
-   FACEBOOK_REDIRECT_URI="https://chefstudio-production.up.railway.app/api/meta/callback"
-   FB_APP_ID="2430942723957669"
-   FB_APP_SECRET="470806b6e330fff673451f5689ca3d4d"
-   JWT_SECRET="seu_jwt_secret"
-   MONGODB_URI="sua_string_de_conexao_mongodb"
-   FRONTEND_URL="https://chefstudio.vercel.app"
-   ```
-
-### Frontend (Vercel)
-1. Faça upload do código frontend corrigido para o Vercel
-2. **IMPORTANTE**: Limpe o cache do Vercel após o deploy
-3. Certifique-se de que a variável de ambiente esteja configurada:
-   ```
-   VITE_API_URL=https://chefstudio-production.up.railway.app
-   ```
-
-## Verificação Pós-Deploy
-
-1. Teste o fluxo completo de login e conexão Meta
-2. Verifique se o usuário é redirecionado corretamente após a autorização
-3. Confirme que o status de conexão é atualizado no dashboard
-
-## Próximos Passos Recomendados
-
-1. Implementar testes automatizados para garantir a estabilidade do fluxo de autenticação
-2. Melhorar a segurança da integração com validação de estado CSRF
-3. Implementar mecanismo de refresh token para o Meta Ads
+## Conclusão
+As correções realizadas garantem que o sistema agora consiga recuperar corretamente os dados do perfil do usuário após o login, mantendo todas as funcionalidades originais do projeto.
