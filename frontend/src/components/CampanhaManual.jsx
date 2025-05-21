@@ -1,20 +1,7 @@
-// Componente de campanha manual simplificado
+// Componente de campanha manual simplificado usando componentes nativos
 // Arquivo: frontend/src/components/CampanhaManual.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { 
-  Box, 
-  Typography, 
-  TextField, 
-  Button, 
-  Slider, 
-  Grid, 
-  Paper, 
-  CircularProgress, 
-  FormHelperText,
-  Alert,
-  Snackbar
-} from '@mui/material';
 
 const CampanhaManual = () => {
   // Estados para os campos do formulário
@@ -130,171 +117,167 @@ const CampanhaManual = () => {
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit} noValidate>
-      <Typography variant="h6" gutterBottom>
-        Configurações da Campanha Manual
-      </Typography>
-      <Typography variant="body2" color="text.secondary" paragraph>
-        Defina os parâmetros para sua campanha de anúncios no Meta Ads.
-      </Typography>
+    <div className="w-full">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <h2 className="text-xl font-semibold">
+          Configurações da Campanha Manual
+        </h2>
+        <p className="text-sm text-gray-500">
+          Defina os parâmetros para sua campanha de anúncios no Meta Ads.
+        </p>
 
-      <Grid container spacing={3}>
-        {/* Lado esquerdo - Mapa e Raio */}
-        <Grid item xs={12} md={6}>
-          <Paper 
-            sx={{ 
-              p: 0, 
-              height: 300, 
-              backgroundImage: 'url(https://maps.googleapis.com/maps/api/staticmap?center=São+Paulo,Brazil&zoom=12&size=600x400&key=YOUR_API_KEY)', 
-              backgroundSize: 'cover', 
-              backgroundPosition: 'center', 
-              position: 'relative' 
-            }}
-          >
-            <Box 
-              sx={{ 
-                position: 'absolute', 
-                bottom: 20, 
-                left: 20, 
-                right: 20, 
-                bgcolor: 'rgba(255,255,255,0.8)', 
-                p: 2, 
-                borderRadius: 1 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Lado esquerdo - Mapa e Raio */}
+          <div>
+            <div 
+              className="relative h-[300px] bg-cover bg-center rounded-md overflow-hidden"
+              style={{ 
+                backgroundImage: 'url(https://maps.googleapis.com/maps/api/staticmap?center=São+Paulo,Brazil&zoom=12&size=600x400&key=YOUR_API_KEY)'
               }}
             >
-              <Typography gutterBottom>
-                Raio de Alcance ({raioAlcance} Km)
-              </Typography>
-              <Slider
-                value={raioAlcance}
-                onChange={(e, newValue) => setRaioAlcance(newValue)}
-                min={1}
-                max={50}
-                valueLabelDisplay="auto"
-              />
-            </Box>
-          </Paper>
-        </Grid>
+              <div className="absolute bottom-4 left-4 right-4 bg-white bg-opacity-80 p-4 rounded">
+                <label className="block mb-2">
+                  Raio de Alcance ({raioAlcance} Km)
+                </label>
+                <input
+                  type="range"
+                  value={raioAlcance}
+                  onChange={(e) => setRaioAlcance(e.target.value)}
+                  min="1"
+                  max="50"
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </div>
 
-        {/* Lado direito - Formulário Simplificado */}
-        <Grid item xs={12} md={6}>
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                required
-                label="Nome da Campanha"
+          {/* Lado direito - Formulário Simplificado */}
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="nomeCampanha" className="block text-sm font-medium mb-1">
+                Nome da Campanha *
+              </label>
+              <input
+                id="nomeCampanha"
+                type="text"
                 value={nomeCampanha}
                 onChange={(e) => setNomeCampanha(e.target.value)}
                 placeholder="Ex: Campanha de Verão"
+                className="w-full p-2 border rounded-md"
+                required
               />
-            </Grid>
+            </div>
             
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
+            <div>
+              <label htmlFor="orcamento" className="block text-sm font-medium mb-1">
+                Orçamento semanal (R$) *
+              </label>
+              <input
+                id="orcamento"
                 type="number"
-                label="Orçamento semanal (R$)"
                 value={orcamento}
                 onChange={(e) => setOrcamento(e.target.value)}
-                InputProps={{ inputProps: { min: 10 } }}
+                min="10"
+                className="w-full p-2 border rounded-md"
+                required
               />
-              <FormHelperText>
+              <p className="text-xs text-gray-500 mt-1">
                 Para melhores resultados recomendamos um orçamento mínimo semanal de R$70.
-              </FormHelperText>
-            </Grid>
+              </p>
+            </div>
             
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Link da Publicação"
+            <div>
+              <label htmlFor="linkPublicacao" className="block text-sm font-medium mb-1">
+                Link da Publicação
+              </label>
+              <input
+                id="linkPublicacao"
+                type="text"
                 value={linkPublicacao}
                 onChange={(e) => setLinkPublicacao(e.target.value)}
                 placeholder="https://facebook.com/suapagina/posts/123..."
+                className="w-full p-2 border rounded-md"
               />
-            </Grid>
-          </Grid>
-        </Grid>
+            </div>
+          </div>
+        </div>
 
         {/* Texto do Anúncio */}
-        <Grid item xs={12}>
-          <TextField
-            fullWidth
-            multiline
-            rows={3}
-            label="Texto do Anúncio"
+        <div>
+          <label htmlFor="textoAnuncio" className="block text-sm font-medium mb-1">
+            Texto do Anúncio *
+          </label>
+          <textarea
+            id="textoAnuncio"
             value={textoAnuncio}
             onChange={(e) => setTextoAnuncio(e.target.value)}
             placeholder="Ex: Promoção especial esta semana!"
+            className="w-full p-2 border rounded-md"
+            rows="3"
             required
           />
-        </Grid>
+        </div>
 
         {/* Upload de Imagem/Vídeo */}
-        <Grid item xs={12}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="subtitle2" gutterBottom>
-              Imagem/Vídeo para o Anúncio
-            </Typography>
-            
+        <div className="p-4 border rounded-md">
+          <h3 className="text-sm font-semibold mb-2">
+            Imagem/Vídeo para o Anúncio
+          </h3>
+          
+          <label htmlFor="imagem-video-upload" className="inline-block">
+            <span className="px-4 py-2 bg-blue-600 text-white rounded-md cursor-pointer">
+              Selecionar Arquivo
+            </span>
             <input
-              accept="image/*,video/*"
-              style={{ display: 'none' }}
               id="imagem-video-upload"
               type="file"
+              accept="image/*,video/*"
               onChange={handleImagemVideoChange}
+              className="hidden"
             />
-            
-            <label htmlFor="imagem-video-upload">
-              <Button variant="outlined" component="span">
-                Selecionar Arquivo
-              </Button>
-            </label>
-            
-            {imagemPreview && (
-              <Box mt={2} textAlign="center">
-                <img 
-                  src={imagemPreview} 
-                  alt="Preview" 
-                  style={{ maxWidth: '100%', maxHeight: '200px' }} 
-                />
-              </Box>
-            )}
-          </Paper>
-        </Grid>
+          </label>
+          
+          {imagemPreview && (
+            <div className="mt-4 text-center">
+              <img 
+                src={imagemPreview} 
+                alt="Preview" 
+                className="max-w-full max-h-[200px] mx-auto" 
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Mensagem de erro */}
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+            {error}
+          </div>
+        )}
 
         {/* Botão de Envio */}
-        <Grid item xs={12}>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          
-          <Button 
-            type="submit" 
-            fullWidth 
-            variant="contained" 
-            color="primary" 
-            size="large" 
-            disabled={loading}
-          >
-            {loading ? <CircularProgress size={24} /> : 'Criar Anúncio no Meta Ads'}
-          </Button>
-        </Grid>
-      </Grid>
+        <button 
+          type="submit" 
+          className="w-full py-3 bg-blue-600 text-white rounded-md font-medium"
+          disabled={loading}
+        >
+          {loading ? 'Processando...' : 'Criar Anúncio no Meta Ads'}
+        </button>
 
-      {/* Alerta de sucesso */}
-      <Snackbar 
-        open={success} 
-        autoHideDuration={6000} 
-        onClose={handleCloseSuccess}
-      >
-        <Alert onClose={handleCloseSuccess} severity="success">
-          Anúncio criado com sucesso! Verifique a seção de produtos anunciados abaixo.
-        </Alert>
-      </Snackbar>
-    </Box>
+        {/* Mensagem de sucesso */}
+        {success && (
+          <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-md">
+            Anúncio criado com sucesso! Verifique a seção de produtos anunciados abaixo.
+            <button 
+              onClick={handleCloseSuccess}
+              className="ml-2 text-sm underline"
+            >
+              Fechar
+            </button>
+          </div>
+        )}
+      </form>
+    </div>
   );
 };
 
