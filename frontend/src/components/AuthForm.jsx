@@ -84,7 +84,10 @@ const AuthForm = ({ isLogin = true }) => {
       
       // Salvar token e informações do usuário
       localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+      
+      // Extrair dados do usuário da resposta (excluindo o token)
+      const { token, ...userData } = response.data;
+      localStorage.setItem('user', JSON.stringify(userData));
       
       toast({
         title: isLogin ? 'Login realizado com sucesso!' : 'Conta criada com sucesso!',
