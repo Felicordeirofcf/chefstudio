@@ -274,7 +274,7 @@ export const addMenuItem = async (item: any) => {
   }
 };
 
-// Ad Campaign API calls
+// Ad Campaign API calls - CORRIGIDO para usar o endpoint correto
 export const createAdCampaign = async (details: any) => {
   try {
     const token = getToken();
@@ -282,28 +282,11 @@ export const createAdCampaign = async (details: any) => {
       throw new Error("Você precisa estar autenticado para criar campanhas.");
     }
     
-    // This will call the backend endpoint responsible for creating campaigns on Meta.
-    // The 'details' object should contain all necessary info: budget, radius, ad creative (text, image/video ID), etc.
-    const response = await api.post(`/ads/campaigns`, details);
+    // Corrigido para usar o endpoint correto conforme definido no backend
+    const response = await api.post(`/ads`, details);
     return response.data; // Expected: { message: "Campanha criada com sucesso!", campaignId: "actual_campaign_id" }
   } catch (error: any) {
     throw new Error(error.response?.data?.message || "Erro ao criar campanha de anúncios.");
-  }
-};
-
-// Restaurant Info - Assuming there's a backend endpoint for this
-export const saveRestaurantInfo = async (data: any) => {
-  try {
-    const token = getToken();
-    if (!token) {
-      throw new Error("Você precisa estar autenticado para salvar informações do restaurante.");
-    }
-    
-    // Assuming an endpoint like /restaurant/info or similar for saving/updating restaurant details
-    const response = await api.post(`/restaurant/info`, data); // or PUT if it's an update
-    return response.data;
-  } catch (error: any) {
-    throw new Error(error.response?.data?.message || "Erro ao salvar informações do restaurante.");
   }
 };
 
@@ -316,7 +299,8 @@ export const getUserCampaigns = async () => {
       return []; // Return empty array on error to avoid UI crash
     }
     
-    const response = await api.get(`/ads/campaigns`);
+    // Corrigido para usar o endpoint correto conforme definido no backend
+    const response = await api.get(`/ads`);
     return response.data;
   } catch (error: any) {
     console.error("Erro ao buscar campanhas do usuário:", error);

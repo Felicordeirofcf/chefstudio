@@ -37,12 +37,8 @@ export default function Login() {
         isMetaConnected: response.metaConnectionStatus === "connected"
       }));
       
-      // Redireciona conforme conexão com Meta
-      if (response.metaConnectionStatus === "connected") {
-        navigate("/dashboard");
-      } else {
-        navigate("/connect-meta");
-      }
+      // Redireciona para o dashboard diretamente
+      navigate("/dashboard");
     } catch (err: any) {
       console.error("Erro no login:", err);
       setError(err.message || "Falha ao fazer login. Verifique suas credenciais.");

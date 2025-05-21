@@ -91,11 +91,8 @@ export default function Register() {
         description: "Sua conta foi criada com sucesso.",
       });
 
-      if (response.metaConnectionStatus === "connected") {
-        navigate("/dashboard");
-      } else {
-        navigate("/connect-meta");
-      }
+      // Redireciona diretamente para o dashboard
+      navigate("/dashboard");
 
     } catch (err: any) {
       console.error("Falha ao registrar:", err);

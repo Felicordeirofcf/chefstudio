@@ -6,6 +6,7 @@ import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { getUserProfile, updateUserProfile } from "../../lib/api";
 import { useToast } from "../../hooks/use-toast";
+import { Loader2 } from "lucide-react";
 
 // Define type for user profile data
 interface UserProfile {
@@ -31,14 +32,34 @@ const ProfilePage: React.FC = () => {
   });
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
-  // Fetch user profile on component mount
+  // Fetch user profile on component mount with retry logic
   useEffect(() => {
     const fetchProfile = async () => {
       setLoadingProfile(true);
+      setProfileError(null);
+      
       try {
+        // Verificar se há token antes de fazer a requisição
+        const userInfo = localStorage.getItem('userInfo');
+        const token = localStorage.getItem('token');
+        
+        if (!userInfo && !token) {
+          console.error("Token não encontrado no localStorage");
+          setProfileError("Você precisa estar autenticado para acessar seu perfil. Por favor, faça login novamente.");
+          setLoadingProfile(false);
+          return;
+        }
+        
+        console.log("Buscando perfil do usuário...");
         const profileData = await getUserProfile();
         console.log("Perfil carregado com sucesso:", profileData);
+        
+        if (!profileData || !profileData._id) {
+          throw new Error("Dados do perfil inválidos ou incompletos");
+        }
+        
         setUserProfile(profileData);
         setProfileFormData({
           name: profileData.name || '', 
@@ -52,13 +73,45 @@ const ProfilePage: React.FC = () => {
         });
       } catch (error: any) {
         console.error("Failed to fetch user profile:", error);
-        toast({ title: "Erro ao carregar perfil", description: error.message || "Não foi possível buscar seus dados.", variant: "destructive" });
+        
+        // Mensagem de erro mais amigável baseada no tipo de erro
+        let errorMessage = "Não foi possível buscar seus dados.";
+        
+        if (error.message?.includes("Token") || error.message?.includes("autenticação") || error.message?.includes("autorizado")) {
+          errorMessage = "Sessão expirada ou inválida. Por favor, faça login novamente.";
+          // Limpar tokens para forçar novo login
+          localStorage.removeItem('userInfo');
+          localStorage.removeItem('token');
+          
+          // Redirecionar para login após um breve delay
+          setTimeout(() => {
+            window.location.href = '/login?session_expired=true';
+          }, 3000);
+        } else if (error.message?.includes("Usuário não encontrado")) {
+          errorMessage = "Usuário não encontrado. Por favor, verifique se sua conta ainda está ativa.";
+        } else if (error.message?.includes("rede") || error.message?.includes("conexão")) {
+          errorMessage = "Erro de conexão. Verifique sua internet e tente novamente.";
+        }
+        
+        setProfileError(errorMessage);
+        toast({ 
+          title: "Erro ao carregar perfil", 
+          description: errorMessage, 
+          variant: "destructive" 
+        });
+        
+        // Tentar novamente se for um erro de rede (até 3 tentativas)
+        if (retryCount < 2 && (error.message?.includes("rede") || error.message?.includes("conexão"))) {
+          setRetryCount(prev => prev + 1);
+          setTimeout(() => fetchProfile(), 3000); // Tentar novamente após 3 segundos
+        }
       } finally {
         setLoadingProfile(false);
       }
     };
+    
     fetchProfile();
-  }, [toast]);
+  }, [toast, retryCount]);
 
   // Handle Profile Form Input Change
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,11 +153,36 @@ const ProfilePage: React.FC = () => {
       toast({ title: "Sucesso!", description: "Seu perfil foi atualizado." });
     } catch (error: any) {
       console.error("Failed to update profile:", error);
-      setProfileError(error.message || "Não foi possível salvar as alterações.");
-      toast({ title: "Erro ao salvar", description: error.message || "Não foi possível salvar as alterações.", variant: "destructive" });
+      
+      // Mensagem de erro mais amigável
+      let errorMessage = error.message || "Não foi possível salvar as alterações.";
+      
+      if (error.message?.includes("Token") || error.message?.includes("autenticação") || error.message?.includes("autorizado")) {
+        errorMessage = "Sessão expirada. Por favor, faça login novamente para salvar seu perfil.";
+        // Limpar tokens para forçar novo login
+        localStorage.removeItem('userInfo');
+        localStorage.removeItem('token');
+        
+        // Redirecionar para login após um breve delay
+        setTimeout(() => {
+          window.location.href = '/login?session_expired=true';
+        }, 3000);
+      }
+      
+      setProfileError(errorMessage);
+      toast({ 
+        title: "Erro ao salvar", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     } finally {
       setProfileLoading(false);
     }
+  };
+
+  // Função para tentar novamente
+  const handleRetry = () => {
+    setRetryCount(0); // Resetar contador para forçar nova tentativa
   };
 
   return (
@@ -114,13 +192,21 @@ const ProfilePage: React.FC = () => {
           <CardTitle className="text-xl sm:text-2xl">Meu Perfil</CardTitle>
           <CardDescription>Gerencie suas informações pessoais e do estabelecimento.</CardDescription>
         </div>
-        {!isEditingProfile && !loadingProfile && (
+        {!isEditingProfile && !loadingProfile && userProfile && (
           <Button variant="outline" onClick={() => setIsEditingProfile(true)}>Editar Perfil</Button>
         )}
       </CardHeader>
       <CardContent>
         {loadingProfile ? (
-          <p>Carregando perfil...</p>
+          <div className="flex flex-col items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Carregando seu perfil...</p>
+          </div>
+        ) : profileError ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="text-red-500 mb-4">{profileError}</div>
+            <Button onClick={handleRetry} variant="outline">Tentar Novamente</Button>
+          </div>
         ) : userProfile ? (
           isEditingProfile ? (
             // EDITING FORM
@@ -163,7 +249,14 @@ const ProfilePage: React.FC = () => {
                     cep: userProfile.cep || '' 
                   });
                 }}>Cancelar</Button>
-                <Button type="submit" disabled={profileLoading}>{profileLoading ? "Salvando..." : "Salvar Alterações"}</Button>
+                <Button type="submit" disabled={profileLoading}>
+                  {profileLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : "Salvar Alterações"}
+                </Button>
               </div>
             </form>
           ) : (
@@ -180,7 +273,10 @@ const ProfilePage: React.FC = () => {
             </div>
           )
         ) : (
-          <p className="text-red-500">Não foi possível carregar os dados do perfil.</p>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="text-red-500 mb-4">Não foi possível carregar os dados do perfil.</div>
+            <Button onClick={handleRetry} variant="outline">Tentar Novamente</Button>
+          </div>
         )}
       </CardContent>
     </Card>
