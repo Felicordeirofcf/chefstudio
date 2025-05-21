@@ -75,11 +75,26 @@ export default function MetaCallback() {
           console.log("MetaCallback: Preparando redirecionamento para dashboard");
           setDebugInfo(prev => prev + "\nPreparando redirecionamento para dashboard");
           
+          // CORREÇÃO: Usar setTimeout com função que força o redirecionamento
           setTimeout(() => {
             console.log("MetaCallback: Redirecionando para o dashboard após conexão bem-sucedida");
             setDebugInfo(prev => prev + "\nRedirecionando para /dashboard");
-            window.location.href = "/dashboard"; // Usando window.location para forçar refresh completo
-          }, 2000);
+            
+            // CORREÇÃO: Forçar redirecionamento de duas maneiras para garantir que funcione
+            try {
+              // Método 1: Usar navigate com replace
+              navigate("/dashboard", { replace: true });
+              
+              // Método 2: Como backup, usar window.location após um pequeno delay adicional
+              setTimeout(() => {
+                window.location.href = "/dashboard";
+              }, 500);
+            } catch (navError) {
+              console.error("Erro ao navegar:", navError);
+              // Fallback direto para window.location
+              window.location.href = "/dashboard";
+            }
+          }, 1500);
           
           return;
         }
@@ -95,15 +110,26 @@ export default function MetaCallback() {
             description: "Estamos finalizando a conexão com sua conta Meta...",
           });
           
-          // Redirecionar para o dashboard após alguns segundos
-          console.log("MetaCallback: Preparando redirecionamento para dashboard após receber código");
-          setDebugInfo(prev => prev + "\nPreparando redirecionamento para dashboard após receber código");
-          
+          // CORREÇÃO: Usar setTimeout com função que força o redirecionamento
           setTimeout(() => {
-            console.log("MetaCallback: Redirecionando para o dashboard após receber código de autorização");
+            console.log("MetaCallback: Redirecionando para o dashboard após receber código");
             setDebugInfo(prev => prev + "\nRedirecionando para /dashboard");
-            window.location.href = "/dashboard"; // Usando window.location para forçar refresh completo
-          }, 2500);
+            
+            // CORREÇÃO: Forçar redirecionamento de duas maneiras para garantir que funcione
+            try {
+              // Método 1: Usar navigate com replace
+              navigate("/dashboard", { replace: true });
+              
+              // Método 2: Como backup, usar window.location após um pequeno delay adicional
+              setTimeout(() => {
+                window.location.href = "/dashboard";
+              }, 500);
+            } catch (navError) {
+              console.error("Erro ao navegar:", navError);
+              // Fallback direto para window.location
+              window.location.href = "/dashboard";
+            }
+          }, 2000);
           
           return;
         }
@@ -127,8 +153,22 @@ export default function MetaCallback() {
         setTimeout(() => {
           console.log("MetaCallback: Redirecionando para página de conexão após erro");
           setDebugInfo(prev => prev + "\nRedirecionando para /connect-meta após erro");
-          navigate("/connect-meta");
-        }, 4000);
+          
+          // CORREÇÃO: Forçar redirecionamento de duas maneiras para garantir que funcione
+          try {
+            // Método 1: Usar navigate com replace
+            navigate("/connect-meta", { replace: true });
+            
+            // Método 2: Como backup, usar window.location após um pequeno delay adicional
+            setTimeout(() => {
+              window.location.href = "/connect-meta";
+            }, 500);
+          } catch (navError) {
+            console.error("Erro ao navegar:", navError);
+            // Fallback direto para window.location
+            window.location.href = "/connect-meta";
+          }
+        }, 3000);
       } finally {
         setLoading(false);
       }
@@ -136,6 +176,12 @@ export default function MetaCallback() {
 
     processCallback();
   }, [location, navigate, toast]);
+
+  // CORREÇÃO: Adicionar botão de redirecionamento manual como fallback
+  const handleManualRedirect = () => {
+    console.log("MetaCallback: Redirecionamento manual para dashboard");
+    window.location.href = "/dashboard";
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
@@ -162,6 +208,16 @@ export default function MetaCallback() {
           <div className="flex justify-center">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
           </div>
+        )}
+        
+        {/* CORREÇÃO: Botão de redirecionamento manual como fallback */}
+        {!loading && !error && (
+          <button
+            onClick={handleManualRedirect}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Ir para o Dashboard
+          </button>
         )}
         
         {/* Informações de debug - visíveis apenas em desenvolvimento */}
