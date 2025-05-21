@@ -1,7 +1,5 @@
-// Componente CampanhaManual corrigido com mapa funcional e endpoints ajustados
-// Arquivo: frontend/src/components/CampanhaManual.jsx
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { createCampaign, uploadCampaignMedia } from '../lib/api';
 
 const CampanhaManual = () => {
   // Estados para os campos do formulário
@@ -21,13 +19,16 @@ const CampanhaManual = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
+  const [isMetaConnected, setIsMetaConnected] = useState(false);
 
   // Buscar informações do usuário ao carregar o componente
   useEffect(() => {
     try {
       const storedUserInfo = localStorage.getItem('userInfo');
       if (storedUserInfo) {
-        setUserInfo(JSON.parse(storedUserInfo));
+        const parsedInfo = JSON.parse(storedUserInfo);
+        setUserInfo(parsedInfo);
+        setIsMetaConnected(parsedInfo.isMetaConnected || parsedInfo.metaConnectionStatus === "connected");
       }
     } catch (error) {
       console.error('Erro ao carregar informações do usuário:', error);
@@ -110,6 +111,13 @@ const CampanhaManual = () => {
     }
   };
 
+  // Função para conectar com Meta Ads
+  const handleConnectMeta = () => {
+    // Usar o URL completo para garantir que funcione em produção
+    const baseUrl = window.location.origin;
+    window.location.href = `${baseUrl}/api/meta/connect`;
+  };
+
   // Função para criar a campanha
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -138,33 +146,13 @@ const CampanhaManual = () => {
         postUrl: linkPublicacao || ''
       };
 
-      // Enviar dados da campanha para a API
-      // Usando endpoint correto e método POST
-      const response = await axios({
-        method: 'post',
-        url: '/api/campaigns/create',  // Endpoint ajustado
-        data: campaignData,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Usar a função correta da API para criar campanha
+      const response = await createCampaign(campaignData);
 
       // Se houver imagem/vídeo, fazer upload separado
-      if (imagemVideo) {
-        const formData = new FormData();
-        formData.append('media', imagemVideo);
-        formData.append('campaignId', response.data.id || response.data._id);
-        
-        await axios({
-          method: 'post',
-          url: '/api/campaigns/upload-media',  // Endpoint para upload de mídia
-          data: formData,
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        });
+      if (imagemVideo && response.id) {
+        const campaignId = response.id || response._id;
+        await uploadCampaignMedia(campaignId, imagemVideo);
       }
 
       // Limpar formulário após sucesso
@@ -181,7 +169,7 @@ const CampanhaManual = () => {
       
       // Atualizar a lista de produtos anunciados
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('anuncioCreated', { detail: response.data }));
+        window.dispatchEvent(new CustomEvent('anuncioCreated', { detail: response }));
       }
       
     } catch (error) {
@@ -191,7 +179,7 @@ const CampanhaManual = () => {
       if (error.response && error.response.status === 405) {
         setError('Erro no servidor: método não permitido. Por favor, entre em contato com o suporte.');
       } else {
-        setError(error.response?.data?.message || 'Erro ao criar campanha. Por favor, tente novamente.');
+        setError(error.message || 'Erro ao criar campanha. Por favor, tente novamente.');
       }
     } finally {
       setLoading(false);
@@ -202,6 +190,34 @@ const CampanhaManual = () => {
   const handleCloseSuccess = () => {
     setSuccess(false);
   };
+
+  // Se o usuário não estiver conectado ao Meta Ads, mostrar botão de conexão
+  if (!isMetaConnected) {
+    return (
+      <div className="w-full p-6 bg-white rounded-lg shadow-md">
+        <h2 className="text-xl font-semibold mb-4">Conectar ao Meta Ads</h2>
+        <p className="text-gray-600 mb-6">
+          Para criar anúncios no Meta Ads, você precisa conectar sua conta do Facebook primeiro.
+          Isso permitirá que o ChefStudio crie e gerencie campanhas em seu nome.
+        </p>
+        
+        <div className="flex flex-col items-center justify-center py-8">
+          <button 
+            onClick={handleConnectMeta}
+            className="px-6 py-3 bg-blue-600 text-white rounded-md font-medium flex items-center"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+            </svg>
+            Conectar com Meta Ads
+          </button>
+          <p className="text-sm text-gray-500 mt-4">
+            Você será redirecionado para o Facebook para autorizar o acesso.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
