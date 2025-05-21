@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
-import { getUserProfile, updatePlan } from "../../lib/api";
+import { getUserProfile, updateUserPlan } from "../../lib/api";
 import { useToast } from "../../hooks/use-toast";
 
 // Define type for plan details
@@ -58,7 +58,7 @@ const PlansPage: React.FC = () => {
 
     setUpdatingPlan(true);
     try {
-      const response = await updatePlan({ planName });
+      const response = await updateUserPlan({ plan: planName });
       // Update user profile state with the new plan details
       setUserProfile(prev => prev ? { ...prev, plan: response.plan } : null);
       toast({ title: "Sucesso!", description: response.message || `Plano atualizado para ${planName}.` });
@@ -122,4 +122,3 @@ const PlansPage: React.FC = () => {
 };
 
 export default PlansPage;
-
