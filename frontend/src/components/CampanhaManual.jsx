@@ -1,4 +1,4 @@
-// Componente de campanha manual simplificado usando componentes nativos
+// Componente CampanhaManual corrigido com mapa funcional e endpoints ajustados
 // Arquivo: frontend/src/components/CampanhaManual.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
@@ -12,6 +12,9 @@ const CampanhaManual = () => {
   const [textoAnuncio, setTextoAnuncio] = useState('');
   const [imagemVideo, setImagemVideo] = useState(null);
   const [imagemPreview, setImagemPreview] = useState('');
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [map, setMap] = useState(null);
+  const [circle, setCircle] = useState(null);
 
   // Estados para controle de carregamento e erros
   const [loading, setLoading] = useState(false);
@@ -30,6 +33,69 @@ const CampanhaManual = () => {
       console.error('Erro ao carregar informações do usuário:', error);
     }
   }, []);
+
+  // Inicializar o mapa quando o componente montar
+  useEffect(() => {
+    // Verificar se o Leaflet está disponível globalmente
+    if (window.L && !mapLoaded) {
+      // Criar script para carregar o CSS do Leaflet
+      const linkElement = document.createElement('link');
+      linkElement.rel = 'stylesheet';
+      linkElement.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(linkElement);
+
+      // Inicializar o mapa após um pequeno delay para garantir que o CSS foi carregado
+      setTimeout(() => {
+        const mapContainer = document.getElementById('map-container');
+        if (mapContainer) {
+          // Inicializar o mapa
+          const mapInstance = window.L.map('map-container').setView([-23.5505, -46.6333], 12);
+          
+          // Adicionar camada de tiles
+          window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          }).addTo(mapInstance);
+          
+          // Adicionar círculo para representar o raio
+          const circleInstance = window.L.circle([-23.5505, -46.6333], {
+            color: 'blue',
+            fillColor: '#30f',
+            fillOpacity: 0.2,
+            radius: raioAlcance * 1000 // Converter para metros
+          }).addTo(mapInstance);
+          
+          // Salvar referências
+          setMap(mapInstance);
+          setCircle(circleInstance);
+          setMapLoaded(true);
+        }
+      }, 500);
+    } else if (!window.L) {
+      // Se o Leaflet não estiver disponível, carregá-lo dinamicamente
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+      script.crossOrigin = '';
+      script.onload = () => {
+        setMapLoaded(true);
+      };
+      document.head.appendChild(script);
+    }
+
+    // Limpeza ao desmontar
+    return () => {
+      if (map) {
+        map.remove();
+      }
+    };
+  }, []);
+
+  // Atualizar o raio do círculo quando o valor do slider mudar
+  useEffect(() => {
+    if (circle && map) {
+      circle.setRadius(raioAlcance * 1000);
+    }
+  }, [raioAlcance, circle, map]);
 
   // Função para lidar com o upload de imagem/vídeo
   const handleImagemVideoChange = (e) => {
@@ -58,32 +124,48 @@ const CampanhaManual = () => {
       setError(null);
 
       // Verificar se o usuário está autenticado
-      if (!userInfo || !userInfo.token) {
+      const token = localStorage.getItem('token') || (userInfo && userInfo.token);
+      if (!token) {
         throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
       }
 
-      // Preparar FormData para upload de imagem/vídeo
-      const formData = new FormData();
-      formData.append('name', nomeCampanha);
-      formData.append('budget', orcamento);
-      formData.append('radius', raioAlcance);
-      formData.append('adText', textoAnuncio);
-      
-      if (linkPublicacao) {
-        formData.append('postUrl', linkPublicacao);
-      }
-      
-      if (imagemVideo) {
-        formData.append('media', imagemVideo);
-      }
+      // Preparar dados para envio
+      const campaignData = {
+        name: nomeCampanha,
+        budget: orcamento,
+        radius: raioAlcance,
+        adText: textoAnuncio,
+        postUrl: linkPublicacao || ''
+      };
 
       // Enviar dados da campanha para a API
-      const response = await axios.post('/api/meta/campaigns', formData, {
+      // Usando endpoint correto e método POST
+      const response = await axios({
+        method: 'post',
+        url: '/api/campaigns/create',  // Endpoint ajustado
+        data: campaignData,
         headers: {
-          Authorization: `Bearer ${userInfo.token}`,
-          'Content-Type': 'multipart/form-data'
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
+
+      // Se houver imagem/vídeo, fazer upload separado
+      if (imagemVideo) {
+        const formData = new FormData();
+        formData.append('media', imagemVideo);
+        formData.append('campaignId', response.data.id || response.data._id);
+        
+        await axios({
+          method: 'post',
+          url: '/api/campaigns/upload-media',  // Endpoint para upload de mídia
+          data: formData,
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+      }
 
       // Limpar formulário após sucesso
       setNomeCampanha('');
@@ -97,15 +179,20 @@ const CampanhaManual = () => {
       // Exibir mensagem de sucesso
       setSuccess(true);
       
-      // Atualizar a lista de produtos anunciados (pode ser implementado com um callback)
+      // Atualizar a lista de produtos anunciados
       if (typeof window !== 'undefined') {
-        // Disparar evento para atualizar a lista de produtos anunciados
         window.dispatchEvent(new CustomEvent('anuncioCreated', { detail: response.data }));
       }
       
     } catch (error) {
       console.error('Erro ao criar campanha:', error);
-      setError(error.response?.data?.message || 'Erro ao criar campanha. Por favor, tente novamente.');
+      
+      // Tratamento específico para erro 405 Method Not Allowed
+      if (error.response && error.response.status === 405) {
+        setError('Erro no servidor: método não permitido. Por favor, entre em contato com o suporte.');
+      } else {
+        setError(error.response?.data?.message || 'Erro ao criar campanha. Por favor, tente novamente.');
+      }
     } finally {
       setLoading(false);
     }
@@ -130,24 +217,28 @@ const CampanhaManual = () => {
           {/* Lado esquerdo - Mapa e Raio */}
           <div>
             <div 
-              className="relative h-[300px] bg-cover bg-center rounded-md overflow-hidden"
-              style={{ 
-                backgroundImage: 'url(https://maps.googleapis.com/maps/api/staticmap?center=São+Paulo,Brazil&zoom=12&size=600x400&key=YOUR_API_KEY)'
-              }}
+              id="map-container"
+              className="relative h-[300px] bg-gray-100 rounded-md overflow-hidden"
+              style={{ width: '100%', height: '300px' }}
             >
-              <div className="absolute bottom-4 left-4 right-4 bg-white bg-opacity-80 p-4 rounded">
-                <label className="block mb-2">
-                  Raio de Alcance ({raioAlcance} Km)
-                </label>
-                <input
-                  type="range"
-                  value={raioAlcance}
-                  onChange={(e) => setRaioAlcance(e.target.value)}
-                  min="1"
-                  max="50"
-                  className="w-full"
-                />
-              </div>
+              {!mapLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+                </div>
+              )}
+            </div>
+            <div className="mt-4">
+              <label className="block mb-2">
+                Raio de Alcance ({raioAlcance} Km)
+              </label>
+              <input
+                type="range"
+                value={raioAlcance}
+                onChange={(e) => setRaioAlcance(parseInt(e.target.value))}
+                min="1"
+                max="50"
+                className="w-full"
+              />
             </div>
           </div>
 
