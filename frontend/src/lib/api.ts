@@ -164,8 +164,21 @@ export const getUserProfile = async () => {
       throw new Error("Você precisa estar autenticado para acessar seu perfil.");
     }
     
-    // Corrigido para usar o endpoint correto conforme definido no backend
-    const response = await api.get(`/auth/profile`);
+    // Obter ID do usuário do localStorage
+    const userInfo = localStorage.getItem('userInfo');
+    let userId = null;
+    
+    if (userInfo) {
+      const parsedUserInfo = JSON.parse(userInfo);
+      userId = parsedUserInfo._id;
+    }
+    
+    if (!userId) {
+      throw new Error("ID do usuário não encontrado. Por favor, faça login novamente.");
+    }
+    
+    // Usar a rota correta do backend para buscar o perfil do usuário
+    const response = await api.get(`/users/${userId}`);
     
     // Atualizar informações do usuário no localStorage se necessário
     if (response.data && response.data._id) {
