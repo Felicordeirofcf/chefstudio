@@ -11,7 +11,6 @@ import Register from './components/auth/Register';
 import DashboardLayout from './components/layout/DashboardLayout';
 import DashboardHome from './components/dashboard/Dashboard';
 import ProfilePage from './components/dashboard/ProfilePage';
-import PlansPage from './components/dashboard/PlansPage';
 import { Toaster } from "./components/ui/toaster";
 import './index.css';
 
@@ -68,10 +67,7 @@ const router = createBrowserRouter([
         path: "profile",
         element: <ProfilePage />,
       },
-      {
-        path: "plans",
-        element: <PlansPage />,
-      },
+      // Rota "plans" removida para garantir que o botão não apareça no menu
     ],
   },
 ]);
