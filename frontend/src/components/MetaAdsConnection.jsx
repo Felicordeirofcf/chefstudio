@@ -1,40 +1,64 @@
-// Componente para conexão com Meta Ads usando componentes nativos
+// Componente MetaAdsConnection corrigido para autenticação adequada
 // Arquivo: frontend/src/components/MetaAdsConnection.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useAuth } from '../hooks/useAuth';
 
 const MetaAdsConnection = () => {
-  const { user, loading: authLoading } = useAuth();
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [userToken, setUserToken] = useState(null);
 
   // Verificar status da conexão ao carregar o componente
   useEffect(() => {
-    const checkConnection = async () => {
-      if (!user || !user.token) return;
+    // Verificar token no localStorage (tanto 'token' quanto 'userInfo.token')
+    const checkToken = () => {
+      // Primeiro tenta obter o token diretamente
+      let token = localStorage.getItem('token');
       
-      try {
-        setLoading(true);
-        const response = await axios.get('/api/meta/connection-status', {
-          headers: {
-            Authorization: `Bearer ${user.token}`
-          },
-          timeout: 5000 // Timeout para evitar requisições pendentes
-        });
-        
-        setConnected(response.data.connected);
-      } catch (err) {
-        console.error('Erro ao verificar conexão com Meta Ads:', err);
-        // Não mostrar erro ao usuário neste momento
-      } finally {
-        setLoading(false);
+      // Se não encontrar, tenta obter do userInfo
+      if (!token) {
+        try {
+          const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+          token = userInfo.token;
+        } catch (err) {
+          console.error('Erro ao obter token do userInfo:', err);
+        }
       }
+      
+      return token;
     };
+
+    const token = checkToken();
+    setUserToken(token);
     
-    checkConnection();
-  }, [user]);
+    if (token) {
+      checkConnection(token);
+    }
+  }, []);
+
+  // Função para verificar conexão com Meta Ads
+  const checkConnection = async (token) => {
+    try {
+      setLoading(true);
+      
+      // Verificar status da conexão com Meta Ads
+      const response = await axios.get('/api/meta/connection-status', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        timeout: 5000 // Timeout para evitar requisições pendentes
+      });
+      
+      setConnected(response.data?.connected || false);
+    } catch (err) {
+      console.error('Erro ao verificar conexão com Meta Ads:', err);
+      // Não mostrar erro ao usuário neste momento
+      setConnected(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Função para conectar com Meta Ads
   const handleConnect = async () => {
@@ -42,23 +66,46 @@ const MetaAdsConnection = () => {
       setLoading(true);
       setError(null);
       
-      if (!user || !user.token) {
-        throw new Error('Usuário não autenticado');
+      if (!userToken) {
+        // Se não houver token, tentar fazer login automático
+        try {
+          // Tentar obter credenciais salvas (implementação simplificada)
+          const email = localStorage.getItem('userEmail');
+          const password = localStorage.getItem('userPassword');
+          
+          if (email && password) {
+            const loginResponse = await axios.post('/api/auth/login', { email, password });
+            if (loginResponse.data && loginResponse.data.token) {
+              localStorage.setItem('token', loginResponse.data.token);
+              setUserToken(loginResponse.data.token);
+            } else {
+              throw new Error('Login automático falhou');
+            }
+          } else {
+            throw new Error('Credenciais não encontradas');
+          }
+        } catch (loginErr) {
+          throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
+        }
       }
       
       // Obter URL de autorização
       const response = await axios.get('/api/meta/auth-url', {
         headers: {
-          Authorization: `Bearer ${user.token}`
+          Authorization: `Bearer ${userToken}`
         }
       });
       
       // Redirecionar para página de autorização do Facebook
-      window.location.href = response.data.url;
+      if (response.data && response.data.url) {
+        window.location.href = response.data.url;
+      } else {
+        throw new Error('URL de autorização não recebida');
+      }
       
     } catch (err) {
       console.error('Erro ao conectar com Meta Ads:', err);
-      setError('Não foi possível iniciar a conexão com Meta Ads. Por favor, tente novamente.');
+      setError('Não foi possível iniciar a conexão com Meta Ads. Por favor, faça login novamente.');
     } finally {
       setLoading(false);
     }
@@ -70,13 +117,13 @@ const MetaAdsConnection = () => {
       setLoading(true);
       setError(null);
       
-      if (!user || !user.token) {
+      if (!userToken) {
         throw new Error('Usuário não autenticado');
       }
       
       await axios.post('/api/meta/disconnect', {}, {
         headers: {
-          Authorization: `Bearer ${user.token}`
+          Authorization: `Bearer ${userToken}`
         }
       });
       
@@ -89,10 +136,15 @@ const MetaAdsConnection = () => {
     }
   };
 
-  if (authLoading) {
+  if (!userToken) {
     return (
-      <div className="flex justify-center p-4">
-        <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+      <div className="p-4 bg-white border rounded-md mb-6 shadow-sm">
+        <h2 className="text-xl font-semibold mb-2">
+          Conexão com Meta Ads
+        </h2>
+        <div className="p-4 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-md">
+          Você precisa estar autenticado para conectar ao Meta Ads. Por favor, faça login novamente.
+        </div>
       </div>
     );
   }
