@@ -8,6 +8,7 @@ export default function MetaConnect() {
   const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>("");
 
   const imageUrl = "/images/meta-connect.png"; // Deve estar em /public/images
 
@@ -18,29 +19,37 @@ export default function MetaConnect() {
   const handleConnect = async () => {
     setError(null);
     setLoading(true);
+    setDebugInfo("Iniciando conexão com Meta...");
 
     try {
       const userInfo = localStorage.getItem("userInfo");
       const token = userInfo ? JSON.parse(userInfo).token : null;
 
       if (!token) {
-        throw new Error("Token JWT não encontrado. Faça login novamente.");
+        const errorMsg = "Token JWT não encontrado. Faça login novamente.";
+        setDebugInfo(prev => prev + "\nErro: " + errorMsg);
+        throw new Error(errorMsg);
       }
 
       // ✅ Limpa possíveis barras no final da base URL
       const baseUrl = (import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app").replace(/\/+$/, "");
+      setDebugInfo(prev => prev + "\nBase URL: " + baseUrl);
 
       // ✅ Garante URL correta com token e estado único para prevenir CSRF
       const state = generateState();
       // Corrigido: Alterado para usar a rota correta de login do Meta
       const redirectUrl = `${baseUrl}/api/meta/facebook/login?token=${encodeURIComponent(token)}&state=${state}`;
+      setDebugInfo(prev => prev + "\nURL de redirecionamento: " + redirectUrl);
 
+      console.log("MetaConnect: Redirecionando para autenticação Meta:", redirectUrl);
+      
       // Redireciona para o Meta
       window.location.href = redirectUrl;
 
     } catch (err: any) {
       console.error("Erro ao conectar com Meta:", err);
       setError(err.message || "Erro ao conectar com Meta.");
+      setDebugInfo(prev => prev + "\nErro capturado: " + (err.message || "Erro desconhecido"));
       toast({
         title: "Erro",
         description: err.message || "Erro inesperado.",
@@ -51,7 +60,7 @@ export default function MetaConnect() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
       <div className="w-full max-w-md p-8 sm:p-12 space-y-6 bg-white rounded-lg shadow-xl text-center mx-4 sm:mx-0">
         <div className="flex justify-center">
           <svg className="w-12 h-12 text-blue-600" fill="currentColor" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
@@ -82,6 +91,16 @@ export default function MetaConnect() {
         >
           {loading ? "Conectando..." : "Conectar Instagram / Facebook"}
         </Button>
+        
+        {/* Informações de debug - visíveis apenas em desenvolvimento */}
+        {import.meta.env.DEV && debugInfo && (
+          <div className="mt-8 p-4 bg-gray-100 rounded-md text-left">
+            <h3 className="font-bold text-sm mb-2">Informações de Debug:</h3>
+            <pre className="text-xs whitespace-pre-wrap overflow-auto max-h-40">
+              {debugInfo}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );

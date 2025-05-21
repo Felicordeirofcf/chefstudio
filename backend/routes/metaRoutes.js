@@ -9,13 +9,14 @@ const {
   getAdAccounts,
   createMetaCampaign,
   createAdSet,
-  createAdCreative
+  createAdCreative,
+  createAdFromPost
 } = require("../controllers/metaController");
 const { protect } = require("../middleware/authMiddleware");
 
 // Rotas públicas para autenticação Facebook
 router.get("/facebook/login", loginWithFacebook);
-router.get("/facebook/callback", facebookCallback);
+router.get("/callback", facebookCallback);
 
 // Rotas protegidas para Meta Ads
 router.post("/connect", protect, connectMetaAccount);
@@ -25,5 +26,8 @@ router.get("/ad-accounts", protect, getAdAccounts);
 router.post("/campaigns", protect, createMetaCampaign);
 router.post("/adsets", protect, createAdSet);
 router.post("/creatives", protect, createAdCreative);
+
+// Nova rota para criar anúncios a partir de publicações do Facebook
+router.post("/create-ad-from-post", protect, createAdFromPost);
 
 module.exports = router;
