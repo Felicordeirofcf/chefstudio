@@ -1,20 +1,7 @@
-// Componente para exibir produtos anunciados
+// Componente para exibir produtos anunciados usando componentes nativos
 // Arquivo: frontend/src/components/ProdutosAnunciados.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { 
-  Box, 
-  Typography, 
-  Grid, 
-  Card, 
-  CardMedia, 
-  CardContent, 
-  CardActions,
-  Button,
-  Chip,
-  CircularProgress,
-  Alert
-} from '@mui/material';
 import { useAuth } from '../hooks/useAuth';
 
 const ProdutosAnunciados = () => {
@@ -71,95 +58,78 @@ const ProdutosAnunciados = () => {
 
   if (loading && anuncios.length === 0) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-        <CircularProgress />
-      </Box>
+      <div className="flex justify-center p-8">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+      </div>
     );
   }
 
   if (error && anuncios.length === 0) {
     return (
-      <Alert severity="error" sx={{ mt: 2 }}>
+      <div className="p-4 mt-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
         {error}
-      </Alert>
+      </div>
     );
   }
 
   if (anuncios.length === 0) {
     return (
-      <Box sx={{ mt: 4 }}>
-        <Typography variant="h6" gutterBottom>
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold mb-2">
           Produtos Anunciados
-        </Typography>
-        <Alert severity="info">
+        </h2>
+        <div className="p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-md">
           Você ainda não tem anúncios criados. Use o formulário acima para criar seu primeiro anúncio.
-        </Alert>
-      </Box>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ mt: 4 }}>
-      <Typography variant="h6" gutterBottom>
+    <div className="mt-8">
+      <h2 className="text-xl font-semibold mb-2">
         Produtos Anunciados
-      </Typography>
-      <Typography variant="body2" color="text.secondary" paragraph>
+      </h2>
+      <p className="text-sm text-gray-500 mb-4">
         Todos os anúncios que você criou aparecem aqui. Clique em um anúncio para ver mais detalhes.
-      </Typography>
+      </p>
       
-      <Grid container spacing={3}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {anuncios.map((anuncio) => (
-          <Grid item xs={12} sm={6} md={3} key={anuncio.id}>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <CardMedia
-                component="img"
-                height="140"
-                image={anuncio.imageUrl || 'https://via.placeholder.com/300x140?text=Anúncio'}
-                alt={anuncio.name}
-              />
-              <CardContent sx={{ flexGrow: 1 }}>
-                <Typography gutterBottom variant="h6" component="div" noWrap>
-                  {anuncio.name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                }}>
-                  {anuncio.adText}
-                </Typography>
-                <Box sx={{ mt: 1 }}>
-                  <Chip 
-                    label={`R$ ${anuncio.budget}`} 
-                    size="small" 
-                    color="primary" 
-                    variant="outlined" 
-                    sx={{ mr: 1, mt: 1 }} 
-                  />
-                  <Chip 
-                    label={`${anuncio.radius} km`} 
-                    size="small" 
-                    color="secondary" 
-                    variant="outlined" 
-                    sx={{ mt: 1 }} 
-                  />
-                </Box>
-              </CardContent>
-              <CardActions>
-                <Button size="small" color="primary">
-                  Ver Detalhes
-                </Button>
-                <Button size="small" color="secondary">
-                  Editar
-                </Button>
-              </CardActions>
-            </Card>
-          </Grid>
+          <div key={anuncio.id} className="border rounded-md overflow-hidden flex flex-col h-full bg-white shadow-sm">
+            <img
+              src={anuncio.imageUrl || 'https://via.placeholder.com/300x140?text=Anúncio'}
+              alt={anuncio.name}
+              className="h-36 w-full object-cover"
+            />
+            <div className="p-4 flex-grow">
+              <h3 className="font-semibold text-lg mb-1 truncate">
+                {anuncio.name}
+              </h3>
+              <p className="text-sm text-gray-600 line-clamp-2 mb-2">
+                {anuncio.adText}
+              </p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  R$ {anuncio.budget}
+                </span>
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                  {anuncio.radius} km
+                </span>
+              </div>
+            </div>
+            <div className="border-t p-3 flex justify-between">
+              <button className="text-sm text-blue-600 hover:text-blue-800">
+                Ver Detalhes
+              </button>
+              <button className="text-sm text-purple-600 hover:text-purple-800">
+                Editar
+              </button>
+            </div>
+          </div>
         ))}
-      </Grid>
-    </Box>
+      </div>
+    </div>
   );
 };
 

@@ -1,7 +1,6 @@
 // Componente Dashboard principal que integra todos os componentes
 // Arquivo: frontend/src/components/dashboard/Dashboard.jsx
 import React from 'react';
-import { Box, Container, Grid, Typography, Paper } from '@mui/material';
 import CampanhaManual from '../CampanhaManual';
 import ProdutosAnunciados from '../ProdutosAnunciados';
 import MetaAdsConnection from '../MetaAdsConnection';
@@ -12,34 +11,30 @@ const Dashboard = () => {
   const { user, loading } = useAuth();
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+    <div className="container mx-auto px-4 py-8">
       {/* Métricas do Dashboard */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12}>
-          <DashboardMetrics />
-        </Grid>
-      </Grid>
+      <div className="mb-8">
+        <DashboardMetrics />
+      </div>
 
       {/* Conexão com Meta Ads */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12}>
-          <MetaAdsConnection />
-        </Grid>
-      </Grid>
+      <div className="mb-8">
+        <MetaAdsConnection />
+      </div>
 
       {/* Seção de Criação de Anúncio Manual */}
-      <Paper sx={{ p: 3, mb: 4 }}>
-        <Typography variant="h5" component="h2" gutterBottom>
+      <div className="bg-white p-6 rounded-lg shadow-sm border mb-8">
+        <h2 className="text-2xl font-bold mb-4">
           Criar Anúncio Manualmente
-        </Typography>
+        </h2>
         <CampanhaManual />
-      </Paper>
+      </div>
 
       {/* Seção de Produtos Anunciados */}
-      <Paper sx={{ p: 3 }}>
+      <div className="bg-white p-6 rounded-lg shadow-sm border">
         <ProdutosAnunciados />
-      </Paper>
-    </Container>
+      </div>
+    </div>
   );
 };
 

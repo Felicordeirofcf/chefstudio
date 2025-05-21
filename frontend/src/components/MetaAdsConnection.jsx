@@ -1,15 +1,7 @@
-// Componente para conexão com Meta Ads
+// Componente para conexão com Meta Ads usando componentes nativos
 // Arquivo: frontend/src/components/MetaAdsConnection.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { 
-  Box, 
-  Button, 
-  Typography, 
-  CircularProgress, 
-  Alert,
-  Paper
-} from '@mui/material';
 import { useAuth } from '../hooks/useAuth';
 
 const MetaAdsConnection = () => {
@@ -99,54 +91,62 @@ const MetaAdsConnection = () => {
 
   if (authLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-        <CircularProgress size={24} />
-      </Box>
+      <div className="flex justify-center p-4">
+        <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+      </div>
     );
   }
 
   return (
-    <Paper sx={{ p: 2, mb: 3 }}>
-      <Typography variant="h6" gutterBottom>
+    <div className="p-4 bg-white border rounded-md mb-6 shadow-sm">
+      <h2 className="text-xl font-semibold mb-2">
         Conexão com Meta Ads
-      </Typography>
+      </h2>
       
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <div className="p-4 mb-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
           {error}
-        </Alert>
+        </div>
       )}
       
       {connected ? (
-        <Box>
-          <Alert severity="success" sx={{ mb: 2 }}>
+        <div>
+          <div className="p-4 mb-4 bg-green-50 border border-green-200 text-green-700 rounded-md">
             Sua conta está conectada ao Meta Ads
-          </Alert>
-          <Button
-            variant="outlined"
-            color="primary"
+          </div>
+          <button
+            className="px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50"
             onClick={handleDisconnect}
             disabled={loading}
           >
-            {loading ? <CircularProgress size={24} /> : 'Desconectar'}
-          </Button>
-        </Box>
+            {loading ? (
+              <span className="flex items-center">
+                <span className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full mr-2"></span>
+                Processando...
+              </span>
+            ) : 'Desconectar'}
+          </button>
+        </div>
       ) : (
-        <Box>
-          <Alert severity="info" sx={{ mb: 2 }}>
+        <div>
+          <div className="p-4 mb-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-md">
             Conecte sua conta ao Meta Ads para criar anúncios
-          </Alert>
-          <Button
-            variant="contained"
-            color="primary"
+          </div>
+          <button
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             onClick={handleConnect}
             disabled={loading}
           >
-            {loading ? <CircularProgress size={24} /> : 'Conectar ao Meta Ads'}
-          </Button>
-        </Box>
+            {loading ? (
+              <span className="flex items-center">
+                <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                Processando...
+              </span>
+            ) : 'Conectar ao Meta Ads'}
+          </button>
+        </div>
       )}
-    </Paper>
+    </div>
   );
 };
 
