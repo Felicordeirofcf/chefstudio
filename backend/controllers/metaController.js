@@ -1,501 +1,373 @@
 const fetch = require("node-fetch");
-const qs = require("querystring");
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+const User = require("../models/userModel");
+const asyncHandler = require("express-async-handler");
 
-// ----------- CONEXÃO COM META ADS -----------
+// Configurações do Meta
+const APP_ID = process.env.META_APP_ID;
+const APP_SECRET = process.env.META_APP_SECRET;
+const REDIRECT_URI = process.env.META_REDIRECT_URI || "https://chefstudio-production.up.railway.app/api/meta/callback";
+const SCOPES = "ads_management,ads_read,business_management,public_profile,email";
 
-exports.connectMetaAccount = async (req, res) => {
+// Função para extrair ID da publicação a partir da URL
+const extractPostIdFromUrl = (url) => {
   try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: "Usuário não autenticado." });
-    }
-
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: "Usuário não encontrado." });
-    }
-
-    // Gerar token JWT para ser usado como state no fluxo OAuth
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    
-    // Redirecionar para o endpoint de login com Facebook
-    const redirectUrl = `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/meta/facebook/login?token=${token}`;
-    
-    res.json({ 
-      message: "Iniciando conexão com Meta Ads", 
-      redirectUrl 
-    });
-  } catch (err) {
-    console.error("❌ Erro ao iniciar conexão com Meta Ads:", err.message);
-    res.status(500).json({ message: "Erro ao iniciar conexão com Meta Ads" });
-  }
-};
-
-exports.getMetaConnectionStatus = async (req, res) => {
-  try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: "Usuário não autenticado." });
-    }
-
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: "Usuário não encontrado." });
-    }
-
-    const connected = user.metaConnectionStatus === "connected" && user.metaAccessToken;
-    const adAccountId = user.metaAdAccountId || null;
-    
-    res.json({ 
-      connected, 
-      adAccountId,
-      message: connected ? "Conectado ao Meta Ads" : "Não conectado ao Meta Ads" 
-    });
-  } catch (err) {
-    console.error("❌ Erro ao verificar status de conexão com Meta Ads:", err.message);
-    res.status(500).json({ message: "Erro ao verificar status de conexão com Meta Ads" });
-  }
-};
-
-exports.generateAdCaption = (req, res) => {
-  const { productName } = req.body;
-  if (!productName) {
-    return res.status(400).json({ message: "Nome do produto é obrigatório." });
-  }
-
-  const caption = `Experimente agora o incrível ${productName}! #oferta #delivery`;
-  res.json({ caption });
-};
-
-// ----------- LOGIN REAL COM FACEBOOK -----------
-
-exports.loginWithFacebook = (req, res) => {
-  console.log("[DEBUG] loginWithFacebook - Iniciando processo de login com Facebook");
-  console.log("[DEBUG] loginWithFacebook - FB_APP_ID:", process.env.FB_APP_ID);
-  console.log("[DEBUG] loginWithFacebook - FACEBOOK_REDIRECT_URI:", process.env.FACEBOOK_REDIRECT_URI);
-  
-  const appId = process.env.FB_APP_ID;
-  const redirectUri = process.env.FACEBOOK_REDIRECT_URI;
-  // Escopos: ads_management (gerenciar anúncios), business_management (gerenciar negócios), ads_read (ler dados de anúncios)
-  // pages_read_engagement (ler conteúdo de páginas), read_insights (ler métricas)
-  const scope = "ads_management,business_management,pages_read_engagement,ads_read,read_insights";
-
-  const chefStudioJwt = req.query.token; // Este é o JWT do ChefStudio, que será passado como 'state'
-  console.log("[DEBUG] loginWithFacebook - Token JWT recebido:", chefStudioJwt ? "Presente" : "Ausente");
-  
-  if (!chefStudioJwt) {
-    console.error("❌ Erro loginWithFacebook: Token JWT do ChefStudio (para ser usado como state) ausente na query.");
-    return res.status(400).json({ message: "Token JWT do ChefStudio ausente na URL para iniciar o login com Facebook." });
-  }
-
-  if (!appId) {
-    console.error("❌ Erro: FB_APP_ID não está definido nas variáveis de ambiente.");
-    return res.status(500).json({ message: "Erro de configuração do servidor: FB_APP_ID ausente." });
-  }
-  if (!redirectUri) {
-    console.error("❌ Erro: FACEBOOK_REDIRECT_URI não está definido nas variáveis de ambiente.");
-    return res.status(500).json({ message: "Erro de configuração do servidor: FACEBOOK_REDIRECT_URI ausente." });
-  }
-
-  // O 'state' que o Facebook retornará é o JWT do ChefStudio
-  const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${encodeURIComponent(chefStudioJwt)}`;
-  console.log("[DEBUG] loginWithFacebook - URL de autenticação Facebook:", authUrl);
-  console.log("[DEBUG] loginWithFacebook - Redirecting to Facebook auth URL. State (ChefStudio JWT) is being passed.");
-  return res.redirect(authUrl);
-};
-
-exports.facebookCallback = async (req, res) => {
-  const { code, state } = req.query; // 'state' aqui é o JWT do ChefStudio retornado pelo Facebook
-
-  console.log("[DEBUG] facebookCallback - Iniciando...");
-  console.log("[DEBUG] facebookCallback - Code recebido:", code ? "Presente" : "Ausente");
-  console.log("[DEBUG] facebookCallback - State (ChefStudio JWT) recebido:", state ? "Presente" : "Ausente");
-
-  const redirectUri = process.env.FACEBOOK_REDIRECT_URI;
-  const clientId = process.env.FB_APP_ID;
-  const clientSecret = process.env.FB_APP_SECRET;
-  const frontendUrl = process.env.FRONTEND_URL || 'https://chefstudio.vercel.app';
-
-  console.log("[DEBUG] facebookCallback - Variáveis de ambiente:", {
-    redirectUri,
-    clientId: clientId ? "Configurado" : "Ausente",
-    clientSecret: clientSecret ? "Configurado" : "Ausente",
-    frontendUrl
-  });
-
-  if (!code || !state) {
-    console.error("❌ Erro facebookCallback: Código de autorização do Facebook ou state (ChefStudio JWT) ausente.");
-    return res.redirect(`${frontendUrl}/meta-callback?meta_error=true&message=${encodeURIComponent("Código ou state ausente no callback do Facebook.")}`);
-  }
-
-  if (!clientId || !clientSecret || !redirectUri) {
-    console.error("❌ Erro facebookCallback: Variáveis de ambiente FB_APP_ID, FB_APP_SECRET ou FACEBOOK_REDIRECT_URI não definidas.");
-    return res.redirect(`${frontendUrl}/meta-callback?meta_error=true&message=${encodeURIComponent("Erro de configuração do servidor Facebook.")}`);
-  }
-
-  try {
-    const params = qs.stringify({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      client_secret: clientSecret,
-      code,
-    });
-
-    console.log("[DEBUG] facebookCallback - Trocando código por token de acesso...");
-    const tokenRes = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?${params}`);
-    const tokenData = await tokenRes.json();
-    console.log("[DEBUG] facebookCallback - Resposta da troca de código por token de acesso Meta:", 
-      tokenData.error ? "ERRO" : "Sucesso");
-    
-    if (tokenData.error) {
-      console.error("❌ Erro facebookCallback ao obter token de acesso Meta:", JSON.stringify(tokenData.error));
-      return res.redirect(`${frontendUrl}/meta-callback?meta_error=true&message=${encodeURIComponent("Erro ao obter token do Facebook: " + tokenData.error.message)}`);
-    }
-
-    const accessToken = tokenData.access_token;
-    if (!accessToken) {
-        console.error("❌ Erro facebookCallback: Access token Meta não recebido.");
-        return res.redirect(`${frontendUrl}/meta-callback?meta_error=true&message=${encodeURIComponent("Token de acesso Meta não recebido.")}`);
-    }
-
-    console.log("[DEBUG] facebookCallback - Token de acesso obtido, buscando dados do usuário...");
-    const meRes = await fetch(`https://graph.facebook.com/me?access_token=${accessToken}&fields=id,name,email`);
-    const meData = await meRes.json();
-    console.log("[DEBUG] facebookCallback - Resposta do endpoint /me do Facebook:", 
-      meData.error ? "ERRO" : "Sucesso");
-
-    if (meData.error) {
-        console.error("❌ Erro facebookCallback ao obter dados do usuário do Facebook (/me):", JSON.stringify(meData.error));
-        return res.redirect(`${frontendUrl}/meta-callback?meta_error=true&message=${encodeURIComponent("Erro ao obter dados do usuário do Facebook: " + meData.error.message)}`);
-    }
-
-    let decodedChefStudioJwt;
-    try {
-        decodedChefStudioJwt = jwt.verify(state, process.env.JWT_SECRET);
-        console.log("[DEBUG] facebookCallback - State (ChefStudio JWT) decodificado com sucesso. Payload:", decodedChefStudioJwt);
-    } catch (jwtError) {
-        console.error("❌ Erro facebookCallback: Falha ao verificar/decodificar o ChefStudio JWT (state):", jwtError.message);
-        return res.redirect(`${frontendUrl}/meta-callback?meta_error=true&message=${encodeURIComponent("Token de estado (JWT) inválido ou expirado.")}`);
-    }
-
-    console.log("[DEBUG] facebookCallback - Buscando usuário no banco de dados...");
-    const user = await User.findById(decodedChefStudioJwt.id);
-    if (!user) {
-      console.error(`❌ Erro facebookCallback: Usuário ChefStudio não encontrado no DB com ID: ${decodedChefStudioJwt.id}.`);
-      return res.redirect(`${frontendUrl}/meta-callback?meta_error=true&message=${encodeURIComponent("Usuário ChefStudio não encontrado.")}`);
-    }
-
-    console.log("[DEBUG] facebookCallback - Usuário encontrado, atualizando dados...");
-    user.metaAccessToken = accessToken;
-    user.metaUserId = meData.id; // Facebook User ID
-    user.metaConnectionStatus = "connected";
-    user.metaEmail = meData.email; 
-    user.metaName = meData.name; 
-
-    // Buscar e salvar o ID da Conta de Anúncios
-    try {
-      console.log("[DEBUG] facebookCallback - Buscando contas de anúncio...");
-      const adAccountsRes = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?access_token=${accessToken}&fields=id,name,account_status`);
-      const adAccountsData = await adAccountsRes.json();
-      console.log("[DEBUG] facebookCallback - Resposta do /me/adaccounts:", 
-        adAccountsData.error ? "ERRO" : `Sucesso (${adAccountsData.data?.length || 0} contas encontradas)`);
-
-      if (adAccountsData.error) {
-        console.warn("⚠️ Aviso facebookCallback: Erro ao obter contas de anúncio do Facebook. O Ad Account ID não será salvo automaticamente.", JSON.stringify(adAccountsData.error));
-        user.metaAdAccountId = null; // Limpar qualquer valor anterior se houver erro
-      } else if (adAccountsData.data && adAccountsData.data.length > 0) {
-        user.metaAdAccountId = adAccountsData.data[0].id; // Salva o ID da primeira conta (ex: "act_xxxxxxxxxxxxxxx")
-        console.log(`✅ Ad Account ID (${user.metaAdAccountId}) obtido e será salvo para o usuário ChefStudio: ${user.email}`);
-      } else {
-        console.warn(`⚠️ Aviso facebookCallback: Nenhuma conta de anúncio encontrada para o usuário Facebook ID: ${meData.id}. O Ad Account ID não será salvo.`);
-        user.metaAdAccountId = null; // Nenhuma conta encontrada
-      }
-    } catch (adAccountError) {
-      console.warn("⚠️ Aviso facebookCallback: Exceção ao tentar obter contas de anúncio:", adAccountError.message);
-      user.metaAdAccountId = null; // Limpar em caso de exceção
-    }
-
-    console.log("[DEBUG] facebookCallback - Salvando usuário atualizado...");
-    await user.save();
-    console.log(`✅ Dados da conexão Meta (Token, FB UserID, Ad Account ID: ${user.metaAdAccountId}) salvos para o usuário ChefStudio: ${user.email}`);
-    
-    // Corrigido: Garantir que o redirecionamento seja para a rota correta no frontend
-    // Adicionando timestamp para evitar cache
-    const timestamp = Date.now();
-    const redirectToUrl = `${frontendUrl}/meta-callback?meta_connected=true&userId=${user._id}&t=${timestamp}`;
-    console.log("[DEBUG] facebookCallback - Redirecionando para:", redirectToUrl);
-    return res.redirect(redirectToUrl);
-
-  } catch (err) {
-    console.error("❌ Erro GERAL no facebookCallback:", err.message, err.stack);
-    return res.redirect(`${frontendUrl}/meta-callback?meta_error=true&message=${encodeURIComponent("Erro inesperado ao processar conexão com Facebook: " + err.message)}`);
-  }
-};
-
-// ----------- CRIAÇÃO DE ANÚNCIOS A PARTIR DE PUBLICAÇÕES -----------
-
-exports.createAdFromPost = async (req, res) => {
-  try {
-    const { postUrl, adName, dailyBudget, startDate, endDate, targetCountry } = req.body;
-    
-    if (!postUrl || !adName || !dailyBudget || !startDate || !targetCountry) {
-      return res.status(400).json({ 
-        message: "Parâmetros obrigatórios ausentes. Necessário: postUrl, adName, dailyBudget, startDate, targetCountry" 
-      });
-    }
-    
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: "Usuário não autenticado." });
-    }
-
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: "Usuário não encontrado." });
-    }
-    
-    if (!user.metaAccessToken || !user.metaConnectionStatus || user.metaConnectionStatus !== "connected") {
-      return res.status(401).json({ 
-        message: "Usuário não está conectado ao Meta Ads. Por favor, conecte sua conta primeiro.",
-        isConnected: false
-      });
-    }
-    
-    if (!user.metaAdAccountId) {
-      return res.status(400).json({ 
-        message: "Nenhuma conta de anúncios encontrada. Por favor, conecte uma conta com permissões de anúncios.",
-        isConnected: true,
-        hasAdAccount: false
-      });
-    }
-    
-    // Extrair ID da publicação da URL
-    let postId = null;
-    
-    // Padrão para URLs do Facebook como https://www.facebook.com/photo/?fbid=122102873852863870&set=a.122102873882863870
-    const fbidMatch = postUrl.match(/fbid=(\d+)/);
+    // Tentar extrair o ID da publicação de diferentes formatos de URL
+    // Formato: https://www.facebook.com/photo/?fbid=122102873852863870&set=a.122102873882863870
+    const fbidMatch = url.match(/fbid=(\d+)/);
     if (fbidMatch && fbidMatch[1]) {
-      postId = fbidMatch[1];
-    } 
-    // Padrão para URLs do Facebook como https://www.facebook.com/username/posts/123456789
-    else {
-      const postsMatch = postUrl.match(/\/posts\/(\d+)/);
-      if (postsMatch && postsMatch[1]) {
-        postId = postsMatch[1];
+      return fbidMatch[1];
+    }
+    
+    // Formato: https://www.facebook.com/username/posts/123456789
+    const postsMatch = url.match(/\/posts\/(\d+)/);
+    if (postsMatch && postsMatch[1]) {
+      return postsMatch[1];
+    }
+    
+    // Formato: https://www.facebook.com/permalink.php?story_fbid=123456789
+    const storyMatch = url.match(/story_fbid=(\d+)/);
+    if (storyMatch && storyMatch[1]) {
+      return storyMatch[1];
+    }
+    
+    throw new Error("Não foi possível extrair o ID da publicação da URL fornecida");
+  } catch (error) {
+    console.error("Erro ao extrair ID da publicação:", error);
+    throw new Error("Formato de URL inválido ou não suportado");
+  }
+};
+
+// @desc    Iniciar login com Facebook
+// @route   GET /api/meta/login
+// @access  Public
+const facebookLogin = (req, res) => {
+  try {
+    // Gerar URL de autorização do Facebook
+    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SCOPES)}&response_type=code&state=${req.query.userId || ""}`;
+    
+    // Redirecionar para a URL de autorização
+    res.redirect(authUrl);
+  } catch (error) {
+    console.error("Erro ao iniciar login com Facebook:", error);
+    res.redirect(`/connect-meta?meta_error=true&message=${encodeURIComponent(error.message)}`);
+  }
+};
+
+// @desc    Callback do Facebook após autorização
+// @route   GET /api/meta/callback
+// @access  Public
+const facebookCallback = asyncHandler(async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    
+    if (!code) {
+      throw new Error("Código de autorização não recebido");
+    }
+    
+    // Trocar código por token de acesso
+    const tokenResponse = await fetch(`https://graph.facebook.com/v18.0/oauth/access_token?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_secret=${APP_SECRET}&code=${code}`, {
+      method: "GET",
+    });
+    
+    const tokenData = await tokenResponse.json();
+    
+    if (!tokenData.access_token) {
+      throw new Error("Token de acesso não recebido");
+    }
+    
+    // Obter informações do usuário
+    const userResponse = await fetch(`https://graph.facebook.com/v18.0/me?fields=id,name,email&access_token=${tokenData.access_token}`, {
+      method: "GET",
+    });
+    
+    const userData = await userResponse.json();
+    
+    if (!userData.id) {
+      throw new Error("ID do usuário não recebido");
+    }
+    
+    // Obter contas de anúncios
+    const adAccountsResponse = await fetch(`https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name,account_status&access_token=${tokenData.access_token}`, {
+      method: "GET",
+    });
+    
+    const adAccountsData = await adAccountsResponse.json();
+    
+    // Verificar se o usuário tem pelo menos uma conta de anúncios
+    if (!adAccountsData.data || adAccountsData.data.length === 0) {
+      throw new Error("Nenhuma conta de anúncios encontrada");
+    }
+    
+    // Atualizar usuário no banco de dados
+    let userId = state;
+    
+    if (!userId) {
+      // Se não tiver userId no state, tentar obter do token
+      try {
+        const token = req.headers.authorization?.split(" ")[1];
+        if (token) {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET);
+          userId = decoded.id;
+        }
+      } catch (error) {
+        console.error("Erro ao decodificar token:", error);
       }
     }
     
-    if (!postId) {
-      return res.status(400).json({ 
-        message: "Não foi possível extrair o ID da publicação da URL fornecida. Por favor, verifique o formato da URL."
-      });
+    if (userId) {
+      const user = await User.findById(userId);
+      
+      if (user) {
+        user.metaId = userData.id;
+        user.metaName = userData.name;
+        user.metaEmail = userData.email;
+        user.metaAccessToken = tokenData.access_token;
+        user.metaTokenExpires = Date.now() + (tokenData.expires_in * 1000);
+        user.metaAdAccounts = adAccountsData.data.map(account => ({
+          id: account.id,
+          name: account.name,
+          status: account.account_status
+        }));
+        user.metaConnectionStatus = "connected";
+        
+        await user.save();
+      }
     }
     
-    console.log(`[DEBUG] createAdFromPost - ID da publicação extraído: ${postId}`);
+    // Adicionar timestamp para evitar problemas de cache
+    const timestamp = Date.now();
+    
+    // Redirecionar para a página de callback no frontend
+    res.redirect(`/meta-callback?meta_connected=true&userId=${userId || ""}&timestamp=${timestamp}`);
+    
+  } catch (error) {
+    console.error("Erro no callback do Facebook:", error);
+    res.redirect(`/meta-callback?meta_error=true&message=${encodeURIComponent(error.message)}`);
+  }
+});
+
+// @desc    Obter status de conexão com Meta
+// @route   GET /api/meta/connection-status
+// @access  Private
+const getConnectionStatus = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  
+  if (!user) {
+    res.status(404);
+    throw new Error("Usuário não encontrado");
+  }
+  
+  // Verificar se o token expirou
+  const tokenExpired = user.metaTokenExpires && user.metaTokenExpires < Date.now();
+  
+  res.json({
+    connected: user.metaConnectionStatus === "connected" && !tokenExpired,
+    metaId: user.metaId,
+    metaName: user.metaName,
+    metaEmail: user.metaEmail,
+    adAccounts: user.metaAdAccounts || [],
+    tokenExpired: tokenExpired
+  });
+});
+
+// @desc    Obter perfil do usuário no Meta
+// @route   GET /api/meta/profile
+// @access  Private
+const getUserProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  
+  if (!user) {
+    res.status(404);
+    throw new Error("Usuário não encontrado");
+  }
+  
+  if (user.metaConnectionStatus !== "connected" || !user.metaAccessToken) {
+    res.status(401);
+    throw new Error("Usuário não conectado ao Meta");
+  }
+  
+  try {
+    // Obter informações do usuário
+    const userResponse = await fetch(`https://graph.facebook.com/v18.0/me?fields=id,name,email,picture&access_token=${user.metaAccessToken}`, {
+      method: "GET",
+    });
+    
+    const userData = await userResponse.json();
+    
+    if (userData.error) {
+      throw new Error(userData.error.message);
+    }
+    
+    res.json(userData);
+  } catch (error) {
+    console.error("Erro ao obter perfil do usuário:", error);
+    res.status(500);
+    throw new Error("Erro ao obter perfil do usuário: " + error.message);
+  }
+});
+
+// @desc    Criar anúncio a partir de uma publicação
+// @route   POST /api/meta/create-ad-from-post
+// @access  Private
+const createAdFromPost = asyncHandler(async (req, res) => {
+  const { postUrl, adName, dailyBudget, startDate, endDate, targetCountry } = req.body;
+  
+  if (!postUrl) {
+    res.status(400);
+    throw new Error("URL da publicação é obrigatória");
+  }
+  
+  if (!adName) {
+    res.status(400);
+    throw new Error("Nome do anúncio é obrigatório");
+  }
+  
+  if (!dailyBudget || isNaN(dailyBudget) || parseFloat(dailyBudget) < 1) {
+    res.status(400);
+    throw new Error("Orçamento diário deve ser um número maior que 1");
+  }
+  
+  if (!startDate) {
+    res.status(400);
+    throw new Error("Data de início é obrigatória");
+  }
+  
+  if (endDate && new Date(endDate) <= new Date(startDate)) {
+    res.status(400);
+    throw new Error("Data de término deve ser posterior à data de início");
+  }
+  
+  const user = await User.findById(req.user._id);
+  
+  if (!user) {
+    res.status(404);
+    throw new Error("Usuário não encontrado");
+  }
+  
+  if (user.metaConnectionStatus !== "connected" || !user.metaAccessToken) {
+    res.status(401);
+    throw new Error("Usuário não conectado ao Meta");
+  }
+  
+  if (!user.metaAdAccounts || user.metaAdAccounts.length === 0) {
+    res.status(400);
+    throw new Error("Nenhuma conta de anúncios encontrada");
+  }
+  
+  try {
+    // Extrair ID da publicação da URL
+    const postId = extractPostIdFromUrl(postUrl);
+    
+    // Selecionar a primeira conta de anúncios ativa
+    const adAccount = user.metaAdAccounts.find(account => account.status === 1) || user.metaAdAccounts[0];
     
     // Criar campanha
-    const campaignResponse = await fetch(`https://graph.facebook.com/v19.0/${user.metaAdAccountId}/campaigns`, {
+    const campaignResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccount.id}/campaigns`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        name: `Campanha: ${adName}`, 
-        objective: "OUTCOME_AWARENESS", 
-        status: "PAUSED", 
-        special_ad_categories: ['NONE'],
-        access_token: user.metaAccessToken 
-      })
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: `${adName} - Campanha`,
+        objective: "OUTCOME_AWARENESS",
+        status: "PAUSED",
+        special_ad_categories: [],
+        access_token: user.metaAccessToken,
+      }),
     });
     
     const campaignData = await campaignResponse.json();
+    
     if (campaignData.error) {
-      console.error("❌ Erro ao criar campanha:", JSON.stringify(campaignData.error));
-      return res.status(400).json({ 
-        message: `Erro ao criar campanha: ${campaignData.error.message}`,
-        error: campaignData.error
-      });
+      throw new Error(`Erro ao criar campanha: ${campaignData.error.message}`);
     }
     
-    const campaignId = campaignData.id;
-    console.log(`✅ Campanha criada com ID: ${campaignId}`);
-    
-    // Formatar datas
-    const startDateTime = new Date(startDate);
-    const formattedStartDate = startDateTime.toISOString();
-    
-    let formattedEndDate = null;
-    if (endDate) {
-      const endDateTime = new Date(endDate);
-      formattedEndDate = endDateTime.toISOString();
-    }
-    
-    // Criar Ad Set
-    const adSetPayload = {
-      name: `Conjunto: ${adName}`,
-      campaign_id: campaignId,
-      daily_budget: Math.round(parseFloat(dailyBudget) * 100), // Orçamento em centavos
-      billing_event: "IMPRESSIONS",
-      optimization_goal: "REACH",
-      bid_strategy: "LOWEST_COST_WITHOUT_CAP",
-      start_time: formattedStartDate,
-      targeting: {
-        geo_locations: { countries: [targetCountry] },
-        publisher_platforms: ["facebook", "instagram"],
-        facebook_positions: ["feed"],
-        instagram_positions: ["stream"],
-        device_platforms: ["mobile", "desktop"],
-        age_min: 18,
-        age_max: 65
-      },
-      status: "PAUSED",
-      access_token: user.metaAccessToken
-    };
-    
-    if (formattedEndDate) {
-      adSetPayload.end_time = formattedEndDate;
-    }
-    
-    const adSetResponse = await fetch(`https://graph.facebook.com/v19.0/${user.metaAdAccountId}/adsets`, {
+    // Criar conjunto de anúncios
+    const adSetResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccount.id}/adsets`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(adSetPayload)
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: `${adName} - Conjunto`,
+        campaign_id: campaignData.id,
+        daily_budget: parseFloat(dailyBudget) * 100, // Em centavos
+        bid_amount: 1000, // 10 reais em centavos
+        billing_event: "IMPRESSIONS",
+        optimization_goal: "REACH",
+        targeting: {
+          geo_locations: {
+            countries: [targetCountry],
+          },
+          age_min: 18,
+          age_max: 65,
+        },
+        status: "PAUSED",
+        start_time: new Date(startDate).toISOString(),
+        end_time: endDate ? new Date(endDate).toISOString() : null,
+        access_token: user.metaAccessToken,
+      }),
     });
     
     const adSetData = await adSetResponse.json();
+    
     if (adSetData.error) {
-      console.error("❌ Erro ao criar Ad Set:", JSON.stringify(adSetData.error));
-      return res.status(400).json({ 
-        message: `Erro ao criar conjunto de anúncios: ${adSetData.error.message}`,
-        error: adSetData.error
-      });
+      throw new Error(`Erro ao criar conjunto de anúncios: ${adSetData.error.message}`);
     }
     
-    const adSetId = adSetData.id;
-    console.log(`✅ Ad Set criado com ID: ${adSetId}`);
-    
-    // Criar anúncio usando a publicação existente
-    const adResponse = await fetch(`https://graph.facebook.com/v19.0/${user.metaAdAccountId}/ads`, {
+    // Criar anúncio
+    const adResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccount.id}/ads`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         name: adName,
-        adset_id: adSetId,
+        adset_id: adSetData.id,
         creative: {
-          object_story_id: postId // ID da publicação do Facebook
+          object_story_id: postId,
         },
         status: "PAUSED",
-        access_token: user.metaAccessToken
-      })
+        access_token: user.metaAccessToken,
+      }),
     });
     
     const adData = await adResponse.json();
+    
     if (adData.error) {
-      console.error("❌ Erro ao criar anúncio:", JSON.stringify(adData.error));
-      return res.status(400).json({ 
-        message: `Erro ao criar anúncio: ${adData.error.message}`,
-        error: adData.error
-      });
+      throw new Error(`Erro ao criar anúncio: ${adData.error.message}`);
     }
     
-    const adId = adData.id;
-    console.log(`✅ Anúncio criado com ID: ${adId}`);
-    
-    // Retornar informações completas
+    // Retornar detalhes do anúncio criado
     res.status(201).json({
-      message: "Anúncio criado com sucesso a partir da publicação do Facebook",
       success: true,
+      message: "Anúncio criado com sucesso",
       adDetails: {
-        campaignId,
-        adSetId,
-        adId,
         name: adName,
-        status: "PAUSED", // Anúncio é criado pausado para revisão
-        postId,
+        campaignId: campaignData.id,
+        adSetId: adSetData.id,
+        adId: adData.id,
+        status: "PAUSED",
         dailyBudget: parseFloat(dailyBudget),
-        startDate: formattedStartDate,
-        endDate: formattedEndDate,
-        targetCountry
-      }
+        startDate,
+        endDate,
+        targetCountry,
+        postId,
+      },
     });
     
-  } catch (err) {
-    console.error("❌ Erro ao criar anúncio a partir de publicação:", err.message, err.stack);
-    res.status(500).json({ 
-      message: "Erro interno ao criar anúncio a partir da publicação",
-      error: err.message
-    });
+  } catch (error) {
+    console.error("Erro ao criar anúncio:", error);
+    res.status(500);
+    throw new Error("Erro ao criar anúncio: " + error.message);
   }
-};
+});
 
-// ----------- CONTAS DE ANÚNCIO -----------
-
-exports.getAdAccounts = async (req, res) => {
-  try {
-    if (!req.user || !req.user.id) {
-        return res.status(401).json({ message: "Usuário não autenticado."})
-    }
-    // Busca o usuário mais recente do DB para garantir que temos o metaAccessToken atualizado
-    const currentUser = await User.findById(req.user.id);
-    if (!currentUser || !currentUser.metaAccessToken) {
-      return res.status(401).json({ message: "Token Meta não encontrado para o usuário. Por favor, conecte-se ao Facebook." });
-    }
-    const token = currentUser.metaAccessToken;
-
-    const response = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?access_token=${token}&fields=id,name,account_status,balance,currency,business_name`);
-    const data = await response.json();
-
-    if (data.error) {
-      console.error("❌ Erro ao obter contas de anúncio do Facebook em getAdAccounts:", JSON.stringify(data.error));
-      if (data.error.code === 190) { 
-        return res.status(401).json({ message: "Sessão com o Facebook expirou ou é inválida. Por favor, reconecte.", error: data.error, reconectRequired: true });
-      }
-      return res.status(400).json({ message: "Erro ao obter contas de anúncio do Facebook.", error: data.error });
-    }
-    
-    const adAccounts = data.data && Array.isArray(data.data) ? data.data : [];
-    console.log(`[DEBUG] getAdAccounts - Contas de anúncio encontradas: ${adAccounts.length}`);
-    res.json({ adAccounts });
-
-  } catch (err) {
-    console.error("❌ Erro interno ao buscar contas de anúncio em getAdAccounts:", err.message, err.stack);
-    res.status(500).json({ message: "Erro interno do servidor ao buscar contas de anúncio." });
-  }
-};
-
-// ----------- CAMPANHA -----------
-
-exports.createMetaCampaign = async (req, res) => {
-  const { adAccountId, name, objective = "LINK_CLICKS", status = "PAUSED" } = req.body;
-
-  if (!adAccountId || !name) {
-    return res.status(400).json({ message: "ID da Conta de Anúncios (adAccountId) e Nome da Campanha (name) são obrigatórios." });
-  }
-  if (!req.user || !req.user.metaAccessToken) {
-     return res.status(401).json({ message: "Token Meta não encontrado. Conecte-se ao Facebook." });
-  }
-  const token = req.user.metaAccessToken;
-
-  try {
-    const response = await fetch(`https://graph.facebook.com/v19.0/${adAccountId}/campaigns`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        name, 
-        objective, 
-        status, 
-        special_ad_categories: ['NONE'], // Importante para evitar erros de categoria especial
-        access_token: token 
-      })
-    });
-
-    const data = await response.json();
-    if (data.error) {
-      console.error("❌ Erro ao criar campanha no Facebook:", JSON.stringify(data.error));
-      return res.status(data.error.code === 100 && data.error.error_subcode === 33 ? 400 : (data.error.code || 400) ).json({ message: `Erro ao criar campanha: ${data.error.message}`, error: data.error });
-    }
-
-    console.log("✅ Campanha criada com sucesso no Facebook:", JSON.stringify(data));
-    res.status(201).json({ message: "Campanha criada com sucesso!", campaign: data });
-  } catch (err) {
-    console.error("❌ Erro interno ao criar campanha:", err.message, err.stack);
-    res.status(500).json({ message: "Erro interno do servidor ao criar campanha." });
-  }
+module.exports = {
+  facebookLogin,
+  facebookCallback,
+  getConnectionStatus,
+  getUserProfile,
+  createAdFromPost,
 };
