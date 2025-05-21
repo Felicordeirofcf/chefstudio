@@ -1,4 +1,3 @@
-// Conteúdo do arquivo /home/ubuntu/chefstudio_project/backend/controllers/metaController.js modificado
 const fetch = require("node-fetch");
 const qs = require("querystring");
 const jwt = require("jsonwebtoken");
@@ -113,12 +112,12 @@ exports.facebookCallback = async (req, res) => {
 
   if (!code || !state) {
     console.error("❌ Erro facebookCallback: Código de autorização do Facebook ou state (ChefStudio JWT) ausente.");
-    return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/dashboard?meta_error=true&message=${encodeURIComponent("Código ou state ausente no callback do Facebook.")}`);
+    return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/meta-callback?meta_error=true&message=${encodeURIComponent("Código ou state ausente no callback do Facebook.")}`);
   }
 
   if (!clientId || !clientSecret || !redirectUri) {
     console.error("❌ Erro facebookCallback: Variáveis de ambiente FB_APP_ID, FB_APP_SECRET ou FACEBOOK_REDIRECT_URI não definidas.");
-    return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/dashboard?meta_error=true&message=${encodeURIComponent("Erro de configuração do servidor Facebook.")}`);
+    return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/meta-callback?meta_error=true&message=${encodeURIComponent("Erro de configuração do servidor Facebook.")}`);
   }
 
   try {
@@ -135,13 +134,13 @@ exports.facebookCallback = async (req, res) => {
 
     if (tokenData.error) {
       console.error("❌ Erro facebookCallback ao obter token de acesso Meta:", JSON.stringify(tokenData.error));
-      return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/dashboard?meta_error=true&message=${encodeURIComponent("Erro ao obter token do Facebook: " + tokenData.error.message)}`);
+      return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/meta-callback?meta_error=true&message=${encodeURIComponent("Erro ao obter token do Facebook: " + tokenData.error.message)}`);
     }
 
     const accessToken = tokenData.access_token;
     if (!accessToken) {
         console.error("❌ Erro facebookCallback: Access token Meta não recebido.");
-        return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/dashboard?meta_error=true&message=${encodeURIComponent("Token de acesso Meta não recebido.")}`);
+        return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/meta-callback?meta_error=true&message=${encodeURIComponent("Token de acesso Meta não recebido.")}`);
     }
 
     const meRes = await fetch(`https://graph.facebook.com/me?access_token=${accessToken}&fields=id,name,email`);
@@ -150,7 +149,7 @@ exports.facebookCallback = async (req, res) => {
 
     if (meData.error) {
         console.error("❌ Erro facebookCallback ao obter dados do usuário do Facebook (/me):", JSON.stringify(meData.error));
-        return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/dashboard?meta_error=true&message=${encodeURIComponent("Erro ao obter dados do usuário do Facebook: " + meData.error.message)}`);
+        return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/meta-callback?meta_error=true&message=${encodeURIComponent("Erro ao obter dados do usuário do Facebook: " + meData.error.message)}`);
     }
 
     let decodedChefStudioJwt;
@@ -159,13 +158,13 @@ exports.facebookCallback = async (req, res) => {
         console.log("[DEBUG] facebookCallback - State (ChefStudio JWT) decodificado com sucesso. Payload:", decodedChefStudioJwt);
     } catch (jwtError) {
         console.error("❌ Erro facebookCallback: Falha ao verificar/decodificar o ChefStudio JWT (state):", jwtError.message);
-        return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/dashboard?meta_error=true&message=${encodeURIComponent("Token de estado (JWT) inválido ou expirado.")}`);
+        return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/meta-callback?meta_error=true&message=${encodeURIComponent("Token de estado (JWT) inválido ou expirado.")}`);
     }
 
     const user = await User.findById(decodedChefStudioJwt.id);
     if (!user) {
       console.error(`❌ Erro facebookCallback: Usuário ChefStudio não encontrado no DB com ID: ${decodedChefStudioJwt.id}.`);
-      return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/dashboard?meta_error=true&message=${encodeURIComponent("Usuário ChefStudio não encontrado.")}`);
+      return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/meta-callback?meta_error=true&message=${encodeURIComponent("Usuário ChefStudio não encontrado.")}`);
     }
 
     user.metaAccessToken = accessToken;
@@ -198,11 +197,11 @@ exports.facebookCallback = async (req, res) => {
     await user.save();
     console.log(`✅ Dados da conexão Meta (Token, FB UserID, Ad Account ID: ${user.metaAdAccountId}) salvos para o usuário ChefStudio: ${user.email}`);
     
-    return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/dashboard?meta_connected=true&userId=${user._id}`);
+    return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/meta-callback?meta_connected=true&userId=${user._id}`);
 
   } catch (err) {
     console.error("❌ Erro GERAL no facebookCallback:", err.message, err.stack);
-    return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/dashboard?meta_error=true&message=${encodeURIComponent("Erro inesperado ao processar conexão com Facebook: " + err.message)}`);
+    return res.redirect(`${process.env.FRONTEND_URL || 'https://chefstudio.vercel.app'}/meta-callback?meta_error=true&message=${encodeURIComponent("Erro inesperado ao processar conexão com Facebook: " + err.message)}`);
   }
 };
 
@@ -331,26 +330,22 @@ exports.createAdSet = async (req, res) => {
       console.error("❌ Erro ao criar Ad Set no Facebook:", JSON.stringify(data.error));
       return res.status(data.error.code || 400).json({ message: `Erro ao criar Ad Set: ${data.error.message}`, error: data.error });
     }
+    
     console.log("✅ Ad Set criado com sucesso no Facebook:", JSON.stringify(data));
-    res.status(201).json({ message: "Ad Set criado com sucesso!", adset: data });
+    res.status(201).json({ message: "Ad Set criado com sucesso!", adSet: data });
   } catch (err) {
     console.error("❌ Erro interno ao criar Ad Set:", err.message, err.stack);
     res.status(500).json({ message: "Erro interno do servidor ao criar Ad Set." });
   }
 };
 
-// ----------- AD CREATIVE + ANÚNCIO (Função combinada original do projeto) -----------
+// ----------- AD CREATIVE -----------
 
 exports.createAdCreative = async (req, res) => {
-  const { adAccountId, adSetId, name = "Anúncio ChefStudio", pageId, message, link, image_hash, video_id } = req.body;
+  const { adAccountId, name, title, body, image_url, website_url, call_to_action_type = "LEARN_MORE" } = req.body;
 
-  if (!adAccountId || !adSetId || !pageId || !message || !link) {
-    return res.status(400).json({ message: "Campos obrigatórios (adAccountId, adSetId, pageId, message, link) ausentes." });
-  }
-  if (!image_hash && !video_id) {
-    // A API do Facebook requer image_hash para link_data, ou video_id para video_data.
-    // O usuário precisa fornecer um deles.
-    return res.status(400).json({ message: "É necessário fornecer 'image_hash' (para anúncio de imagem/link) ou 'video_id' (para anúncio de vídeo)." });
+  if (!adAccountId || !name || !title || !body || !image_url || !website_url) {
+    return res.status(400).json({ message: "Campos obrigatórios ausentes para o Ad Creative (adAccountId, name, title, body, image_url, website_url)." });
   }
   if (!req.user || !req.user.metaAccessToken) {
      return res.status(401).json({ message: "Token Meta não encontrado." });
@@ -358,86 +353,42 @@ exports.createAdCreative = async (req, res) => {
   const token = req.user.metaAccessToken;
 
   try {
-    // 1. Criar Ad Creative
-    const creativeName = `${name} Creative - ${Date.now()}`;
-    let objectStorySpec;
-
-    if (image_hash) {
-        objectStorySpec = {
-            page_id: pageId,
-            link_data: {
-                message,
-                link,
-                image_hash: image_hash, // Usar image_hash
-                call_to_action: { type: "LEARN_MORE", value: { link } },
+    const payload = {
+      name,
+      object_story_spec: {
+        page_id: "PÁGINA_ID", // Substituir pelo ID da página real
+        link_data: {
+          message: body,
+          link: website_url,
+          image_hash: "HASH_DA_IMAGEM", // Substituir pelo hash real da imagem
+          name: title,
+          call_to_action: {
+            type: call_to_action_type,
+            value: {
+              link: website_url
             }
-        };
-    } else if (video_id) {
-        // Para video_data, image_url é a URL da thumbnail do vídeo e é obrigatória.
-        // O frontend precisaria fornecer isso, ou uma thumbnail padrão seria usada.
-        // Por simplicidade, vamos assumir que o frontend lida com a thumbnail ou que o usuário sabe que é necessária.
-        // Uma URL de placeholder pode causar falha na criação do anúncio.
-        // Idealmente, o frontend faria upload da imagem/vídeo, obteria o hash/id e a URL da thumbnail.
-        objectStorySpec = {
-            page_id: pageId,
-            video_data: {
-                video_id: video_id,
-                image_url: req.body.video_thumbnail_url || "https://via.placeholder.com/1200x628.png?text=Video+Thumbnail", // Placeholder, idealmente viria do request
-                title: name, // Título para o vídeo
-                link_description: message.substring(0,200), // Descrição curta
-                call_to_action: { type: "LEARN_MORE", value: { link_caption: link, link: link } } // link_caption é o nome do domínio
-            }
-        };
-    }
-
-    const creativePayload = {
-      name: creativeName,
-      object_story_spec: objectStorySpec,
+          }
+        }
+      },
       access_token: token
     };
 
-    const creativeRes = await fetch(`https://graph.facebook.com/v19.0/${adAccountId}/adcreatives`, {
+    const response = await fetch(`https://graph.facebook.com/v19.0/${adAccountId}/adcreatives`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(creativePayload)
+      body: JSON.stringify(payload)
     });
-    const creativeData = await creativeRes.json();
 
-    if (creativeData.error) {
-      console.error("❌ Erro ao criar Ad Creative no Facebook:", JSON.stringify(creativeData.error));
-      return res.status(creativeData.error.code || 400).json({ message: `Erro ao criar Ad Creative: ${creativeData.error.message}`, error: creativeData.error });
+    const data = await response.json();
+    if (data.error) {
+      console.error("❌ Erro ao criar Ad Creative no Facebook:", JSON.stringify(data.error));
+      return res.status(data.error.code || 400).json({ message: `Erro ao criar Ad Creative: ${data.error.message}`, error: data.error });
     }
-    console.log("✅ Ad Creative criado com sucesso:", JSON.stringify(creativeData));
-
-    // 2. Criar Ad
-    const adName = `${name} Ad - ${Date.now()}`;
-    const adPayload = {
-      name: adName,
-      adset_id: adSetId,
-      creative: { creative_id: creativeData.id },
-      status: "PAUSED",
-      access_token: token
-    };
-
-    const adRes = await fetch(`https://graph.facebook.com/v19.0/${adAccountId}/ads`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(adPayload)
-    });
-    const adData = await adRes.json();
-
-    if (adData.error) {
-      console.error("❌ Erro ao criar Ad no Facebook (Creative ID: ${creativeData.id}):", JSON.stringify(adData.error));
-      // Considerar deletar o AdCreative se a criação do Ad falhar (rollback parcial)
-      return res.status(adData.error.code || 400).json({ message: `Erro ao criar Ad: ${adData.error.message}`, error: adData.error, creative_id: creativeData.id });
-    }
-
-    console.log("✅ Anúncio criado com sucesso no Facebook:", JSON.stringify(adData));
-    res.status(201).json({ message: "Anúncio e Ad Creative criados com sucesso!", ad: adData, creative: creativeData });
-
+    
+    console.log("✅ Ad Creative criado com sucesso no Facebook:", JSON.stringify(data));
+    res.status(201).json({ message: "Ad Creative criado com sucesso!", adCreative: data });
   } catch (err) {
-    console.error("❌ Erro interno ao criar Ad Creative e Anúncio:", err.message, err.stack);
-    res.status(500).json({ message: "Erro interno do servidor ao criar Ad Creative e Anúncio." });
+    console.error("❌ Erro interno ao criar Ad Creative:", err.message, err.stack);
+    res.status(500).json({ message: "Erro interno do servidor ao criar Ad Creative." });
   }
 };
-
