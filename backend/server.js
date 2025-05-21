@@ -23,27 +23,19 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Configuração CORS para origens específicas
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',') 
-  : ['https://chefstudio.vercel.app', 'http://localhost:5173', 'http://localhost:3000', 'https://chefstudio-production.up.railway.app'];
+  : ['https://chefstudio.vercel.app', 'http://localhost:5173', 'http://localhost:3000', 'https://chefstudio-production.up.railway.app', 'https://chefstudio.vercel.app', 'https://chefstudio-frontend.vercel.app', '*'];
 
+// Configuração CORS mais permissiva para desenvolvimento
 app.use(cors({
-  origin: function (origin, callback ) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Não permitido por CORS'));
-    }
-  },
+  origin: '*', // Permite todas as origens em desenvolvimento
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'X-Requested-With', 'Accept']
 }));
 
 // Middleware para garantir headers CORS em todas as respostas
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && (allowedOrigins.includes(origin) || allowedOrigins.includes('*'))) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
+  res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
