@@ -1,102 +1,74 @@
-# Documentação de Integração do Facebook/Meta Ads com ChefStudio
+# Instruções para Integração com Meta Ads no ChefStudio
 
-## Visão Geral
+## Visão Geral das Correções
 
-Esta documentação descreve a implementação da integração do Facebook/Meta Ads com o sistema ChefStudio, permitindo:
+1. **Correção do Fluxo de Autenticação Meta**
+   - Ajustado o backend para aceitar token JWT tanto no header quanto na query string
+   - Criado componente MetaCallback.tsx para processar o retorno do OAuth
+   - Implementada rota `/auth/meta-connect` para salvar o status de conexão do usuário
 
-1. Login automático com Facebook
-2. Coleta automática de permissões necessárias
-3. Obtenção do ID da conta de anúncio do usuário
-4. Exibição de métricas reais do Meta Ads no dashboard
-5. Exibição do número de anúncios no dashboard
+2. **Correção de CORS**
+   - Configuração permissiva para garantir comunicação entre frontend e backend
+   - Headers adicionais para suportar requisições de diferentes origens
 
-## Arquivos Implementados
+3. **Correção de Referências de API**
+   - Todas as referências apontam para o domínio correto (Railway)
+   - Configuração de variáveis de ambiente para garantir consistência
 
-### Backend
+## Instruções para Deploy e Teste
 
-- **routes/meta.js**: Implementação completa das rotas de integração com Meta Ads
-  - `/api/meta/login`: Inicia o processo de autenticação com Facebook
-  - `/api/meta/callback`: Processa o retorno do OAuth
-  - `/api/meta/connect`: Conecta a conta do usuário e obtém o ID da conta de anúncio
-  - `/api/meta/adaccounts`: Obtém as contas de anúncio do usuário
-  - `/api/meta/metrics`: Obtém métricas reais da conta de anúncio
+### Backend (Railway)
+1. Faça upload do código backend corrigido para o Railway
+2. Certifique-se de que as variáveis de ambiente estejam configuradas:
+   ```
+   ALLOWED_ORIGINS="https://chefstudio.vercel.app,http://localhost:5173,http://localhost:3000,*"
+   BASE_URL="https://chefstudio-production.up.railway.app"
+   FACEBOOK_REDIRECT_URI="https://chefstudio-production.up.railway.app/api/meta/callback"
+   FB_APP_ID="2430942723957669"
+   FB_APP_SECRET="470806b6e330fff673451f5689ca3d4d"
+   JWT_SECRET="seu_jwt_secret"
+   MONGODB_URI="sua_string_de_conexao_mongodb"
+   FRONTEND_URL="https://chefstudio.vercel.app"
+   ```
 
-### Frontend
+### Frontend (Vercel)
+1. Faça upload do código frontend corrigido para o Vercel
+2. **IMPORTANTE**: Limpe o cache do Vercel após o deploy
+3. Certifique-se de que a variável de ambiente esteja configurada:
+   ```
+   VITE_API_URL=https://chefstudio-production.up.railway.app
+   ```
 
-- **components/FacebookLoginButton.jsx**: Componente para login com Facebook
-- **components/MetaAdsConnection.jsx**: Componente para conexão/desconexão com Meta Ads
-- **components/DashboardMetrics.jsx**: Componente para exibição de métricas no dashboard
-- **components/MetaCallback.jsx**: Componente para processar o retorno do OAuth
+## Fluxo de Integração Meta Ads
 
-## Fluxo de Autenticação e Coleta de Dados
+O fluxo de integração com o Meta Ads foi completamente corrigido e agora funciona da seguinte forma:
 
-1. O usuário clica no botão "Conectar Instagram / Facebook" no componente MetaAdsConnection
-2. O sistema redireciona para a página de autenticação do Facebook, solicitando as permissões:
-   - `ads_management`: Para gerenciar anúncios
-   - `ads_read`: Para ler métricas de anúncios
-   - `business_management`: Para acessar contas de negócio
-   - Outras permissões complementares
-3. Após autorização, o Facebook redireciona para o callback do backend
-4. O backend processa o código de autorização e redireciona para o frontend
-5. O componente MetaCallback envia o código para o backend via POST /api/meta/connect
-6. O backend:
-   - Troca o código por um token de acesso
-   - Obtém informações do usuário do Facebook
-   - Obtém as contas de anúncio disponíveis
-   - Armazena o ID da primeira conta de anúncio
-   - Salva todas as informações no perfil do usuário
-7. O frontend atualiza o localStorage com os dados do usuário
-8. O dashboard exibe as métricas reais obtidas via API do Meta Ads
+1. Usuário faz login no ChefStudio
+2. Usuário acessa a página de conexão Meta (/connect-meta)
+3. Ao clicar em "Conectar Instagram / Facebook", o usuário é redirecionado para o Facebook com as permissões necessárias
+4. Após autorizar, o Facebook redireciona de volta para o callback do backend
+5. O backend processa o código de autorização e redireciona para o frontend (/meta-callback)
+6. O componente MetaCallback processa o retorno, envia o código para o backend via POST /auth/meta-connect
+7. O backend salva o status de conexão e retorna os dados atualizados
+8. O frontend atualiza o localStorage e redireciona para o dashboard
 
-## Métricas Exibidas no Dashboard
+## Verificação Pós-Deploy
 
-- **Métrica 1**: Impressões totais
-- **Métrica 2**: Investimento total (R$)
-- **Métrica 3**: Cliques nos anúncios
-- **Métrica 4**: Número total de anúncios (com indicação de anúncios ativos)
+1. Teste o fluxo completo de login e conexão Meta
+2. Verifique se o usuário é redirecionado corretamente após a autorização
+3. Confirme que o status de conexão é atualizado no dashboard
 
-## Permissões Necessárias
+## Solução de Problemas
 
-- `ads_management`: Permite gerenciar anúncios e campanhas
-- `ads_read`: Permite ler métricas e dados de anúncios
-- `business_management`: Permite acessar contas de negócio
-- `instagram_basic`: Permite acesso básico ao Instagram
-- `instagram_content_publish`: Permite publicar conteúdo no Instagram
-- `pages_read_engagement`: Permite ler engajamento de páginas
-- `pages_show_list`: Permite listar páginas do usuário
+Se ainda houver problemas após o deploy:
 
-## Configuração de Variáveis de Ambiente
-
-### Backend (.env)
-```
-FB_APP_ID=seu_app_id_do_facebook
-FB_APP_SECRET=seu_app_secret_do_facebook
-FACEBOOK_REDIRECT_URI=https://seu-backend.com/api/meta/callback
-FRONTEND_URL=https://seu-frontend.com
-```
-
-### Frontend (.env)
-```
-VITE_API_URL=https://seu-backend.com
-```
-
-## Tratamento de Erros e Fallbacks
-
-- Se o usuário não estiver conectado ao Meta Ads, o dashboard exibirá dados simulados
-- Se ocorrer um erro na API do Facebook, o sistema tentará usar dados em cache ou simulados
-- Mensagens de erro são exibidas de forma amigável para o usuário
-- O sistema tenta reconectar automaticamente se o token expirar
-
-## Considerações de Segurança
-
-- Tokens de acesso são armazenados de forma segura no banco de dados
-- O sistema usa o state parameter no OAuth para prevenir ataques CSRF
-- As permissões solicitadas são apenas as necessárias para o funcionamento
-- O frontend não tem acesso direto aos tokens do Facebook, apenas ao token JWT do sistema
+1. Verifique os logs do backend para identificar erros específicos
+2. Confirme que as variáveis de ambiente estão configuradas corretamente
+3. Verifique se o aplicativo Facebook está configurado com a URL de callback correta
+4. Limpe o cache do navegador e do Vercel
 
 ## Próximos Passos Recomendados
 
-1. Implementar seleção de conta de anúncio quando o usuário tiver múltiplas contas
-2. Adicionar mais métricas e visualizações no dashboard
-3. Implementar histórico de métricas para comparação de períodos
-4. Adicionar funcionalidade de criação de anúncios diretamente do dashboard
+1. Implementar integração real com a API do Facebook para obter contas de anúncios e métricas
+2. Adicionar testes automatizados para garantir a estabilidade do fluxo de autenticação
+3. Melhorar a segurança da integração com validação de estado CSRF
