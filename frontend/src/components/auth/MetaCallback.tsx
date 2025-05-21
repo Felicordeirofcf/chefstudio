@@ -10,6 +10,68 @@ export default function MetaCallback() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>("");
+  const [redirectAttempted, setRedirectAttempted] = useState(false);
+
+  // Função para atualizar o localStorage e garantir que a atualização seja concluída
+  const updateLocalStorage = (metaConnected = true) => {
+    try {
+      const userInfoStr = localStorage.getItem("userInfo");
+      if (!userInfoStr) {
+        throw new Error("Informações do usuário não encontradas");
+      }
+
+      const userInfo = JSON.parse(userInfoStr);
+      
+      // Atualizar informações do usuário no localStorage
+      const updatedUserInfo = {
+        ...userInfo,
+        metaConnectionStatus: "connected",
+        isMetaConnected: true,
+        metaConnectedAt: new Date().toISOString() // Adicionar timestamp para evitar problemas de cache
+      };
+
+      // Salvar no localStorage
+      localStorage.setItem("userInfo", JSON.stringify(updatedUserInfo));
+      
+      // Verificar se a atualização foi bem-sucedida
+      const verifyUserInfo = localStorage.getItem("userInfo");
+      if (!verifyUserInfo) {
+        throw new Error("Falha ao verificar atualização do localStorage");
+      }
+      
+      const parsedVerify = JSON.parse(verifyUserInfo);
+      if (parsedVerify.metaConnectionStatus !== "connected") {
+        throw new Error("Falha ao atualizar status de conexão no localStorage");
+      }
+      
+      return true;
+    } catch (err) {
+      console.error("Erro ao atualizar localStorage:", err);
+      return false;
+    }
+  };
+
+  // Função para forçar redirecionamento para o dashboard
+  const forceRedirectToDashboard = () => {
+    if (redirectAttempted) return; // Evitar múltiplas tentativas
+    
+    setRedirectAttempted(true);
+    console.log("MetaCallback: Forçando redirecionamento para dashboard");
+    
+    try {
+      // Método 1: Usar navigate com replace
+      navigate("/dashboard", { replace: true });
+      
+      // Método 2: Como backup, usar window.location após um pequeno delay
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 300);
+    } catch (navError) {
+      console.error("Erro ao navegar:", navError);
+      // Fallback direto para window.location
+      window.location.href = "/dashboard";
+    }
+  };
 
   useEffect(() => {
     const processCallback = async () => {
@@ -43,27 +105,10 @@ export default function MetaCallback() {
           console.log("MetaCallback: Conexão bem-sucedida, userId:", userId);
           setDebugInfo(prev => prev + "\nConexão bem-sucedida com userId: " + userId);
           
-          // Obter informações do usuário do localStorage
-          const userInfoStr = localStorage.getItem("userInfo");
-          if (!userInfoStr) {
-            console.error("MetaCallback: Informações do usuário não encontradas no localStorage");
-            setDebugInfo(prev => prev + "\nErro: userInfo não encontrado no localStorage");
-            throw new Error("Informações do usuário não encontradas");
-          }
-
-          const userInfo = JSON.parse(userInfoStr);
-          console.log("MetaCallback: userInfo do localStorage:", userInfo);
-          
-          // Atualizar informações do usuário no localStorage
-          const updatedUserInfo = {
-            ...userInfo,
-            metaConnectionStatus: "connected",
-            isMetaConnected: true
-          };
-
-          localStorage.setItem("userInfo", JSON.stringify(updatedUserInfo));
-          console.log("MetaCallback: localStorage atualizado com status de conexão");
-          setDebugInfo(prev => prev + "\nLocalStorage atualizado com status de conexão");
+          // Atualizar localStorage
+          const updated = updateLocalStorage(true);
+          console.log("MetaCallback: localStorage atualizado:", updated);
+          setDebugInfo(prev => prev + "\nLocalStorage atualizado: " + updated);
 
           // Mostrar mensagem de sucesso
           toast({
@@ -75,25 +120,8 @@ export default function MetaCallback() {
           console.log("MetaCallback: Preparando redirecionamento para dashboard");
           setDebugInfo(prev => prev + "\nPreparando redirecionamento para dashboard");
           
-          // CORREÇÃO: Usar setTimeout com função que força o redirecionamento
           setTimeout(() => {
-            console.log("MetaCallback: Redirecionando para o dashboard após conexão bem-sucedida");
-            setDebugInfo(prev => prev + "\nRedirecionando para /dashboard");
-            
-            // CORREÇÃO: Forçar redirecionamento de duas maneiras para garantir que funcione
-            try {
-              // Método 1: Usar navigate com replace
-              navigate("/dashboard", { replace: true });
-              
-              // Método 2: Como backup, usar window.location após um pequeno delay adicional
-              setTimeout(() => {
-                window.location.href = "/dashboard";
-              }, 500);
-            } catch (navError) {
-              console.error("Erro ao navegar:", navError);
-              // Fallback direto para window.location
-              window.location.href = "/dashboard";
-            }
+            forceRedirectToDashboard();
           }, 1500);
           
           return;
@@ -104,31 +132,18 @@ export default function MetaCallback() {
           console.log("MetaCallback: Código de autorização encontrado:", code);
           setDebugInfo(prev => prev + "\nCódigo de autorização encontrado");
           
+          // Atualizar localStorage mesmo com apenas o código
+          // Isso ajuda a evitar problemas de redirecionamento
+          updateLocalStorage(true);
+          
           // Mostrar mensagem de processamento
           toast({
             title: "Processando conexão",
             description: "Estamos finalizando a conexão com sua conta Meta...",
           });
           
-          // CORREÇÃO: Usar setTimeout com função que força o redirecionamento
           setTimeout(() => {
-            console.log("MetaCallback: Redirecionando para o dashboard após receber código");
-            setDebugInfo(prev => prev + "\nRedirecionando para /dashboard");
-            
-            // CORREÇÃO: Forçar redirecionamento de duas maneiras para garantir que funcione
-            try {
-              // Método 1: Usar navigate com replace
-              navigate("/dashboard", { replace: true });
-              
-              // Método 2: Como backup, usar window.location após um pequeno delay adicional
-              setTimeout(() => {
-                window.location.href = "/dashboard";
-              }, 500);
-            } catch (navError) {
-              console.error("Erro ao navegar:", navError);
-              // Fallback direto para window.location
-              window.location.href = "/dashboard";
-            }
+            forceRedirectToDashboard();
           }, 2000);
           
           return;
@@ -154,18 +169,10 @@ export default function MetaCallback() {
           console.log("MetaCallback: Redirecionando para página de conexão após erro");
           setDebugInfo(prev => prev + "\nRedirecionando para /connect-meta após erro");
           
-          // CORREÇÃO: Forçar redirecionamento de duas maneiras para garantir que funcione
           try {
-            // Método 1: Usar navigate com replace
             navigate("/connect-meta", { replace: true });
-            
-            // Método 2: Como backup, usar window.location após um pequeno delay adicional
-            setTimeout(() => {
-              window.location.href = "/connect-meta";
-            }, 500);
           } catch (navError) {
             console.error("Erro ao navegar:", navError);
-            // Fallback direto para window.location
             window.location.href = "/connect-meta";
           }
         }, 3000);
@@ -177,10 +184,15 @@ export default function MetaCallback() {
     processCallback();
   }, [location, navigate, toast]);
 
-  // CORREÇÃO: Adicionar botão de redirecionamento manual como fallback
+  // Botão de redirecionamento manual como fallback
   const handleManualRedirect = () => {
     console.log("MetaCallback: Redirecionamento manual para dashboard");
-    window.location.href = "/dashboard";
+    
+    // Garantir que o localStorage está atualizado antes do redirecionamento manual
+    updateLocalStorage(true);
+    
+    // Forçar redirecionamento
+    forceRedirectToDashboard();
   };
 
   return (
@@ -210,7 +222,7 @@ export default function MetaCallback() {
           </div>
         )}
         
-        {/* CORREÇÃO: Botão de redirecionamento manual como fallback */}
+        {/* Botão de redirecionamento manual como fallback */}
         {!loading && !error && (
           <button
             onClick={handleManualRedirect}
