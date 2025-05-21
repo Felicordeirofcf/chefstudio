@@ -3,6 +3,7 @@ const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
+const axios = require('axios');
 
 /**
  * @swagger
@@ -55,7 +56,6 @@ router.get('/login', async (req, res) => {
     }
     
     // Verificar se o usuário existe
-    // Corrigido: usar decoded.userId em vez de decoded.id
     const user = await User.findById(decoded.userId);
     if (!user) {
       return res.status(401).json({ 
@@ -142,6 +142,84 @@ router.get('/callback', async (req, res) => {
     // Redirecionar para o frontend com mensagem de erro
     const frontendUrl = process.env.FRONTEND_URL || 'https://chefstudio.vercel.app';
     res.redirect(`${frontendUrl}/meta-callback?error=${encodeURIComponent(error.message)}`);
+  }
+});
+
+/**
+ * @swagger
+ * /api/meta/connect:
+ *   post:
+ *     summary: Conecta a conta do usuário com o Facebook/Meta
+ *     tags: [Meta]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 description: Código de autorização do Facebook
+ *     responses:
+ *       200:
+ *         description: Conexão realizada com sucesso
+ *       400:
+ *         description: Parâmetros inválidos
+ *       401:
+ *         description: Não autorizado
+ *       500:
+ *         description: Erro interno do servidor
+ */
+router.post('/connect', authMiddleware, async (req, res) => {
+  try {
+    const { code } = req.body;
+    
+    if (!code) {
+      return res.status(400).json({ message: 'Código de autorização ausente' });
+    }
+    
+    // Obter o usuário a partir do middleware de autenticação
+    const userId = req.user.userId;
+    
+    // Buscar o usuário no banco de dados
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Usuário não encontrado' });
+    }
+    
+    // Simular troca do código de autorização por token de acesso
+    // Em produção, isso seria feito com uma chamada real à API do Facebook
+    const mockAccessToken = `mock_access_token_${Date.now()}`;
+    
+    // Atualizar o usuário com as informações do Meta
+    user.metaConnectionStatus = 'connected';
+    user.metaAccessToken = mockAccessToken;
+    user.metaConnectedAt = new Date();
+    
+    // Salvar as alterações no usuário
+    await user.save();
+    
+    // Retornar sucesso
+    res.json({
+      success: true,
+      message: 'Conta conectada com sucesso ao Meta',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        metaConnectionStatus: user.metaConnectionStatus,
+        metaConnectedAt: user.metaConnectedAt
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao conectar com Meta:', error);
+    res.status(500).json({ 
+      message: 'Erro ao conectar com Meta',
+      error: error.message
+    });
   }
 });
 
