@@ -177,8 +177,9 @@ export const getUserProfile = async () => {
       throw new Error("ID do usuário não encontrado. Por favor, faça login novamente.");
     }
     
-    // Usar a rota correta do backend para buscar o perfil do usuário
-    const response = await api.get(`/auth/profile`);
+    // CORREÇÃO: Usar a rota correta do backend para buscar o perfil do usuário
+    // Alterado de /auth/profile para /users/{userId}
+    const response = await api.get(`/users/${userId}`);
     
     // Atualizar informações do usuário no localStorage se necessário
     if (response.data && response.data._id) {
