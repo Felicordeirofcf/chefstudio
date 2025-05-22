@@ -10,10 +10,11 @@ const swaggerJsdoc = require('swagger-jsdoc');
 
 // Importar todas as rotas necessárias
 const authRoutes = require('./routes/authRoutes');
-// const userRoutes = require('./routes/userRoutes');
+const userRoutes = require('./routes/user');
 const metaRoutes = require('./routes/metaRoutes');
-// const menuRoutes = require('./routes/menuRoutes');
+const menuRoutes = require('./routes/menu');
 const healthRoutes = require('./routes/healthRoutes');
+const profileRoutes = require('./routes/profile');
 
 // Configurar variáveis de ambiente
 dotenv.config();
@@ -67,10 +68,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Rotas de API - incluindo todas as necessárias
 app.use('/api/auth', authRoutes);
-// app.use('/api/users', userRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/meta', metaRoutes);
-// app.use('/api/menu', menuRoutes);
+app.use('/api/menu', menuRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/profile', profileRoutes);
 
 // Rota básica para verificar se o servidor está funcionando
 app.get('/api', (req, res) => {
