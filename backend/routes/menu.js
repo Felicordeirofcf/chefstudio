@@ -4,9 +4,9 @@ const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
 
-// Modelo para os itens do menu (se não existir, crie este arquivo)
-// Caso já exista um modelo, use-o em vez de criar um novo
-const MenuItem = require('../models/menuItem');
+// Modelo para os itens do menu
+// Corrigido para usar a capitalização correta do arquivo
+const MenuItem = require('../models/MenuItem');
 
 /**
  * @swagger
