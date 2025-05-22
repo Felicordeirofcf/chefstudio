@@ -1,4 +1,3 @@
-import React, { useState, useEffect } from 'react';
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { createCampaign, uploadCampaignMedia } from '../lib/api';
 
