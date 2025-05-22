@@ -91,6 +91,7 @@ app.use('/api/meta', require('./routes/meta'));
 app.use('/api/meta-ads', require('./routes/meta-ads'));
 app.use('/api/menu', require('./routes/menu'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/health', require('./routes/health'));
 
 // Rota de teste
 app.get('/', (req, res) => {
