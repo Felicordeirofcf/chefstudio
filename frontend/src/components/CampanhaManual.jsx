@@ -118,6 +118,9 @@ const CampanhaManual = () => {
         throw new Error('Você precisa conectar sua conta ao Meta Ads antes de criar campanhas. Vá para seu perfil e conecte-se.');
       }
 
+      // URL base correta para o backend
+      const API_BASE_URL = "https://chefstudio-production.up.railway.app/api";
+
       // Preparar dados para envio
       const campaignData = {
         name: nomeCampanha,
@@ -128,11 +131,11 @@ const CampanhaManual = () => {
       };
 
       // Determinar qual endpoint usar com base nos dados fornecidos
-      let endpoint = '/api/meta-ads/create-from-post';
+      let endpoint = `${API_BASE_URL}/meta-ads/create-from-post`;
       
       // Se não tiver link de publicação, usar o endpoint de criação por imagem
       if (!linkPublicacao) {
-        endpoint = '/api/meta-ads/create-from-image';
+        endpoint = `${API_BASE_URL}/meta-ads/create-from-image`;
       }
 
       console.log(`Usando endpoint: ${endpoint} para criar campanha`);
