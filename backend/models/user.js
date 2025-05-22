@@ -41,6 +41,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: 'free'
   },
+  // Campos de integração com Meta/Facebook
   facebookId: {
     type: String
   },
@@ -50,6 +51,38 @@ const userSchema = new mongoose.Schema({
   facebookTokenExpiry: {
     type: Date
   },
+  // Campos Meta Ads atualizados
+  metaId: {
+    type: String
+  },
+  metaName: {
+    type: String
+  },
+  metaEmail: {
+    type: String
+  },
+  metaAccessToken: {
+    type: String
+  },
+  metaTokenExpires: {
+    type: Date
+  },
+  metaConnectionStatus: {
+    type: String,
+    enum: ['connected', 'disconnected'],
+    default: 'disconnected'
+  },
+  metaAdAccounts: {
+    type: Array,
+    default: []
+  },
+  metaPrimaryAdAccountId: {
+    type: String
+  },
+  metaPrimaryAdAccountName: {
+    type: String
+  },
+  // Campos legados (mantidos para compatibilidade)
   adsAccountId: {
     type: String
   },
