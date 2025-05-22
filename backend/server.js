@@ -113,20 +113,3 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
-  .connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log('Conectado ao MongoDB');
-  })
-  .catch((error) => {
-    console.error('Erro ao conectar ao MongoDB:', error.message);
-  });
-
-// Definir porta
-const PORT = process.env.PORT || 5000;
-
-// Iniciar servidor
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
-
-module.exports = app;
