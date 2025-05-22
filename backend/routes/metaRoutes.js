@@ -1,8 +1,8 @@
-// Versão corrigida das rotas Meta
-const express = require("express");
+// Arquivo de rotas do backend corrigido para garantir consistência de endpoints
+const express = require('express');
 const router = express.Router();
-const metaController = require("../controllers/metaController");
-const { protect } = require("../middleware/authMiddleware");
+const metaController = require('../controllers/metaController');
+const { protect } = require('../middleware/authMiddleware');
 
 /**
  * @swagger
@@ -83,5 +83,90 @@ router.get("/connection-status", protect, metaController.getConnectionStatus);
  *         description: Usuário não encontrado
  */
 router.get("/verify-connection", protect, metaController.verifyConnection);
+
+/**
+ * @swagger
+ * /api/meta/create-ad-from-post:
+ *   post:
+ *     summary: Criar anúncio a partir de uma publicação
+ *     tags: [Meta]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - postUrl
+ *               - campaignName
+ *               - dailyBudget
+ *               - startDate
+ *             properties:
+ *               postUrl:
+ *                 type: string
+ *               campaignName:
+ *                 type: string
+ *               dailyBudget:
+ *                 type: number
+ *               startDate:
+ *                 type: string
+ *               endDate:
+ *                 type: string
+ *               targetCountry:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Anúncio criado com sucesso
+ *       400:
+ *         description: Dados inválidos ou usuário não conectado ao Meta
+ *       401:
+ *         description: Não autorizado
+ */
+router.post("/create-ad-from-post", protect, metaController.createAdFromPost);
+
+/**
+ * @swagger
+ * /api/meta/campaigns:
+ *   get:
+ *     summary: Obter campanhas do usuário
+ *     tags: [Meta]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Campanhas obtidas com sucesso
+ *       400:
+ *         description: Usuário não conectado ao Meta
+ *       401:
+ *         description: Não autorizado
+ */
+router.get("/campaigns", protect, metaController.getCampaigns);
+
+/**
+ * @swagger
+ * /api/meta/metrics:
+ *   get:
+ *     summary: Obter métricas do Meta Ads
+ *     tags: [Meta]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: timeRange
+ *         schema:
+ *           type: string
+ *           enum: [today, yesterday, last_7_days, last_30_days, this_month, last_month]
+ *         description: Período de tempo para as métricas
+ *     responses:
+ *       200:
+ *         description: Métricas obtidas com sucesso
+ *       400:
+ *         description: Usuário não conectado ao Meta
+ *       401:
+ *         description: Não autorizado
+ */
+router.get("/metrics", protect, metaController.getMetrics);
 
 module.exports = router;
