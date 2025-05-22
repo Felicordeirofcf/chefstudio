@@ -52,7 +52,7 @@ const DashboardMetrics = () => {
 
         // Tentar obter métricas da API usando a instância centralizada
         try {
-          const response = await api.get(`/meta/metrics?timeRange=${timeRange}`);
+          const response = await api.get(`/api/meta/metrics?timeRange=${timeRange}`);
           
           if (response.data && typeof response.data === 'object') {
             // Verificar se os dados da API têm a estrutura esperada
