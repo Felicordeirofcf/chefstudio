@@ -178,12 +178,17 @@ export const getUserProfile = async () => {
     }
     
     // Usar a rota correta do backend para buscar o perfil do usuário
-    const response = await api.get(`/users/${userId}`);
+    const response = await api.get(`/auth/profile`);
     
     // Atualizar informações do usuário no localStorage se necessário
     if (response.data && response.data._id) {
       const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
-      const updatedUser = { ...currentUser, ...response.data, token: currentUser.token };
+      const updatedUser = { 
+        ...currentUser, 
+        ...response.data, 
+        _id: userId, // Garantir que o ID seja preservado
+        token: currentUser.token // Garantir que o token seja preservado
+      };
       localStorage.setItem('userInfo', JSON.stringify(updatedUser));
     }
     
@@ -217,7 +222,12 @@ export const updateUserProfile = async (userData: any) => {
     
     // Atualizar informações do usuário no localStorage
     const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
-    const updatedUser = { ...currentUser, ...userData };
+    const updatedUser = { 
+      ...currentUser, 
+      ...userData,
+      _id: userId, // Garantir que o ID seja preservado
+      token: currentUser.token // Garantir que o token seja preservado
+    };
     localStorage.setItem('userInfo', JSON.stringify(updatedUser));
     
     return response.data;
@@ -295,10 +305,21 @@ export const createAdCampaign = async (details: any) => {
       throw new Error("Você precisa estar autenticado para criar campanhas.");
     }
     
+    // Determinar qual endpoint usar com base nos dados fornecidos
+    let endpoint = '/meta-ads/create-from-post';
+    
+    // Se não tiver link de publicação, usar o endpoint de criação por imagem
+    if (!details.postUrl) {
+      endpoint = '/meta-ads/create-from-image';
+    }
+    
+    console.log(`Usando endpoint: ${endpoint} para criar campanha`);
+    
     // Corrigido para usar o endpoint correto conforme definido no backend
-    const response = await api.post(`/ads`, details);
-    return response.data; // Expected: { message: "Campanha criada com sucesso!", campaignId: "actual_campaign_id" }
+    const response = await api.post(endpoint, details);
+    return response.data;
   } catch (error: any) {
+    console.error('Erro ao criar campanha:', error);
     throw new Error(error.response?.data?.message || "Erro ao criar campanha de anúncios.");
   }
 };
@@ -313,7 +334,7 @@ export const getUserCampaigns = async () => {
     }
     
     // Corrigido para usar o endpoint correto conforme definido no backend
-    const response = await api.get(`/ads`);
+    const response = await api.get(`/meta-ads/campaigns`);
     return response.data;
   } catch (error: any) {
     console.error("Erro ao buscar campanhas do usuário:", error);
