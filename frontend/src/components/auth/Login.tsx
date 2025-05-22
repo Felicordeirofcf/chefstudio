@@ -1,3 +1,4 @@
+import React from 'react';
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Link, useNavigate } from "react-router-dom";
@@ -8,12 +9,12 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   
   const imageUrl = "/image.png"; // Local: public/image.png
   
-  const handleLogin = async (event: React.FormEvent) => {
+  const handleLogin = async (event) => {
     event.preventDefault();
     setError(null);
     setLoading(true);
@@ -22,33 +23,45 @@ export default function Login() {
       // Melhorado para capturar e exibir erros mais detalhados
       const response = await loginUser({ email, password });
       
-      if (!response?.token || !response?.email) {
-        throw new Error("Login mal sucedido: token ou dados do usuário ausentes.");
+      if (!response?.token || !response?._id) {
+        throw new Error("Login mal sucedido: token ou ID do usuário ausentes.");
       }
       
       // Armazena os dados diretamente
       localStorage.setItem("userInfo", JSON.stringify({
         token: response.token,
         _id: response._id,
-        name: response.name,
+        name: response.name || '',
         email: response.email,
-        metaUserId: response.metaUserId,
-        metaConnectionStatus: response.metaConnectionStatus,
+        metaUserId: response.metaUserId || '',
+        metaConnectionStatus: response.metaConnectionStatus || 'disconnected',
         isMetaConnected: response.metaConnectionStatus === "connected"
       }));
+      
+      // Armazenar token separadamente para compatibilidade
+      localStorage.setItem("token", response.token);
+      
+      console.log("Login bem-sucedido, dados armazenados:", {
+        token: response.token,
+        _id: response._id,
+        metaConnectionStatus: response.metaConnectionStatus
+      });
       
       // Verifica se o usuário está conectado ao Meta Ads
       if (response.metaConnectionStatus !== "connected") {
         // Se não estiver conectado, redireciona para a página de conexão Meta
+        console.log("Usuário não conectado ao Meta Ads, redirecionando para /connect-meta");
         navigate("/connect-meta");
       } else {
         // Se já estiver conectado, redireciona para o dashboard
+        console.log("Usuário já conectado ao Meta Ads, redirecionando para /dashboard");
         navigate("/dashboard");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Erro no login:", err);
       setError(err.message || "Falha ao fazer login. Verifique suas credenciais.");
       localStorage.removeItem("userInfo");
+      localStorage.removeItem("token");
     } finally {
       setLoading(false);
     }

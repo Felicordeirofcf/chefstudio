@@ -45,6 +45,7 @@ export const useAuth = () => {
           const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
           if (userInfo && userInfo._id) {
             setUser(userInfo);
+            console.log('Usuário carregado do localStorage:', userInfo);
           }
         } catch (err) {
           console.error('Erro ao obter userInfo do localStorage:', err);
@@ -60,13 +61,29 @@ export const useAuth = () => {
           });
           
           if (response.data) {
-            // Atualizar localStorage com dados mais recentes
+            // Garantir que o _id seja preservado
+            const currentUserInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+            const userId = response.data._id || currentUserInfo._id;
+            
+            if (!userId) {
+              console.error('ID do usuário não encontrado na resposta da API nem no localStorage');
+              throw new Error('ID do usuário não encontrado');
+            }
+            
+            // Atualizar localStorage com dados mais recentes, preservando o _id
             const updatedUserInfo = {
               ...response.data,
-              token
+              _id: userId,
+              token,
+              metaUserId: response.data.metaUserId || currentUserInfo.metaUserId,
+              metaConnectionStatus: response.data.metaConnectionStatus || currentUserInfo.metaConnectionStatus,
+              isMetaConnected: (response.data.metaConnectionStatus === "connected") || (currentUserInfo.metaConnectionStatus === "connected")
             };
             
             localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
+            localStorage.setItem('token', token); // Garantir que o token também esteja armazenado separadamente
+            
+            console.log('Perfil atualizado com sucesso:', updatedUserInfo);
             setUser(updatedUserInfo);
           }
         } catch (apiErr) {
@@ -106,8 +123,12 @@ export const useAuth = () => {
       
       const { token, _id, name, email, metaUserId, metaConnectionStatus, plan } = response.data || {};
       
-      if (!token || !_id) {
-        throw new Error("Login mal sucedido: token ou dados do usuário ausentes.");
+      if (!token) {
+        throw new Error("Login mal sucedido: token ausente na resposta.");
+      }
+      
+      if (!_id) {
+        throw new Error("Login mal sucedido: ID do usuário ausente na resposta.");
       }
       
       const userInfo = {
@@ -120,6 +141,8 @@ export const useAuth = () => {
         plan,
         isMetaConnected: metaConnectionStatus === "connected"
       };
+      
+      console.log('Login bem-sucedido, salvando dados:', userInfo);
       
       // Salvar em ambos os formatos para compatibilidade
       localStorage.setItem('token', token);
@@ -154,6 +177,14 @@ export const useAuth = () => {
         throw new Error('Usuário não autenticado');
       }
       
+      // Obter ID do usuário atual
+      const currentUserInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      const userId = currentUserInfo._id;
+      
+      if (!userId) {
+        throw new Error('ID do usuário não encontrado');
+      }
+      
       // Tentar atualizar com endpoint principal
       let response;
       try {
@@ -165,9 +196,6 @@ export const useAuth = () => {
       } catch (err) {
         // Se falhar, tentar endpoint alternativo
         if (err.response && err.response.status === 404) {
-          const userId = user?._id;
-          if (!userId) throw new Error('ID do usuário não encontrado');
-          
           response = await axios.put(`/api/users/${userId}`, userData, {
             headers: {
               Authorization: `Bearer ${token}`
@@ -178,14 +206,17 @@ export const useAuth = () => {
         }
       }
       
-      // Atualizar localStorage com dados atualizados
+      // Atualizar localStorage com dados atualizados, preservando o _id e token
       const updatedUserInfo = {
-        ...user,
+        ...currentUserInfo,
         ...response.data,
-        token
+        _id: userId, // Garantir que o ID seja preservado
+        token // Garantir que o token seja preservado
       };
       
       localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
+      localStorage.setItem('token', token); // Garantir que o token também esteja armazenado separadamente
+      
       setUser(updatedUserInfo);
       
       return updatedUserInfo;

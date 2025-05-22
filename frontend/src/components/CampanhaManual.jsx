@@ -112,6 +112,12 @@ const CampanhaManual = () => {
         throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
       }
 
+      // Verificar se o ID do usuário está disponível
+      const userId = userInfo?._id;
+      if (!userId) {
+        throw new Error('ID do usuário não encontrado. Por favor, faça login novamente.');
+      }
+
       // Preparar dados para envio
       const campaignData = {
         name: nomeCampanha,
@@ -121,10 +127,18 @@ const CampanhaManual = () => {
         postUrl: linkPublicacao || ''
       };
 
+      // Determinar qual endpoint usar com base nos dados fornecidos
+      let endpoint = '/api/meta-ads/create-from-post';
+      
+      // Se não tiver link de publicação, usar o endpoint de criação por imagem
+      if (!linkPublicacao) {
+        endpoint = '/api/meta-ads/create-from-image';
+      }
+
       // Enviar dados da campanha para a API
       const response = await axios({
         method: 'post',
-        url: '/api/campaigns/create',
+        url: endpoint,
         data: campaignData,
         headers: {
           'Authorization': `Bearer ${token}`,
