@@ -47,12 +47,12 @@ const MetaAdsConnection = () => {
       
       // Verificar status da conexão com Meta Ads usando a instância api centralizada
       try {
-        const response = await api.get('/meta/connection-status');
+        const response = await api.get('/api/meta/connection-status');
         setConnected(response.data?.connected || response.data?.status === 'connected' || false);
       } catch (err) {
         // Se o primeiro endpoint falhar, tentar endpoint alternativo
         if (err.response && err.response.status === 404) {
-          const altResponse = await api.get('/users/meta-status');
+          const altResponse = await api.get('/api/users/meta-status');
           setConnected(altResponse.data?.connected || altResponse.data?.status === 'connected' || false);
         } else {
           // Se ambos falharem, verificar no localStorage
@@ -88,32 +88,19 @@ const MetaAdsConnection = () => {
         throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
       }
       
-      // Obter URL de autorização usando a instância api centralizada
-      try {
-        const response = await api.get('/meta/auth-url');
-        
-        // Redirecionar para página de autorização do Facebook
-        if (response.data && response.data.url) {
-          window.location.href = response.data.url;
-          return;
-        } else {
-          throw new Error('URL de autorização não recebida');
-        }
-      } catch (err) {
-        // Se o primeiro endpoint falhar, tentar endpoint alternativo
-        if (err.response && err.response.status === 404) {
-          const altResponse = await api.get('/auth/meta-connect');
-          
-          if (altResponse.data && altResponse.data.url) {
-            window.location.href = altResponse.data.url;
-            return;
-          } else {
-            throw new Error('URL de autorização não recebida do endpoint alternativo');
-          }
-        } else {
-          throw err;
-        }
+      // Obter ID do usuário do localStorage
+      const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      const userId = userInfo?._id;
+      
+      if (!userId) {
+        throw new Error('ID do usuário não encontrado. Por favor, faça login novamente.');
       }
+      
+      // Redirecionar para a página de login do Meta
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://chefstudio-production.up.railway.app';
+      window.location.href = `${apiUrl}/api/meta/login?userId=${userId}`;
+      
+      return;
     } catch (err) {
       console.error('Erro ao conectar com Meta Ads:', err);
       setError('Não foi possível iniciar a conexão com Meta Ads. Por favor, tente novamente mais tarde.');
@@ -133,12 +120,12 @@ const MetaAdsConnection = () => {
       }
       
       try {
-        await api.post('/meta/disconnect', {});
+        await api.post('/api/meta/disconnect', {});
         setConnected(false);
       } catch (err) {
         // Se o primeiro endpoint falhar, tentar endpoint alternativo
         if (err.response && err.response.status === 404) {
-          await api.post('/users/meta-disconnect', {});
+          await api.post('/api/users/meta-disconnect', {});
           setConnected(false);
         } else {
           throw err;

@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 // Definir a URL base correta para o backend na Railway
-const API_BASE_URL = "https://chefstudio-production.up.railway.app/api";
+// Removendo o '/api' do final para evitar duplicação
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app";
 
 // Função melhorada para obter token, verificando múltiplas fontes
 const getToken = (): string | null => {
@@ -87,7 +88,7 @@ api.interceptors.response.use(
 
 export const registerUser = async (userData: any) => {
   try {
-    const response = await api.post(`/auth/register`, userData);
+    const response = await api.post(`/api/auth/register`, userData);
     const { token, _id, name, email, metaUserId, metaConnectionStatus, plan } = response.data || {};
     if (!token || !_id) throw new Error("Registro mal sucedido: token ou dados do usuário ausentes.");
     
@@ -118,7 +119,7 @@ export const loginUser = async (credentials: any) => {
     console.log('Tentando login com:', credentials.email);
     console.log('URL da API:', API_BASE_URL);
     
-    const response = await api.post(`/auth/login`, credentials);
+    const response = await api.post(`/api/auth/login`, credentials);
     console.log('Resposta do login:', response.data);
     
     const { token, _id, name, email, metaUserId, metaConnectionStatus, plan } = response.data || {};
@@ -178,7 +179,7 @@ export const getUserProfile = async () => {
     }
     
     // Usar a rota correta do backend para buscar o perfil do usuário
-    const response = await api.get(`/users/${userId}`);
+    const response = await api.get(`/api/users/${userId}`);
     
     // Atualizar informações do usuário no localStorage se necessário
     if (response.data && response.data._id) {
@@ -213,7 +214,7 @@ export const updateUserProfile = async (userData: any) => {
     if (!userId) throw new Error("ID do usuário não encontrado.");
     
     // Corrigido para usar o endpoint correto
-    const response = await api.put(`/users/${userId}`, userData);
+    const response = await api.put(`/api/users/${userId}`, userData);
     
     // Atualizar informações do usuário no localStorage
     const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
@@ -237,7 +238,7 @@ export const updateUserPlan = async (planData: any) => {
     const userId = JSON.parse(localStorage.getItem('userInfo') || '{}')._id;
     if (!userId) throw new Error("ID do usuário não encontrado.");
     
-    const response = await api.put(`/users/${userId}/plan`, planData);
+    const response = await api.put(`/api/users/${userId}/plan`, planData);
     
     // Atualizar informações do usuário no localStorage
     const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
@@ -259,7 +260,7 @@ export const getMenuItems = async () => {
       throw new Error("Você precisa estar autenticado para acessar o cardápio.");
     }
     
-    const response = await api.get(`/menu`);
+    const response = await api.get(`/api/menu`);
     return response.data;
   } catch (error: any) {
     console.error("Erro ao buscar itens do cardápio (API Real):", error);
@@ -280,7 +281,7 @@ export const addMenuItem = async (item: any) => {
       throw new Error("Você precisa estar autenticado para adicionar itens ao cardápio.");
     }
     
-    const response = await api.post(`/menu`, item);
+    const response = await api.post(`/api/menu`, item);
     return response.data; // Backend should return the created item with its new _id
   } catch (error: any) {
     throw new Error(error.response?.data?.message || "Erro ao adicionar item ao cardápio.");
@@ -296,7 +297,7 @@ export const createAdCampaign = async (details: any) => {
     }
     
     // Corrigido para usar o endpoint correto conforme definido no backend
-    const response = await api.post(`/meta/create-ad-from-post`, details);
+    const response = await api.post(`/api/meta/create-ad-from-post`, details);
     return response.data;
   } catch (error: any) {
     throw new Error(error.response?.data?.message || "Erro ao criar campanha de anúncios.");
@@ -313,7 +314,7 @@ export const getUserCampaigns = async () => {
     }
     
     // Corrigido para usar o endpoint correto conforme definido no backend
-    const response = await api.get(`/meta/connection-status`);
+    const response = await api.get(`/api/meta/connection-status`);
     return response.data;
   } catch (error: any) {
     console.error("Erro ao buscar campanhas do usuário:", error);
