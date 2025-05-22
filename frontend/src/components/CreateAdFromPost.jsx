@@ -18,6 +18,8 @@ export default function CreateAdFromPost() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [adDetails, setAdDetails] = useState(null);
+  const [metaConnected, setMetaConnected] = useState(false);
+  const [metaConnectionChecked, setMetaConnectionChecked] = useState(false);
   
   // Pré-preencher com a URL fornecida pelo usuário
   const [formData, setFormData] = useState({
@@ -55,6 +57,11 @@ export default function CreateAdFromPost() {
   };
 
   const validateForm = () => {
+    if (!metaConnected) {
+      setError("Você precisa conectar sua conta ao Meta Ads primeiro");
+      return false;
+    }
+    
     if (!formData.postUrl) {
       setError("URL da publicação é obrigatória");
       return false;
@@ -91,10 +98,16 @@ export default function CreateAdFromPost() {
     try {
       // Obter token do localStorage
       const userInfo = localStorage.getItem("userInfo");
-      const token = userInfo ? JSON.parse(userInfo).token : null;
+      const parsedUserInfo = userInfo ? JSON.parse(userInfo) : null;
+      const token = parsedUserInfo?.token;
       
       if (!token) {
         throw new Error("Você precisa estar logado para criar anúncios");
+      }
+      
+      // Verificar se o usuário está conectado ao Meta
+      if (!metaConnected) {
+        throw new Error("Você precisa conectar sua conta ao Meta Ads primeiro");
       }
       
       // Configurar cliente axios com o token
@@ -102,7 +115,8 @@ export default function CreateAdFromPost() {
       const api = axios.create({
         baseURL: API_BASE_URL,
         headers: {
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
       
@@ -148,21 +162,32 @@ export default function CreateAdFromPost() {
     const checkMetaConnection = async () => {
       try {
         const userInfo = localStorage.getItem("userInfo");
-        const token = userInfo ? JSON.parse(userInfo).token : null;
+        const parsedUserInfo = userInfo ? JSON.parse(userInfo) : null;
+        const token = parsedUserInfo?.token;
         
-        if (!token) return;
+        if (!token) {
+          setMetaConnected(false);
+          setMetaConnectionChecked(true);
+          return;
+        }
         
         const API_BASE_URL = `${(import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app").replace(/\/+$/, "")}/api`;
         const api = axios.create({
           baseURL: API_BASE_URL,
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
         });
         
         const response = await api.get("/meta/connection-status");
         
-        if (!response.data.connected) {
+        // Verificar se o usuário está conectado ao Meta
+        const isConnected = response.data.connected === true;
+        setMetaConnected(isConnected);
+        
+        if (!isConnected) {
+          setError("Você precisa conectar sua conta ao Meta Ads primeiro");
           toast({
             title: "Conexão Meta necessária",
             description: "Você precisa conectar sua conta Meta para criar anúncios.",
@@ -171,6 +196,10 @@ export default function CreateAdFromPost() {
         }
       } catch (err) {
         console.error("Erro ao verificar status de conexão Meta:", err);
+        setMetaConnected(false);
+        setError("Não foi possível verificar sua conexão com o Meta Ads. Por favor, tente novamente mais tarde.");
+      } finally {
+        setMetaConnectionChecked(true);
       }
     };
     
@@ -188,7 +217,28 @@ export default function CreateAdFromPost() {
         </CardHeader>
         
         <CardContent>
-          {!success ? (
+          {!metaConnectionChecked ? (
+            <div className="flex justify-center items-center py-8">
+              <LoaderIcon className="h-8 w-8 animate-spin text-blue-600" />
+              <span className="ml-2">Verificando conexão com Meta Ads...</span>
+            </div>
+          ) : !metaConnected ? (
+            <Alert variant="destructive" className="mb-6">
+              <InfoIcon className="h-4 w-4" />
+              <AlertTitle>Conexão Meta necessária</AlertTitle>
+              <AlertDescription>
+                Você precisa conectar sua conta ao Meta Ads antes de criar anúncios.
+                <div className="mt-4">
+                  <Button 
+                    onClick={() => window.location.href = "/connect-meta"}
+                    variant="outline"
+                  >
+                    Ir para página de conexão Meta
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          ) : !success ? (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="postUrl">URL da Publicação do Facebook</Label>
@@ -319,7 +369,7 @@ export default function CreateAdFromPost() {
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={loading}
+                disabled={loading || !metaConnected}
               >
                 {loading ? (
                   <>
@@ -422,23 +472,14 @@ export default function CreateAdFromPost() {
                 
                 <Button 
                   className="flex-1"
-                  onClick={() => {
-                    window.open("https://business.facebook.com/adsmanager", "_blank");
-                  }}
+                  onClick={() => window.location.href = "/dashboard"}
                 >
-                  Gerenciar no Facebook
+                  Voltar para Dashboard
                 </Button>
               </div>
             </div>
           )}
         </CardContent>
-        
-        <CardFooter className="flex flex-col items-start">
-          <p className="text-sm text-gray-500">
-            Nota: O anúncio será criado no estado "Pausado" para que você possa revisar antes de ativá-lo.
-            Após a criação, você pode gerenciar seus anúncios no Gerenciador de Anúncios do Facebook.
-          </p>
-        </CardFooter>
       </Card>
     </div>
   );
