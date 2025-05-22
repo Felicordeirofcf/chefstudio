@@ -12,6 +12,8 @@ import DashboardLayout from './components/layout/DashboardLayout';
 import DashboardHome from './components/dashboard/Dashboard';
 import ProfilePage from './components/dashboard/ProfilePage';
 import PlansPage from './components/dashboard/PlansPage';
+import ConnectMeta from './components/auth/ConnectMeta';
+import MetaCallback from './components/auth/MetaCallback';
 import { Toaster } from "./components/ui/toaster";
 import './index.css';
 
@@ -51,6 +53,22 @@ const router = createBrowserRouter([
   {
     path: "/register",
     element: <Register />,
+  },
+  {
+    path: "/connect-meta",
+    element: (
+      <ProtectedRoute>
+        <ConnectMeta />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/meta-callback",
+    element: (
+      <ProtectedRoute>
+        <MetaCallback />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/dashboard",
