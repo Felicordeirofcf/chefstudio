@@ -320,3 +320,8 @@ export const getUserCampaigns = async () => {
     return []; // Return empty array on error to avoid UI crash
   }
 };
+
+// Exportar a instância api para uso em componentes
+export { api };
+// Também exportar como default para compatibilidade máxima
+export default api;
