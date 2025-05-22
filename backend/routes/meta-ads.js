@@ -69,10 +69,10 @@ const upload = multer({
  *               endDate:
  *                 type: string
  *                 format: date-time
- *                 description: Data de término do anúncio (opcional)
+ *                 description: Data de término do anúncio opcional
  *               targetCountry:
  *                 type: string
- *                 description: Código do país alvo (ex: BR)
+ *                 description: Código do país alvo
  *     responses:
  *       200:
  *         description: Anúncio criado com sucesso
@@ -194,7 +194,7 @@ router.post('/create-from-post', authMiddleware, async (req, res) => {
  *                 description: Data de início do anúncio
  *               targetCountry:
  *                 type: string
- *                 description: Código do país alvo (ex: BR)
+ *                 description: Código do país alvo
  *     responses:
  *       200:
  *         description: Anúncio criado com sucesso
