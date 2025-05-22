@@ -1,7 +1,7 @@
 // Componente para autenticação e gerenciamento de perfil
 // Arquivo: frontend/src/hooks/useAuth.js
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '../lib/api';
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
@@ -53,14 +53,8 @@ export const useAuth = () => {
         
         // Tentar obter perfil atualizado da API
         try {
-          // CORREÇÃO: Usar a rota /profile para buscar o perfil do usuário autenticado
-          // Esta rota usa o token para identificar o usuário, sem necessidade de ID
-          const response = await axios.get('/api/profile', {
-            headers: {
-              Authorization: `Bearer ${token}`
-            },
-            timeout: 5000 // Timeout para evitar requisições pendentes
-          });
+          // CORREÇÃO: Usar a instância api centralizada e a rota /profile para buscar o perfil
+          const response = await api.get('/profile');
           
           if (response.data) {
             // Garantir que o _id seja preservado
@@ -89,12 +83,7 @@ export const useAuth = () => {
           try {
             console.log('Tentando rota alternativa /auth/me para perfil...');
             
-            const response = await axios.get('/api/auth/me', {
-              headers: {
-                Authorization: `Bearer ${token}`
-              },
-              timeout: 5000
-            });
+            const response = await api.get('/auth/me');
             
             if (response.data) {
               const currentUserInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
@@ -138,14 +127,14 @@ export const useAuth = () => {
       setLoading(true);
       setError(null);
       
-      // Tentar login com endpoint principal
+      // Tentar login com endpoint principal usando a instância api centralizada
       let response;
       try {
-        response = await axios.post('/api/auth/login', credentials);
+        response = await api.post('/auth/login', credentials);
       } catch (err) {
         // Se falhar, tentar endpoint alternativo
         if (err.response && err.response.status === 404) {
-          response = await axios.post('/api/users/login', credentials);
+          response = await api.post('/users/login', credentials);
         } else {
           throw err;
         }
@@ -205,23 +194,15 @@ export const useAuth = () => {
         throw new Error('Usuário não autenticado');
       }
       
-      // CORREÇÃO: Usar a rota /profile para atualizar o perfil
+      // CORREÇÃO: Usar a instância api centralizada e a rota /profile para atualizar o perfil
       let response;
       try {
-        response = await axios.put('/api/profile', userData, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
+        response = await api.put('/profile', userData);
       } catch (err) {
         // Se falhar, tentar rota alternativa
         if (err.response && err.response.status === 404) {
           console.log('Tentando rota alternativa para atualizar perfil...');
-          response = await axios.put('/api/auth/profile', userData, {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          });
+          response = await api.put('/auth/profile', userData);
         } else {
           throw err;
         }
