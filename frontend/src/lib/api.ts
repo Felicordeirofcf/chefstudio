@@ -287,63 +287,24 @@ export const addMenuItem = async (item: any) => {
   }
 };
 
-// Meta Ads API calls
-export const createCampaign = async (campaignData: any) => {
+// Ad Campaign API calls - CORRIGIDO para usar o endpoint correto
+export const createAdCampaign = async (details: any) => {
   try {
     const token = getToken();
     if (!token) {
       throw new Error("Você precisa estar autenticado para criar campanhas.");
     }
     
-    // Obter adAccountId do usuário
-    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-    const adAccountId = userInfo.adsAccountId || campaignData.adAccountId;
-    
-    if (!adAccountId) {
-      throw new Error("ID da conta de anúncios não encontrado. Verifique sua conexão com o Meta Ads.");
-    }
-    
-    // Preparar dados para envio
-    const dataToSend = {
-      ...campaignData,
-      adAccountId,
-    };
-    
-    // Usar o endpoint correto
-    const response = await api.post('/campaigns', dataToSend);
-    
-    return response.data;
+    // Corrigido para usar o endpoint correto conforme definido no backend
+    const response = await api.post(`/ads`, details);
+    return response.data; // Expected: { message: "Campanha criada com sucesso!", campaignId: "actual_campaign_id" }
   } catch (error: any) {
-    console.error("Erro ao criar campanha:", error);
     throw new Error(error.response?.data?.message || "Erro ao criar campanha de anúncios.");
   }
 };
 
-export const uploadCampaignMedia = async (campaignId: string, mediaFile: File) => {
-  try {
-    const token = getToken();
-    if (!token) {
-      throw new Error("Você precisa estar autenticado para fazer upload de mídia.");
-    }
-    
-    const formData = new FormData();
-    formData.append('media', mediaFile);
-    formData.append('campaignId', campaignId);
-    
-    const response = await api.post('/campaigns/upload-media', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    });
-    
-    return response.data;
-  } catch (error: any) {
-    console.error("Erro ao fazer upload de mídia:", error);
-    throw new Error(error.response?.data?.message || "Erro ao fazer upload de mídia para a campanha.");
-  }
-};
-
-export const getCampaigns = async () => {
+// Placeholder for fetching user's campaigns from backend (if needed for dashboard display)
+export const getUserCampaigns = async () => {
   try {
     const token = getToken();
     if (!token) {
@@ -351,96 +312,11 @@ export const getCampaigns = async () => {
       return []; // Return empty array on error to avoid UI crash
     }
     
-    // Obter adAccountId do usuário
-    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-    const adAccountId = userInfo.adsAccountId;
-    
-    if (!adAccountId) {
-      console.warn('ID da conta de anúncios não encontrado');
-      return [];
-    }
-    
-    const response = await api.get(`/campaigns?adAccountId=${adAccountId}`);
+    // Corrigido para usar o endpoint correto conforme definido no backend
+    const response = await api.get(`/ads`);
     return response.data;
   } catch (error: any) {
     console.error("Erro ao buscar campanhas do usuário:", error);
     return []; // Return empty array on error to avoid UI crash
-  }
-};
-
-export const getCampaignById = async (campaignId: string) => {
-  try {
-    const token = getToken();
-    if (!token) {
-      throw new Error("Você precisa estar autenticado para acessar detalhes da campanha.");
-    }
-    
-    const response = await api.get(`/campaigns/${campaignId}`);
-    return response.data;
-  } catch (error: any) {
-    console.error("Erro ao buscar detalhes da campanha:", error);
-    throw new Error(error.response?.data?.message || "Erro ao buscar detalhes da campanha.");
-  }
-};
-
-export const updateCampaignStatus = async (campaignId: string, status: string) => {
-  try {
-    const token = getToken();
-    if (!token) {
-      throw new Error("Você precisa estar autenticado para atualizar o status da campanha.");
-    }
-    
-    const response = await api.put(`/campaigns/${campaignId}/status`, { status });
-    return response.data;
-  } catch (error: any) {
-    console.error("Erro ao atualizar status da campanha:", error);
-    throw new Error(error.response?.data?.message || "Erro ao atualizar status da campanha.");
-  }
-};
-
-export const getCampaignMetrics = async (campaignId: string) => {
-  try {
-    const token = getToken();
-    if (!token) {
-      throw new Error("Você precisa estar autenticado para acessar métricas da campanha.");
-    }
-    
-    const response = await api.get(`/campaigns/${campaignId}/metrics`);
-    return response.data;
-  } catch (error: any) {
-    console.error("Erro ao buscar métricas da campanha:", error);
-    throw new Error(error.response?.data?.message || "Erro ao buscar métricas da campanha.");
-  }
-};
-
-// Funções para configurações de localização
-export const saveLocationSettings = async (locationData: any) => {
-  try {
-    const token = getToken();
-    if (!token) {
-      throw new Error("Você precisa estar autenticado para salvar configurações de localização.");
-    }
-    
-    const response = await api.post('/location', locationData);
-    return response.data;
-  } catch (error: any) {
-    console.error("Erro ao salvar configurações de localização:", error);
-    throw new Error(error.response?.data?.message || "Erro ao salvar configurações de localização.");
-  }
-};
-
-export const getLocationSettings = async () => {
-  try {
-    const token = getToken();
-    if (!token) {
-      console.warn('Tentativa de buscar configurações de localização sem token');
-      return null;
-    }
-    
-    const response = await api.get('/location');
-    return response.data;
-  } catch (error: any) {
-    console.error("Erro ao buscar configurações de localização:", error);
-    return null;
   }
 };

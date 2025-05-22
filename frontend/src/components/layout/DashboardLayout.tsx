@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
-import { User, LogOut, Menu as MenuIcon, X as XIcon, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { User, CreditCard, LogOut, Menu as MenuIcon, X as XIcon, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getUserProfile, logoutUser } from "../../lib/api";
 import { useToast } from "../../hooks/use-toast";
@@ -37,12 +37,12 @@ const DashboardLayout: React.FC = () => {
     navigate('/');
   };
 
-  // Removido o item "Planos" do menu lateral conforme solicitado pelo cliente
   const managementSubItems = [
     { name: 'Meu Perfil', path: '/dashboard/profile', icon: User },
+    { name: 'Planos', path: '/dashboard/plans', icon: CreditCard },
   ];
 
-  const isActive = (path: string) => location.pathname === path || (path === '/dashboard/profile' && location.pathname.startsWith('/dashboard/profile'));
+  const isActive = (path: string) => location.pathname === path || (path === '/dashboard/profile' && location.pathname.startsWith('/dashboard/profile')) || (path === '/dashboard/plans' && location.pathname.startsWith('/dashboard/plans'));
   const isManagementActive = () => managementSubItems.some(item => isActive(item.path));
 
   return (
