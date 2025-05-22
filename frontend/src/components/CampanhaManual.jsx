@@ -131,7 +131,7 @@ const CampanhaManual = () => {
     };
   }, []);
 
-  // Inicializar o mapa quando o componente montar
+  // Inicializar o mapa quando o componente montar com localização em tempo real
   useEffect(() => {
     // Verificar se o Leaflet está disponível globalmente
     if (window.L && !mapLoaded) {
@@ -145,21 +145,83 @@ const CampanhaManual = () => {
       setTimeout(() => {
         const mapContainer = document.getElementById('map-container');
         if (mapContainer) {
-          // Inicializar o mapa
-          const mapInstance = window.L.map('map-container').setView([-23.5505, -46.6333], 12);
+          // Inicializar o mapa com posição padrão (será atualizada com geolocalização)
+          const mapInstance = window.L.map('map-container').setView([-23.5505, -46.6333], 14);
           
           // Adicionar camada de tiles
           window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           }).addTo(mapInstance);
           
-          // Adicionar círculo para representar o raio
+          // Adicionar círculo para representar o raio (será atualizado com a posição real)
           const circleInstance = window.L.circle([-23.5505, -46.6333], {
             color: 'blue',
             fillColor: '#30f',
             fillOpacity: 0.2,
             radius: raioAlcance * 1000 // Converter para metros
           }).addTo(mapInstance);
+          
+          // Adicionar marcador para a posição atual
+          const markerIcon = window.L.icon({
+            iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+            shadowSize: [41, 41]
+          });
+          
+          const marker = window.L.marker([-23.5505, -46.6333], {icon: markerIcon}).addTo(mapInstance);
+          marker.bindPopup("Sua localização atual").openPopup();
+          
+          // Obter localização em tempo real
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                const { latitude, longitude } = position.coords;
+                const userLocation = [latitude, longitude];
+                
+                // Atualizar mapa com a localização real
+                mapInstance.setView(userLocation, 14);
+                marker.setLatLng(userLocation);
+                circleInstance.setLatLng(userLocation);
+                
+                // Adicionar popup informativo
+                marker.bindPopup("Sua localização atual<br>Raio de alcance: " + raioAlcance + " km").openPopup();
+                
+                console.log("Localização obtida:", userLocation);
+              },
+              (error) => {
+                console.error("Erro ao obter localização:", error);
+                // Manter localização padrão em caso de erro
+              },
+              { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            );
+            
+            // Observar mudanças na localização
+            const watchId = navigator.geolocation.watchPosition(
+              (position) => {
+                const { latitude, longitude } = position.coords;
+                const userLocation = [latitude, longitude];
+                
+                // Atualizar posição do marcador e círculo
+                marker.setLatLng(userLocation);
+                circleInstance.setLatLng(userLocation);
+                
+                // Atualizar popup
+                marker.bindPopup("Sua localização atual<br>Raio de alcance: " + raioAlcance + " km");
+              },
+              (error) => {
+                console.error("Erro ao observar localização:", error);
+              },
+              { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            );
+            
+            // Limpar observador ao desmontar
+            return () => {
+              navigator.geolocation.clearWatch(watchId);
+            };
+          }
           
           // Salvar referências
           setMap(mapInstance);
@@ -216,12 +278,13 @@ const CampanhaManual = () => {
     window.location.href = authUrl;
   };
 
-  // Função para criar a campanha
+  // Função para criar a campanha automaticamente com Meta Ads
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!nomeCampanha || !orcamento || !textoAnuncio || (!linkPublicacao && !imagemVideo)) {
-      setError('Por favor, preencha todos os campos obrigatórios.');
+    // Validação simplificada: apenas nome, texto e uma das opções (link ou imagem)
+    if (!nomeCampanha || !textoAnuncio || (!linkPublicacao && !imagemVideo)) {
+      setError('Por favor, adicione um nome para a campanha, texto do anúncio e uma imagem ou link do cardápio.');
       return;
     }
 
@@ -231,25 +294,77 @@ const CampanhaManual = () => {
 
       // Verificar se o usuário está autenticado
       const token = localStorage.getItem('token') || (userInfo && userInfo.token);
+      const metaToken = localStorage.getItem('metaInfo') ? JSON.parse(localStorage.getItem('metaInfo')).accessToken : null;
+      
       if (!token) {
         throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
       }
+      
+      if (!metaToken && !userInfo?.metaAccessToken) {
+        throw new Error('Conexão com Meta Ads não encontrada. Por favor, conecte sua conta novamente.');
+      }
 
-      // Preparar dados para envio
+      // Obter localização atual para o anúncio
+      let userLocation = { lat: -23.5505, lng: -46.6333 }; // Localização padrão (São Paulo)
+      
+      try {
+        // Tentar obter localização atual
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0
+          });
+        });
+        
+        userLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        
+        console.log("Localização obtida para anúncio:", userLocation);
+      } catch (locError) {
+        console.warn("Não foi possível obter localização precisa, usando padrão:", locError);
+      }
+
+      // Preparar dados para envio - Formato simplificado para Meta Ads
       const campaignData = {
         name: nomeCampanha,
         budget: orcamento,
         radius: raioAlcance,
         adText: textoAnuncio,
-        postUrl: linkPublicacao || ''
+        postUrl: linkPublicacao || '',
+        location: userLocation,
+        // Dados específicos para Meta Ads
+        targeting: {
+          geo_locations: {
+            radius: raioAlcance,
+            latitude: userLocation.lat,
+            longitude: userLocation.lng,
+            distance_unit: "kilometer"
+          },
+          age_min: 18,
+          age_max: 65,
+          publisher_platforms: ["facebook", "instagram"],
+          device_platforms: ["mobile", "desktop"]
+        },
+        optimization_goal: "REACH", // Alcance máximo
+        billing_event: "IMPRESSIONS", // Cobrança por impressões
+        status: "ACTIVE", // Ativar imediatamente
+        special_ad_categories: [], // Sem categorias especiais
+        access_token: metaToken || userInfo?.metaAccessToken
       };
+
+      console.log("Enviando dados para criação de anúncio:", campaignData);
 
       // Usar a função correta da API para criar campanha
       const response = await createCampaign(campaignData);
+      console.log("Resposta da criação de campanha:", response);
 
       // Se houver imagem/vídeo, fazer upload separado
       if (imagemVideo && response.id) {
         const campaignId = response.id || response._id;
+        console.log("Enviando imagem para campanha ID:", campaignId);
         await uploadCampaignMedia(campaignId, imagemVideo);
       }
 
@@ -273,9 +388,17 @@ const CampanhaManual = () => {
     } catch (error) {
       console.error('Erro ao criar campanha:', error);
       
-      // Tratamento específico para erro 405 Method Not Allowed
-      if (error.response && error.response.status === 405) {
-        setError('Erro no servidor: método não permitido. Por favor, entre em contato com o suporte.');
+      // Tratamento específico para erros comuns
+      if (error.response) {
+        if (error.response.status === 405) {
+          setError('Erro no servidor: método não permitido. Por favor, entre em contato com o suporte.');
+        } else if (error.response.status === 401) {
+          setError('Autorização expirada. Por favor, reconecte sua conta Meta Ads.');
+        } else if (error.response.data && error.response.data.error) {
+          setError(`Erro do Meta Ads: ${error.response.data.error.message || 'Erro desconhecido'}`);
+        } else {
+          setError(`Erro ${error.response.status}: ${error.response.statusText || 'Erro desconhecido'}`);
+        }
       } else {
         setError(error.message || 'Erro ao criar campanha. Por favor, tente novamente.');
       }
@@ -340,19 +463,29 @@ const CampanhaManual = () => {
                   <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
                 </div>
               )}
-            </div>
-            <div className="mt-4">
-              <label className="block mb-2">
+            </            <div>
+              <label htmlFor="raioAlcance" className="block mb-2">
                 Raio de Alcance ({raioAlcance} Km)
               </label>
               <input
                 type="range"
+                id="raioAlcance"
                 value={raioAlcance}
                 onChange={(e) => setRaioAlcance(parseInt(e.target.value))}
                 min="1"
-                max="50"
-                className="w-full"
+                max="7"
+                step="1"
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
               />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>1km</span>
+                <span>2km</span>
+                <span>3km</span>
+                <span>4km</span>
+                <span>5km</span>
+                <span>6km</span>
+                <span>7km</span>
+              </div>
             </div>
           </div>
 
@@ -423,32 +556,67 @@ const CampanhaManual = () => {
           />
         </div>
 
-        {/* Upload de Imagem/Vídeo */}
-        <div className="p-4 border rounded-md">
-          <h3 className="text-sm font-semibold mb-2">
-            Imagem/Vídeo para o Anúncio
+        {/* Upload de Imagem/Vídeo ou Link do Cardápio - Simplificado */}
+        <div className="p-6 border rounded-md bg-gray-50">
+          <h3 className="text-lg font-semibold mb-4 text-center">
+            Adicione seu Cardápio ou Imagem
           </h3>
           
-          <label htmlFor="imagem-video-upload" className="inline-block">
-            <span className="px-4 py-2 bg-blue-600 text-white rounded-md cursor-pointer">
-              Selecionar Arquivo
-            </span>
-            <input
-              id="imagem-video-upload"
-              type="file"
-              accept="image/*,video/*"
-              onChange={handleImagemVideoChange}
-              className="hidden"
-            />
-          </label>
+          <div className="flex flex-col items-center space-y-6">
+            <div className="w-full max-w-md">
+              <div className="text-center mb-2 text-gray-700">Opção 1: Faça upload da foto do cardápio</div>
+              <div className="flex justify-center">
+                <label htmlFor="imagem-video-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-blue-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-blue-50 transition-colors">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <svg className="w-8 h-8 mb-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    <p className="mb-1 text-sm text-gray-500">Clique para selecionar</p>
+                    <p className="text-xs text-gray-500">PNG, JPG ou JPEG</p>
+                  </div>
+                  <input
+                    id="imagem-video-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImagemVideoChange}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+            
+            <div className="text-center text-gray-500">- OU -</div>
+            
+            <div className="w-full max-w-md">
+              <div className="text-center mb-2 text-gray-700">Opção 2: Cole o link do cardápio ou publicação</div>
+              <input
+                id="linkPublicacao"
+                type="text"
+                value={linkPublicacao}
+                onChange={(e) => setLinkPublicacao(e.target.value)}
+                placeholder="https://facebook.com/suapagina/posts/123... ou link do cardápio"
+                className="w-full p-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
           
           {imagemPreview && (
-            <div className="mt-4 text-center">
-              <img 
-                src={imagemPreview} 
-                alt="Preview" 
-                className="max-w-full max-h-[200px] mx-auto" 
-              />
+            <div className="mt-6 text-center">
+              <p className="text-green-600 font-medium mb-2">Imagem selecionada:</p>
+              <div className="relative inline-block">
+                <img 
+                  src={imagemPreview} 
+                  alt="Preview" 
+                  className="max-w-full max-h-[200px] mx-auto rounded-lg border border-gray-200 shadow-sm" 
+                />
+                <button 
+                  onClick={() => {setImagemVideo(null); setImagemPreview('');}}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center"
+                  type="button"
+                >
+                  ×
+                </button>
+              </div>
             </div>
           )}
         </div>
