@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const RAW_BASE_URL = import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app";
-const API_BASE_URL = `${RAW_BASE_URL.replace(/\/+$/, "")}/api`;
+// Definir a URL base correta para o backend na Railway
+const API_BASE_URL = "https://chefstudio-production.up.railway.app/api";
 
 // Função melhorada para obter token, verificando múltiplas fontes
 const getToken = (): string | null => {
@@ -164,24 +164,26 @@ export const getUserProfile = async () => {
       throw new Error("Você precisa estar autenticado para acessar seu perfil.");
     }
     
-    // CORREÇÃO: Usar a rota /profile para buscar o perfil do usuário autenticado
-    // Esta rota usa o token para identificar o usuário, sem necessidade de ID
-    const response = await api.get(`/profile`);
+    // Obter ID do usuário do localStorage
+    const userInfo = localStorage.getItem('userInfo');
+    let userId = null;
+    
+    if (userInfo) {
+      const parsedUserInfo = JSON.parse(userInfo);
+      userId = parsedUserInfo._id;
+    }
+    
+    if (!userId) {
+      throw new Error("ID do usuário não encontrado. Por favor, faça login novamente.");
+    }
+    
+    // Usar a rota correta do backend para buscar o perfil do usuário
+    const response = await api.get(`/users/${userId}`);
     
     // Atualizar informações do usuário no localStorage se necessário
-    if (response.data) {
+    if (response.data && response.data._id) {
       const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
-      const updatedUser = { 
-        ...currentUser, 
-        ...response.data,
-        token: currentUser.token // Garantir que o token seja preservado
-      };
-      
-      // Garantir que o _id seja preservado se existir
-      if (currentUser._id) {
-        updatedUser._id = currentUser._id;
-      }
-      
+      const updatedUser = { ...currentUser, ...response.data, token: currentUser.token };
       localStorage.setItem('userInfo', JSON.stringify(updatedUser));
     }
     
@@ -189,49 +191,14 @@ export const getUserProfile = async () => {
   } catch (error: any) {
     console.error('Erro ao buscar perfil:', error);
     
-    // Tentar rota alternativa se a primeira falhar
-    try {
-      console.log('Tentando rota alternativa para perfil...');
-      const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
-      
-      // Tentar com /auth/me como alternativa
-      const response = await api.get(`/auth/me`);
-      
-      if (response.data) {
-        const updatedUser = { 
-          ...currentUser, 
-          ...response.data,
-          token: currentUser.token // Garantir que o token seja preservado
-        };
-        
-        // Garantir que o _id seja preservado se existir
-        if (currentUser._id) {
-          updatedUser._id = currentUser._id;
-        }
-        
-        localStorage.setItem('userInfo', JSON.stringify(updatedUser));
-      }
-      
-      return response.data;
-    } catch (secondError) {
-      console.error('Erro na rota alternativa para perfil:', secondError);
-      
-      // Se for erro de autenticação, tratar especificamente
-      if (error.response && error.response.status === 401) {
-        localStorage.removeItem('userInfo');
-        localStorage.removeItem('token');
-        throw new Error("Sessão expirada. Por favor, faça login novamente.");
-      }
-      
-      // Se temos dados no localStorage, retornar esses dados como fallback
-      const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-      if (userInfo && userInfo._id) {
-        console.log('Usando dados do localStorage como fallback para perfil');
-        return userInfo;
-      }
-      
-      throw new Error(error.response?.data?.message || "Erro ao buscar perfil do usuário.");
+    // Se for erro de autenticação, tratar especificamente
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('userInfo');
+      localStorage.removeItem('token');
+      throw new Error("Sessão expirada. Por favor, faça login novamente.");
     }
+    
+    throw new Error(error.response?.data?.message || "Erro ao buscar perfil do usuário.");
   }
 };
 
@@ -242,55 +209,21 @@ export const updateUserProfile = async (userData: any) => {
       throw new Error("Você precisa estar autenticado para atualizar seu perfil.");
     }
     
-    // CORREÇÃO: Usar a rota /profile para atualizar o perfil do usuário autenticado
-    const response = await api.put(`/profile`, userData);
+    const userId = JSON.parse(localStorage.getItem('userInfo') || '{}')._id;
+    if (!userId) throw new Error("ID do usuário não encontrado.");
+    
+    // Corrigido para usar o endpoint correto
+    const response = await api.put(`/users/${userId}`, userData);
     
     // Atualizar informações do usuário no localStorage
     const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
-    const updatedUser = { 
-      ...currentUser, 
-      ...userData,
-      token: currentUser.token // Garantir que o token seja preservado
-    };
-    
-    // Garantir que o _id seja preservado se existir
-    if (currentUser._id) {
-      updatedUser._id = currentUser._id;
-    }
-    
+    const updatedUser = { ...currentUser, ...userData };
     localStorage.setItem('userInfo', JSON.stringify(updatedUser));
     
     return response.data;
   } catch (error: any) {
     console.error('Erro ao atualizar perfil:', error);
-    
-    // Tentar rota alternativa se a primeira falhar
-    try {
-      console.log('Tentando rota alternativa para atualizar perfil...');
-      const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
-      
-      // Tentar com /auth/profile como alternativa
-      const response = await api.put(`/auth/profile`, userData);
-      
-      // Atualizar informações do usuário no localStorage
-      const updatedUser = { 
-        ...currentUser, 
-        ...userData,
-        token: currentUser.token // Garantir que o token seja preservado
-      };
-      
-      // Garantir que o _id seja preservado se existir
-      if (currentUser._id) {
-        updatedUser._id = currentUser._id;
-      }
-      
-      localStorage.setItem('userInfo', JSON.stringify(updatedUser));
-      
-      return response.data;
-    } catch (secondError) {
-      console.error('Erro na rota alternativa para atualizar perfil:', secondError);
-      throw new Error(error.response?.data?.message || "Erro ao atualizar perfil.");
-    }
+    throw new Error(error.response?.data?.message || "Erro ao atualizar perfil.");
   }
 };
 
@@ -362,21 +295,10 @@ export const createAdCampaign = async (details: any) => {
       throw new Error("Você precisa estar autenticado para criar campanhas.");
     }
     
-    // Determinar qual endpoint usar com base nos dados fornecidos
-    let endpoint = '/meta-ads/create-from-post';
-    
-    // Se não tiver link de publicação, usar o endpoint de criação por imagem
-    if (!details.postUrl) {
-      endpoint = '/meta-ads/create-from-image';
-    }
-    
-    console.log(`Usando endpoint: ${endpoint} para criar campanha`);
-    
     // Corrigido para usar o endpoint correto conforme definido no backend
-    const response = await api.post(endpoint, details);
+    const response = await api.post(`/meta-ads/create-from-post`, details);
     return response.data;
   } catch (error: any) {
-    console.error('Erro ao criar campanha:', error);
     throw new Error(error.response?.data?.message || "Erro ao criar campanha de anúncios.");
   }
 };
