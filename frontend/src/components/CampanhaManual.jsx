@@ -75,30 +75,60 @@ const CampanhaManual = () => {
 
   // Buscar informações do usuário ao carregar o componente
   useEffect(() => {
-    try {
-      // Verificar se há informações do Meta salvas
-      const metaInfoStr = localStorage.getItem('metaInfo');
-      if (metaInfoStr) {
-        const metaInfo = JSON.parse(metaInfoStr);
-        if (metaInfo.accessToken) {
-          setIsMetaConnected(true);
+    const checkMetaConnection = () => {
+      try {
+        // Verificar se há informações do Meta salvas
+        const metaInfoStr = localStorage.getItem('metaInfo');
+        if (metaInfoStr) {
+          const metaInfo = JSON.parse(metaInfoStr);
+          if (metaInfo.accessToken || metaInfo.isConnected) {
+            setIsMetaConnected(true);
+            return true;
+          }
         }
+        
+        // Verificar informações do usuário
+        const storedUserInfo = localStorage.getItem('userInfo');
+        if (storedUserInfo) {
+          const parsedInfo = JSON.parse(storedUserInfo);
+          const connected = (
+            parsedInfo.isMetaConnected || 
+            parsedInfo.metaConnectionStatus === "connected" ||
+            parsedInfo.metaAccessToken
+          );
+          setUserInfo(parsedInfo);
+          setIsMetaConnected(connected);
+          return connected;
+        }
+        return false;
+      } catch (error) {
+        console.error('Erro ao carregar informações do usuário:', error);
+        return false;
       }
-      
-      // Verificar informações do usuário
-      const storedUserInfo = localStorage.getItem('userInfo');
-      if (storedUserInfo) {
-        const parsedInfo = JSON.parse(storedUserInfo);
-        setUserInfo(parsedInfo);
-        setIsMetaConnected(
-          parsedInfo.isMetaConnected || 
-          parsedInfo.metaConnectionStatus === "connected" ||
-          parsedInfo.metaAccessToken
-        );
-      }
-    } catch (error) {
-      console.error('Erro ao carregar informações do usuário:', error);
-    }
+    };
+
+    // Verificar status inicial
+    checkMetaConnection();
+    
+    // Adicionar listener para o evento personalizado de atualização da conexão Meta
+    const handleMetaConnectionUpdate = () => {
+      console.log("CampanhaManual: Evento de atualização de conexão Meta detectado");
+      const isConnected = checkMetaConnection();
+      console.log("CampanhaManual: Status de conexão atualizado:", isConnected);
+    };
+    
+    window.addEventListener('metaConnectionUpdated', handleMetaConnectionUpdate);
+    
+    // Também verificar periodicamente para garantir
+    const intervalId = setInterval(() => {
+      checkMetaConnection();
+    }, 2000);
+    
+    // Limpar listeners ao desmontar
+    return () => {
+      window.removeEventListener('metaConnectionUpdated', handleMetaConnectionUpdate);
+      clearInterval(intervalId);
+    };
   }, []);
 
   // Inicializar o mapa quando o componente montar
