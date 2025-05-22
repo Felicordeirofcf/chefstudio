@@ -1,4 +1,4 @@
-// Arquivo principal do servidor com configuração de CORS e rotas
+// Versão simplificada do server.js que funciona apenas com as rotas essenciais
 const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
@@ -6,11 +6,12 @@ const path = require('path');
 const cors = require('./middleware/corsMiddleware');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
-// Importar rotas
-const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/userRoutes');
+// Importar apenas as rotas que são essenciais para a integração Meta
+// Comentando as rotas que não foram incluídas no pacote
+// const authRoutes = require('./routes/authRoutes');
+// const userRoutes = require('./routes/userRoutes');
 const metaRoutes = require('./routes/metaRoutes');
-const menuRoutes = require('./routes/menuRoutes');
+// const menuRoutes = require('./routes/menuRoutes');
 const healthRoutes = require('./routes/healthRoutes');
 
 // Configurar variáveis de ambiente
@@ -26,12 +27,17 @@ app.use(express.urlencoded({ extended: true }));
 // Aplicar middleware CORS personalizado
 app.use(cors);
 
-// Rotas de API
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
+// Rotas de API - apenas as essenciais
+// app.use('/api/auth', authRoutes);
+// app.use('/api/users', userRoutes);
 app.use('/api/meta', metaRoutes);
-app.use('/api/menu', menuRoutes);
+// app.use('/api/menu', menuRoutes);
 app.use('/api/health', healthRoutes);
+
+// Rota básica para verificar se o servidor está funcionando
+app.get('/api', (req, res) => {
+  res.json({ message: 'API ChefStudio está rodando' });
+});
 
 // Servir arquivos estáticos em produção
 if (process.env.NODE_ENV === 'production') {
