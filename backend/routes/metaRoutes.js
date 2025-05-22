@@ -146,27 +146,51 @@ router.get("/campaigns", protect, metaController.getCampaigns);
 
 /**
  * @swagger
- * /api/meta/metrics:
- *   get:
- *     summary: Obter métricas do Meta Ads
+ * /api/meta/create-from-image:
+ *   post:
+ *     summary: Criar anúncio a partir de uma imagem
  *     tags: [Meta]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: timeRange
- *         schema:
- *           type: string
- *           enum: [today, yesterday, last_7_days, last_30_days, this_month, last_month]
- *         description: Período de tempo para as métricas
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - campaignName
+ *               - dailyBudget
+ *               - startDate
+ *             properties:
+ *               imageUrl:
+ *                 type: string
+ *               campaignName:
+ *                 type: string
+ *               dailyBudget:
+ *                 type: number
+ *               startDate:
+ *                 type: string
+ *               endDate:
+ *                 type: string
+ *               targetCountry:
+ *                 type: string
+ *               adTitle:
+ *                 type: string
+ *               adDescription:
+ *                 type: string
+ *               callToAction:
+ *                 type: string
+ *               menuUrl:
+ *                 type: string
  *     responses:
- *       200:
- *         description: Métricas obtidas com sucesso
+ *       201:
+ *         description: Anúncio com imagem criado com sucesso
  *       400:
- *         description: Usuário não conectado ao Meta
+ *         description: Dados inválidos ou usuário não conectado ao Meta
  *       401:
  *         description: Não autorizado
  */
-router.get("/metrics", protect, metaController.getMetrics);
+router.post("/create-from-image", protect, metaController.createAdFromImage);
 
 module.exports = router;
