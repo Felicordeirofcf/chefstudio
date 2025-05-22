@@ -1,293 +1,98 @@
+// Endpoint para criar anúncios no Meta Ads
+// Arquivo: backend/routes/meta.js
+
 const express = require('express');
 const router = express.Router();
-const { authMiddleware } = require('../middleware/auth');
-const jwt = require('jsonwebtoken');
-const User = require('../models/user');
 const axios = require('axios');
+const { protect } = require('../middleware/authMiddleware');
 
-/**
- * @swagger
- * /api/meta/login:
- *   get:
- *     summary: Inicia o processo de login com o Facebook/Meta
- *     tags: [Meta]
- *     parameters:
- *       - in: query
- *         name: token
- *         schema:
- *           type: string
- *         description: Token JWT do usuário (alternativa ao header Authorization)
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       302:
- *         description: Redirecionamento para a página de login do Facebook
- *       401:
- *         description: Não autorizado
- *       500:
- *         description: Erro interno do servidor
- */
-router.get('/login', async (req, res) => {
+// Configurações do Facebook OAuth
+const FB_APP_ID = '2430942723957669';
+const FB_APP_SECRET = process.env.FB_APP_SECRET || 'seu_app_secret_aqui';
+const FB_REDIRECT_URI = process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/dashboard` : 'http://localhost:5173/dashboard';
+const FB_API_VERSION = 'v18.0';
+
+// @desc    Obter URL de login do Facebook
+// @route   GET /api/meta/login
+// @access  Private
+router.get('/login', (req, res) => {
   try {
-    // Verificar token JWT (seja do header Authorization ou da query string)
-    let token = null;
+    // Construir URL de login com todas as permissões necessárias
+    const scope = 'ads_management,ads_read,business_management,pages_read_engagement,instagram_basic,public_profile';
+    const loginUrl = `https://www.facebook.com/${FB_API_VERSION}/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&scope=${encodeURIComponent(scope)}&response_type=token`;
     
-    // Verificar se o token está no header Authorization
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.split(' ')[1];
-    }
-    
-    // Se não estiver no header, verificar na query string
-    if (!token && req.query.token) {
-      token = req.query.token;
-    }
-    
-    if (!token) {
-      return res.status(401).json({ message: 'Token de autenticação não fornecido' });
-    }
-    
-    // Verificar validade do token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (error) {
-      return res.status(401).json({ message: 'Token inválido ou expirado' });
-    }
-    
-    // Verificar se o usuário existe
-    const user = await User.findById(decoded.userId);
-    if (!user) {
-      return res.status(401).json({ 
-        message: 'Usuário não encontrado',
-        details: {
-          decodedToken: decoded
-        }
-      });
-    }
-    
-    // Configuração do Facebook
-    const appId = process.env.FB_APP_ID;
-    const redirectUri = process.env.FACEBOOK_REDIRECT_URI;
-    
-    if (!appId || !redirectUri) {
-      return res.status(500).json({ 
-        message: 'Configuração do Facebook incompleta',
-        details: {
-          appId: !!appId,
-          redirectUri: !!redirectUri
-        }
-      });
-    }
-    
-    // Construir URL de login do Facebook com todas as permissões necessárias para criação automática de anúncios
-    const scopes = 'email,ads_management,ads_read,business_management,instagram_basic,instagram_content_publish,pages_read_engagement,pages_show_list,ads_management_standard_access,catalog_management,attribution_read,pages_manage_ads,pages_manage_metadata,pages_manage_posts,pages_manage_engagement';
-    const state = token; // Usar o token como state para recuperá-lo no callback
-    
-    const loginUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}&response_type=code`;
-    
-    // Redirecionar para a página de login do Facebook
-    res.redirect(loginUrl);
+    res.json({ url: loginUrl });
   } catch (error) {
-    console.error('Erro ao iniciar login com Facebook:', error);
-    res.status(500).json({ 
-      message: 'Erro ao iniciar login com Facebook',
-      error: error.message
-    });
+    console.error('Erro ao gerar URL de login:', error);
+    res.status(500).json({ message: 'Erro ao gerar URL de login do Facebook' });
   }
 });
 
-/**
- * @swagger
- * /api/meta/callback:
- *   get:
- *     summary: Callback para o processo de login com o Facebook/Meta
- *     tags: [Meta]
- *     parameters:
- *       - in: query
- *         name: code
- *         schema:
- *           type: string
- *         description: Código de autorização do Facebook
- *       - in: query
- *         name: state
- *         schema:
- *           type: string
- *         description: Estado (token JWT) passado na requisição inicial
- *     responses:
- *       302:
- *         description: Redirecionamento para o frontend após processamento
- *       400:
- *         description: Parâmetros inválidos
- *       500:
- *         description: Erro interno do servidor
- */
-router.get('/callback', async (req, res) => {
+// @desc    Criar anúncio no Meta Ads
+// @route   POST /api/meta/create-ad
+// @access  Private
+router.post('/create-ad', protect, async (req, res) => {
   try {
-    const { code, state } = req.query;
+    const { name, budget, radius, link_url, location, targeting } = req.body;
     
-    if (!code) {
-      return res.status(400).json({ message: 'Código de autorização ausente' });
+    // Validar dados obrigatórios
+    if (!name || !link_url) {
+      return res.status(400).json({ message: 'Nome do anúncio e link são obrigatórios' });
     }
     
-    // O state contém o token JWT do usuário
-    const token = state;
+    // Simular criação de anúncio (em produção, usaria a API real do Facebook)
+    // Em um ambiente real, você usaria o SDK do Facebook para JavaScript ou a API Graph
     
-    // Redirecionar para o frontend com os parâmetros necessários
-    const frontendUrl = process.env.FRONTEND_URL || 'https://chefstudio.vercel.app';
-    res.redirect(`${frontendUrl}/meta-callback?code=${code}&token=${token}`);
-  } catch (error) {
-    console.error('Erro no callback do Facebook:', error);
+    // Simular resposta de sucesso
+    const adId = `ad_${Date.now()}`;
+    const campaignId = `campaign_${Date.now()}`;
     
-    // Redirecionar para o frontend com mensagem de erro
-    const frontendUrl = process.env.FRONTEND_URL || 'https://chefstudio.vercel.app';
-    res.redirect(`${frontendUrl}/meta-callback?error=${encodeURIComponent(error.message)}`);
-  }
-});
-
-/**
- * @swagger
- * /api/meta/connect:
- *   post:
- *     summary: Conecta a conta do usuário com o Facebook/Meta
- *     tags: [Meta]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               code:
- *                 type: string
- *                 description: Código de autorização do Facebook
- *     responses:
- *       200:
- *         description: Conexão realizada com sucesso
- *       400:
- *         description: Parâmetros inválidos
- *       401:
- *         description: Não autorizado
- *       500:
- *         description: Erro interno do servidor
- */
-router.post('/connect', authMiddleware, async (req, res) => {
-  try {
-    const { code } = req.body;
+    // Registrar anúncio no banco de dados (simulado)
+    console.log(`Anúncio criado: ${name}, ID: ${adId}, Campanha: ${campaignId}`);
+    console.log(`Orçamento: R$ ${budget}, Raio: ${radius}km, Link: ${link_url}`);
+    console.log(`Localização: Lat ${location.lat}, Lng ${location.lng}`);
     
-    if (!code) {
-      return res.status(400).json({ message: 'Código de autorização ausente' });
-    }
-    
-    // Obter o usuário a partir do middleware de autenticação
-    const userId = req.user.userId;
-    
-    // Buscar o usuário no banco de dados
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
-    }
-    
-    // Simular troca do código de autorização por token de acesso
-    // Em produção, isso seria feito com uma chamada real à API do Facebook
-    const mockAccessToken = `mock_access_token_${Date.now()}`;
-    
-    // Atualizar o usuário com as informações do Meta
-    user.metaConnectionStatus = 'connected';
-    user.metaAccessToken = mockAccessToken;
-    user.metaConnectedAt = new Date();
-    
-    // Salvar as alterações no usuário
-    await user.save();
-    
-    // Retornar sucesso
-    res.json({
+    // Responder com sucesso
+    res.status(201).json({
       success: true,
-      message: 'Conta conectada com sucesso ao Meta',
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        metaConnectionStatus: user.metaConnectionStatus,
-        metaConnectedAt: user.metaConnectedAt
+      ad: {
+        id: adId,
+        name,
+        status: 'ACTIVE',
+        campaign_id: campaignId,
+        created_at: new Date().toISOString(),
+        link_url,
+        budget,
+        radius,
+        location
       }
     });
+    
   } catch (error) {
-    console.error('Erro ao conectar com Meta:', error);
+    console.error('Erro ao criar anúncio:', error);
     res.status(500).json({ 
-      message: 'Erro ao conectar com Meta',
-      error: error.message
+      message: 'Erro ao criar anúncio', 
+      error: error.message 
     });
   }
 });
 
-/**
- * @swagger
- * /api/meta/adaccounts:
- *   get:
- *     summary: Obtém as contas de anúncios do usuário no Facebook/Meta
- *     tags: [Meta]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Lista de contas de anúncios obtida com sucesso
- *       401:
- *         description: Não autorizado
- *       500:
- *         description: Erro interno do servidor
- */
-router.get('/adaccounts', authMiddleware, async (req, res) => {
+// @desc    Verificar status de conexão com Meta Ads
+// @route   GET /api/meta/status
+// @access  Private
+router.get('/status', protect, (req, res) => {
   try {
-    // Implementação futura: integração real com a API do Facebook
-    // Por enquanto, retornar dados simulados
-    res.json([
-      { id: "act_123456789", name: "Conta Principal de Anúncios" },
-      { id: "act_987654321", name: "Conta Secundária de Anúncios" }
-    ]);
-  } catch (error) {
-    console.error('Erro ao obter contas de anúncios:', error);
-    res.status(500).json({ 
-      message: 'Erro ao obter contas de anúncios',
-      error: error.message
-    });
-  }
-});
-
-/**
- * @swagger
- * /api/meta/metrics:
- *   get:
- *     summary: Obtém métricas de campanhas do Facebook/Meta
- *     tags: [Meta]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Métricas obtidas com sucesso
- *       401:
- *         description: Não autorizado
- *       500:
- *         description: Erro interno do servidor
- */
-router.get('/metrics', authMiddleware, async (req, res) => {
-  try {
-    // Implementação futura: integração real com a API do Facebook
-    // Por enquanto, retornar dados simulados
+    // Em um ambiente real, verificaria o token do usuário com a API do Facebook
+    // Aqui, apenas simulamos uma resposta positiva
     res.json({
-      reach: Math.floor(Math.random() * 1000 + 100),
-      clicks: Math.floor(Math.random() * 200 + 50),
-      spend: (Math.random() * 100 + 20).toFixed(2),
-      ctr: (Math.random() * 5 + 1).toFixed(2),
+      isConnected: true,
+      accountId: `act_${Math.floor(Math.random() * 1000000000)}`,
+      status: 'ACTIVE',
+      permissions: ['ads_management', 'ads_read', 'business_management']
     });
   } catch (error) {
-    console.error('Erro ao obter métricas:', error);
-    res.status(500).json({ 
-      message: 'Erro ao obter métricas',
-      error: error.message
-    });
+    console.error('Erro ao verificar status:', error);
+    res.status(500).json({ message: 'Erro ao verificar status de conexão' });
   }
 });
 
