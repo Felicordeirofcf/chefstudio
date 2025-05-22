@@ -296,7 +296,7 @@ export const createAdCampaign = async (details: any) => {
     }
     
     // Corrigido para usar o endpoint correto conforme definido no backend
-    const response = await api.post(`/meta-ads/create-from-post`, details);
+    const response = await api.post(`/meta/create-ad-from-post`, details);
     return response.data;
   } catch (error: any) {
     throw new Error(error.response?.data?.message || "Erro ao criar campanha de anúncios.");
@@ -313,7 +313,7 @@ export const getUserCampaigns = async () => {
     }
     
     // Corrigido para usar o endpoint correto conforme definido no backend
-    const response = await api.get(`/meta-ads/campaigns`);
+    const response = await api.get(`/meta/connection-status`);
     return response.data;
   } catch (error: any) {
     console.error("Erro ao buscar campanhas do usuário:", error);
