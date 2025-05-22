@@ -75,10 +75,10 @@ const AuthForm = ({ isLogin = true }) => {
       let response;
       
       if (isLogin) {
-        // Login tradicional
+        // Login tradicional - Corrigido para remover prefixo '/api' duplicado
         response = await api.post('/auth/login', { email, password });
       } else {
-        // Registro
+        // Registro - Corrigido para remover prefixo '/api' duplicado
         response = await api.post('/auth/register', { name, email, password });
       }
       
