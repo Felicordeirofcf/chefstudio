@@ -1,4 +1,4 @@
-// Versão corrigida do controlador de autenticação Meta
+// Implementação completa do controlador Meta com suporte a campanhas e métricas
 const fetch = require("node-fetch");
 const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
@@ -10,6 +10,35 @@ const APP_SECRET = process.env.META_APP_SECRET || "470806b6e330fff673451f5689ca3
 const REDIRECT_URI = process.env.META_REDIRECT_URI || "https://chefstudio-production.up.railway.app/api/meta/callback";
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://chefstudio.vercel.app";
 const SCOPES = "ads_management,ads_read,business_management,public_profile,email";
+
+// Função para extrair ID da publicação a partir da URL
+const extractPostIdFromUrl = (url) => {
+  try {
+    // Tentar extrair o ID da publicação de diferentes formatos de URL
+    // Formato: https://www.facebook.com/photo/?fbid=122102873852863870&set=a.122102873882863870
+    const fbidMatch = url.match(/fbid=(\d+)/);
+    if (fbidMatch && fbidMatch[1]) {
+      return fbidMatch[1];
+    }
+    
+    // Formato: https://www.facebook.com/username/posts/123456789
+    const postsMatch = url.match(/\/posts\/(\d+)/);
+    if (postsMatch && postsMatch[1]) {
+      return postsMatch[1];
+    }
+    
+    // Formato: https://www.facebook.com/permalink.php?story_fbid=123456789
+    const storyMatch = url.match(/story_fbid=(\d+)/);
+    if (storyMatch && storyMatch[1]) {
+      return storyMatch[1];
+    }
+    
+    throw new Error("Não foi possível extrair o ID da publicação da URL fornecida");
+  } catch (error) {
+    console.error("Erro ao extrair ID da publicação:", error);
+    throw new Error("Formato de URL inválido ou não suportado");
+  }
+};
 
 // @desc    Iniciar login com Facebook
 // @route   GET /api/meta/login
@@ -269,9 +298,375 @@ const verifyConnection = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Criar anúncio a partir de uma publicação
+// @route   POST /api/meta/create-ad-from-post
+// @access  Private
+const createAdFromPost = asyncHandler(async (req, res) => {
+  const { postUrl, campaignName, dailyBudget, startDate, endDate, targetCountry } = req.body;
+  
+  if (!postUrl) {
+    res.status(400);
+    throw new Error("URL da publicação é obrigatória");
+  }
+  
+  if (!campaignName) {
+    res.status(400);
+    throw new Error("Nome da campanha é obrigatório");
+  }
+  
+  if (!dailyBudget || isNaN(dailyBudget) || parseFloat(dailyBudget) < 1) {
+    res.status(400);
+    throw new Error("Orçamento diário deve ser um número maior que 1");
+  }
+  
+  if (!startDate) {
+    res.status(400);
+    throw new Error("Data de início é obrigatória");
+  }
+  
+  if (endDate && new Date(endDate) <= new Date(startDate)) {
+    res.status(400);
+    throw new Error("Data de término deve ser posterior à data de início");
+  }
+  
+  const user = await User.findById(req.user._id);
+  
+  if (!user) {
+    res.status(404);
+    throw new Error("Usuário não encontrado");
+  }
+  
+  // Verificar se o usuário está conectado ao Meta
+  if (user.metaConnectionStatus !== "connected" || !user.metaAccessToken) {
+    res.status(400);
+    throw new Error("Você precisa conectar sua conta ao Meta Ads primeiro");
+  }
+  
+  // Verificar se o token expirou
+  if (user.metaTokenExpires && user.metaTokenExpires < Date.now()) {
+    res.status(401);
+    throw new Error("Seu token do Meta expirou. Por favor, reconecte sua conta.");
+  }
+  
+  // Verificar se há conta de anúncios disponível
+  if (!user.metaAdAccounts || user.metaAdAccounts.length === 0) {
+    res.status(400);
+    throw new Error("Nenhuma conta de anúncios encontrada. Por favor, reconecte sua conta Meta.");
+  }
+  
+  try {
+    // Extrair ID da publicação da URL
+    const postId = extractPostIdFromUrl(postUrl);
+    
+    // Usar a conta de anúncios principal se disponível, ou selecionar a primeira ativa, ou a primeira da lista
+    let adAccountId;
+    if (user.metaPrimaryAdAccountId) {
+      adAccountId = user.metaPrimaryAdAccountId;
+    } else {
+      const adAccount = user.metaAdAccounts.find(account => account.status === 1) || user.metaAdAccounts[0];
+      adAccountId = adAccount.id;
+    }
+    
+    // Registrar no log para debug
+    console.log(`Creating ad using account ID: ${adAccountId} for user ${user._id}`);
+    
+    // Criar campanha
+    const campaignResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/campaigns`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: `${campaignName} - Campanha`,
+        objective: "OUTCOME_AWARENESS",
+        status: "PAUSED",
+        special_ad_categories: [],
+        access_token: user.metaAccessToken,
+      }),
+    });
+    
+    const campaignData = await campaignResponse.json();
+    
+    if (campaignData.error) {
+      throw new Error(`Erro ao criar campanha: ${campaignData.error.message}`);
+    }
+    
+    // Criar conjunto de anúncios
+    const adSetResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/adsets`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: `${campaignName} - Conjunto`,
+        campaign_id: campaignData.id,
+        daily_budget: parseFloat(dailyBudget) * 100, // Em centavos
+        bid_amount: 1000, // 10 reais em centavos
+        billing_event: "IMPRESSIONS",
+        optimization_goal: "REACH",
+        targeting: {
+          geo_locations: {
+            countries: [targetCountry || "BR"],
+          },
+          age_min: 18,
+          age_max: 65,
+        },
+        status: "PAUSED",
+        start_time: new Date(startDate).toISOString(),
+        end_time: endDate ? new Date(endDate).toISOString() : null,
+        access_token: user.metaAccessToken,
+      }),
+    });
+    
+    const adSetData = await adSetResponse.json();
+    
+    if (adSetData.error) {
+      throw new Error(`Erro ao criar conjunto de anúncios: ${adSetData.error.message}`);
+    }
+    
+    // Criar anúncio
+    const adResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/ads`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: campaignName,
+        adset_id: adSetData.id,
+        creative: {
+          object_story_id: postId,
+        },
+        status: "PAUSED",
+        access_token: user.metaAccessToken,
+      }),
+    });
+    
+    const adData = await adResponse.json();
+    
+    if (adData.error) {
+      throw new Error(`Erro ao criar anúncio: ${adData.error.message}`);
+    }
+    
+    // Retornar detalhes do anúncio criado
+    res.status(201).json({
+      success: true,
+      message: "Anúncio criado com sucesso",
+      adDetails: {
+        name: campaignName,
+        campaignId: campaignData.id,
+        adSetId: adSetData.id,
+        adId: adData.id,
+        status: "PAUSED",
+        dailyBudget: parseFloat(dailyBudget),
+        startDate,
+        endDate,
+        targetCountry: targetCountry || "BR",
+        postId,
+        adAccountId: adAccountId
+      },
+    });
+    
+  } catch (error) {
+    console.error("Erro ao criar anúncio:", error);
+    res.status(500);
+    throw new Error("Erro ao criar anúncio: " + error.message);
+  }
+});
+
+// @desc    Obter campanhas do usuário
+// @route   GET /api/meta/campaigns
+// @access  Private
+const getCampaigns = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  
+  if (!user) {
+    res.status(404);
+    throw new Error("Usuário não encontrado");
+  }
+  
+  // Verificar se o usuário está conectado ao Meta
+  if (user.metaConnectionStatus !== "connected" || !user.metaAccessToken) {
+    res.status(400);
+    throw new Error("Usuário não está conectado ao Meta");
+  }
+  
+  // Verificar se o token expirou
+  if (user.metaTokenExpires && user.metaTokenExpires < Date.now()) {
+    res.status(401);
+    throw new Error("Seu token do Meta expirou. Por favor, reconecte sua conta.");
+  }
+  
+  try {
+    // Verificar se há conta de anúncios disponível
+    if (!user.metaAdAccounts || user.metaAdAccounts.length === 0) {
+      return res.json([]);
+    }
+    
+    // Usar a conta de anúncios principal se disponível, ou selecionar a primeira ativa, ou a primeira da lista
+    let adAccountId;
+    if (user.metaPrimaryAdAccountId) {
+      adAccountId = user.metaPrimaryAdAccountId;
+    } else {
+      const adAccount = user.metaAdAccounts.find(account => account.status === 1) || user.metaAdAccounts[0];
+      adAccountId = adAccount.id;
+    }
+    
+    // Obter campanhas
+    const campaignsResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/campaigns?fields=id,name,status,objective,created_time,updated_time&access_token=${user.metaAccessToken}`, {
+      method: "GET",
+    });
+    
+    const campaignsData = await campaignsResponse.json();
+    
+    if (campaignsData.error) {
+      throw new Error(campaignsData.error.message);
+    }
+    
+    res.json(campaignsData.data || []);
+    
+  } catch (error) {
+    console.error("Erro ao obter campanhas:", error);
+    res.status(500);
+    throw new Error("Erro ao obter campanhas: " + error.message);
+  }
+});
+
+// @desc    Obter métricas do Meta Ads
+// @route   GET /api/meta/metrics
+// @access  Private
+const getMetrics = asyncHandler(async (req, res) => {
+  const { timeRange = 'last_30_days' } = req.query;
+  
+  const user = await User.findById(req.user._id);
+  
+  if (!user) {
+    res.status(404);
+    throw new Error("Usuário não encontrado");
+  }
+  
+  // Verificar se o usuário está conectado ao Meta
+  if (user.metaConnectionStatus !== "connected" || !user.metaAccessToken) {
+    res.status(400);
+    throw new Error("Usuário não está conectado ao Meta");
+  }
+  
+  // Verificar se o token expirou
+  if (user.metaTokenExpires && user.metaTokenExpires < Date.now()) {
+    res.status(401);
+    throw new Error("Seu token do Meta expirou. Por favor, reconecte sua conta.");
+  }
+  
+  try {
+    // Verificar se há conta de anúncios disponível
+    if (!user.metaAdAccounts || user.metaAdAccounts.length === 0) {
+      return res.json({
+        impressions: 0,
+        clicks: 0,
+        ctr: 0,
+        spend: 0,
+        reach: 0,
+        frequency: 0
+      });
+    }
+    
+    // Usar a conta de anúncios principal se disponível, ou selecionar a primeira ativa, ou a primeira da lista
+    let adAccountId;
+    if (user.metaPrimaryAdAccountId) {
+      adAccountId = user.metaPrimaryAdAccountId;
+    } else {
+      const adAccount = user.metaAdAccounts.find(account => account.status === 1) || user.metaAdAccounts[0];
+      adAccountId = adAccount.id;
+    }
+    
+    // Definir intervalo de datas com base no timeRange
+    let since, until;
+    const now = new Date();
+    
+    switch (timeRange) {
+      case 'today':
+        since = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString().split('T')[0];
+        until = now.toISOString().split('T')[0];
+        break;
+      case 'yesterday':
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        since = yesterday.toISOString().split('T')[0];
+        until = yesterday.toISOString().split('T')[0];
+        break;
+      case 'last_7_days':
+        const last7Days = new Date(now);
+        last7Days.setDate(last7Days.getDate() - 7);
+        since = last7Days.toISOString().split('T')[0];
+        until = now.toISOString().split('T')[0];
+        break;
+      case 'this_month':
+        since = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        until = now.toISOString().split('T')[0];
+        break;
+      case 'last_month':
+        const lastMonth = new Date(now);
+        lastMonth.setMonth(lastMonth.getMonth() - 1);
+        since = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1).toISOString().split('T')[0];
+        until = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0).toISOString().split('T')[0];
+        break;
+      default: // last_30_days
+        const last30Days = new Date(now);
+        last30Days.setDate(last30Days.getDate() - 30);
+        since = last30Days.toISOString().split('T')[0];
+        until = now.toISOString().split('T')[0];
+    }
+    
+    // Obter métricas
+    const metricsResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/insights?fields=impressions,clicks,ctr,spend,reach,frequency&time_range={"since":"${since}","until":"${until}"}&access_token=${user.metaAccessToken}`, {
+      method: "GET",
+    });
+    
+    const metricsData = await metricsResponse.json();
+    
+    if (metricsData.error) {
+      throw new Error(metricsData.error.message);
+    }
+    
+    // Se não houver dados, retornar zeros
+    if (!metricsData.data || metricsData.data.length === 0) {
+      return res.json({
+        impressions: 0,
+        clicks: 0,
+        ctr: 0,
+        spend: 0,
+        reach: 0,
+        frequency: 0
+      });
+    }
+    
+    // Extrair métricas
+    const metrics = metricsData.data[0];
+    
+    res.json({
+      impressions: parseInt(metrics.impressions) || 0,
+      clicks: parseInt(metrics.clicks) || 0,
+      ctr: parseFloat(metrics.ctr) || 0,
+      spend: parseFloat(metrics.spend) || 0,
+      reach: parseInt(metrics.reach) || 0,
+      frequency: parseFloat(metrics.frequency) || 0,
+      timeRange,
+      since,
+      until
+    });
+    
+  } catch (error) {
+    console.error("Erro ao obter métricas:", error);
+    res.status(500);
+    throw new Error("Erro ao obter métricas: " + error.message);
+  }
+});
+
 module.exports = {
   facebookLogin,
   facebookCallback,
   getConnectionStatus,
-  verifyConnection
+  verifyConnection,
+  createAdFromPost,
+  getCampaigns,
+  getMetrics
 };
