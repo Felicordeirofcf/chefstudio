@@ -1,94 +1,12 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createCampaign, uploadCampaignMedia } from '../lib/api';
-
-// Contexto global para status de conexão Meta
-const MetaConnectionContext = createContext({
-  isConnected: false,
-  setConnected: () => {},
-  connectionInfo: null
-});
-
-// Hook personalizado para usar o contexto
-export const useMetaConnection = () => useContext(MetaConnectionContext);
-
-// Provedor do contexto para ser usado no App.jsx ou outro componente de alto nível
-export const MetaConnectionProvider = ({ children }) => {
-  const [isConnected, setConnected] = useState(false);
-  const [connectionInfo, setConnectionInfo] = useState(null);
-  
-  // Verificar status inicial
-  useEffect(() => {
-    const checkInitialStatus = () => {
-      try {
-        // Verificar localStorage
-        const metaInfoStr = localStorage.getItem('metaInfo');
-        if (metaInfoStr) {
-          const metaInfo = JSON.parse(metaInfoStr);
-          if (metaInfo.accessToken || metaInfo.isConnected) {
-            setConnected(true);
-            setConnectionInfo(metaInfo);
-            return;
-          }
-        }
-        
-        // Verificar userInfo
-        const userInfoStr = localStorage.getItem('userInfo');
-        if (userInfoStr) {
-          const userInfo = JSON.parse(userInfoStr);
-          if (userInfo.isMetaConnected || userInfo.metaConnectionStatus === "connected" || userInfo.metaAccessToken) {
-            setConnected(true);
-            setConnectionInfo(userInfo);
-            return;
-          }
-        }
-        
-        // Verificar URL
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('code') || urlParams.get('access_token')) {
-          setConnected(true);
-          return;
-        }
-      } catch (error) {
-        console.error("Erro ao verificar status de conexão:", error);
-      }
-    };
-    
-    checkInitialStatus();
-    
-    // Listener para eventos de atualização
-    const handleConnectionUpdate = () => {
-      checkInitialStatus();
-    };
-    
-    window.addEventListener('metaConnectionUpdated', handleConnectionUpdate);
-    window.addEventListener('storage', (event) => {
-      if (event.key === 'metaInfo' || event.key === 'userInfo') {
-        handleConnectionUpdate();
-      }
-    });
-    
-    return () => {
-      window.removeEventListener('metaConnectionUpdated', handleConnectionUpdate);
-    };
-  }, []);
-  
-  return (
-    <MetaConnectionContext.Provider value={{ isConnected, setConnected, connectionInfo }}>
-      {children}
-    </MetaConnectionContext.Provider>
-  );
-};
 
 // Configurações do Facebook OAuth
 const FB_APP_ID = '2430942723957669'; // ID do app do Facebook corrigido
 const FB_REDIRECT_URI = window.location.origin + '/dashboard'; // Redireciona de volta para o dashboard
 const FB_SCOPE = 'ads_management,ads_read,business_management,pages_read_engagement,instagram_basic,public_profile';
 
-// Componente principal
 const CampanhaManual = () => {
-  // Usar o contexto de conexão Meta
-  const { isConnected: isMetaConnected, setConnected: setIsMetaConnected } = useMetaConnection();
-  
   // Estados para os campos do formulário
   const [nomeCampanha, setNomeCampanha] = useState('');
   const [orcamento, setOrcamento] = useState(70);
@@ -106,199 +24,112 @@ const CampanhaManual = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
+  const [isMetaConnected, setIsMetaConnected] = useState(false);
 
-  // Verificar se há token do Facebook na URL (após redirecionamento)
-  useEffect(() => {
-    const checkFacebookRedirect = () => {
-      console.log("CampanhaManual: Verificando parâmetros de redirecionamento do Facebook");
-      const urlParams = new URLSearchParams(window.location.search);
-      const accessToken = urlParams.get('access_token');
-      const code = urlParams.get('code');
-      const state = urlParams.get('state');
-      const error = urlParams.get('error');
-      
-      // Verificar se há qualquer parâmetro de autenticação
-      if (accessToken || code || state) {
-        console.log("CampanhaManual: Parâmetros de autenticação encontrados na URL");
-        
-        // Salvar token do Facebook
-        const metaInfo = {
-          accessToken: accessToken || `simulated_token_${Date.now()}`,
-          connectedAt: new Date().toISOString(),
-          isMetaConnected: true,
-          code: code || null,
-          state: state || null
-        };
-        
-        // Atualizar localStorage
-        try {
-          // Salvar informações do Meta separadamente primeiro
-          localStorage.setItem('metaInfo', JSON.stringify(metaInfo));
-          
-          // Atualizar userInfo se existir
-          const userInfoStr = localStorage.getItem('userInfo');
-          if (userInfoStr) {
-            const userInfo = JSON.parse(userInfoStr);
-            const updatedUserInfo = {
-              ...userInfo,
-              metaAccessToken: accessToken || `simulated_token_${Date.now()}`,
-              metaConnectionStatus: "connected",
-              isMetaConnected: true,
-              metaConnectedAt: new Date().toISOString()
-            };
-            localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
-            setUserInfo(updatedUserInfo);
-          }
-          
-          // Atualizar estado local e contexto global
-          setIsMetaConnected(true);
-          
-          // Disparar evento personalizado
-          window.dispatchEvent(new CustomEvent('metaConnectionUpdated', { 
-            detail: { connected: true, timestamp: new Date().toISOString() } 
-          }));
-          
-          console.log("CampanhaManual: Status de conexão atualizado com sucesso");
-          
-          // Limpar URL
-          window.history.replaceState({}, document.title, window.location.pathname);
-        } catch (error) {
-          console.error('Erro ao salvar token do Facebook:', error);
-        }
-      } else if (error) {
-        console.error("CampanhaManual: Erro na autenticação com Facebook:", error);
-        setError(`Erro na autenticação com Facebook: ${error}`);
-      }
-    };
-    
-    // Verificar imediatamente
-    checkFacebookRedirect();
-    
-    // Verificar novamente após um pequeno delay para garantir que outros componentes foram carregados
-    setTimeout(() => {
-      checkFacebookRedirect();
-    }, 500);
-  }, [setIsMetaConnected]);
-
-  // Buscar informações do usuário ao carregar o componente
+  // Verificar status de conexão Meta - Abordagem simplificada
   useEffect(() => {
     const checkMetaConnection = () => {
-      try {
-        console.log("CampanhaManual: Verificando status de conexão Meta");
+      console.log("CampanhaManual: Verificando status de conexão Meta");
+      
+      // Forçar conexão se estiver na URL do dashboard com token de acesso
+      const currentUrl = window.location.href;
+      if (currentUrl.includes('dashboard') && 
+          (currentUrl.includes('access_token') || 
+           currentUrl.includes('code') || 
+           currentUrl.includes('state'))) {
+        console.log("CampanhaManual: Parâmetros de autenticação detectados na URL");
+        setIsMetaConnected(true);
         
-        // Verificar se há informações do Meta salvas
+        // Salvar no localStorage para persistência
+        localStorage.setItem('metaConnected', 'true');
+        localStorage.setItem('metaConnectedAt', new Date().toISOString());
+        
+        return true;
+      }
+      
+      // Verificar localStorage diretamente
+      const isConnected = localStorage.getItem('metaConnected') === 'true';
+      if (isConnected) {
+        console.log("CampanhaManual: Status conectado encontrado no localStorage");
+        setIsMetaConnected(true);
+        return true;
+      }
+      
+      // Verificar metaInfo no localStorage
+      try {
         const metaInfoStr = localStorage.getItem('metaInfo');
         if (metaInfoStr) {
           const metaInfo = JSON.parse(metaInfoStr);
-          console.log("CampanhaManual: metaInfo encontrado:", metaInfo);
-          if (metaInfo.accessToken || metaInfo.isConnected) {
-            console.log("CampanhaManual: Meta conectado via metaInfo");
+          if (metaInfo.isConnected || metaInfo.accessToken) {
+            console.log("CampanhaManual: Conexão detectada via metaInfo");
             setIsMetaConnected(true);
+            localStorage.setItem('metaConnected', 'true');
             return true;
           }
         }
-        
-        // Verificar informações do usuário
-        const storedUserInfo = localStorage.getItem('userInfo');
-        if (storedUserInfo) {
-          const parsedInfo = JSON.parse(storedUserInfo);
-          console.log("CampanhaManual: userInfo encontrado:", {
-            isMetaConnected: parsedInfo.isMetaConnected,
-            metaConnectionStatus: parsedInfo.metaConnectionStatus,
-            hasMetaToken: !!parsedInfo.metaAccessToken
-          });
-          
-          const connected = (
-            parsedInfo.isMetaConnected || 
-            parsedInfo.metaConnectionStatus === "connected" ||
-            parsedInfo.metaAccessToken
-          );
-          
-          setUserInfo(parsedInfo);
-          setIsMetaConnected(connected);
-          
-          if (connected) {
-            console.log("CampanhaManual: Meta conectado via userInfo");
-          }
-          
-          return connected;
-        }
-        
-        // Verificar URL para parâmetros de redirecionamento
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        const accessToken = urlParams.get('access_token');
-        
-        if (code || accessToken) {
-          console.log("CampanhaManual: Parâmetros de autenticação encontrados na URL");
-          setIsMetaConnected(true);
-          
-          // Salvar informações simuladas para garantir que o estado seja mantido
-          localStorage.setItem('metaInfo', JSON.stringify({
-            isConnected: true,
-            connectedAt: new Date().toISOString(),
-            accessToken: accessToken || `meta_token_${Date.now()}`
-          }));
-          
-          return true;
-        }
-        
-        return false;
-      } catch (error) {
-        console.error('Erro ao carregar informações do usuário:', error);
-        return false;
+      } catch (e) {
+        console.error("Erro ao verificar metaInfo:", e);
       }
-    };
-
-    // Verificar status inicial
-    const initialStatus = checkMetaConnection();
-    console.log("CampanhaManual: Status inicial de conexão:", initialStatus);
-    
-    // Forçar verificação após um pequeno delay para garantir que localStorage foi atualizado
-    setTimeout(() => {
-      const delayedStatus = checkMetaConnection();
-      console.log("CampanhaManual: Status após delay:", delayedStatus);
       
-      // Se ainda não estiver conectado, verificar novamente após um delay maior
-      if (!delayedStatus) {
+      // Verificar userInfo no localStorage
+      try {
+        const userInfoStr = localStorage.getItem('userInfo');
+        if (userInfoStr) {
+          const userInfo = JSON.parse(userInfoStr);
+          if (userInfo.isMetaConnected || 
+              userInfo.metaConnectionStatus === "connected" || 
+              userInfo.metaAccessToken) {
+            console.log("CampanhaManual: Conexão detectada via userInfo");
+            setIsMetaConnected(true);
+            localStorage.setItem('metaConnected', 'true');
+            return true;
+          }
+        }
+      } catch (e) {
+        console.error("Erro ao verificar userInfo:", e);
+      }
+      
+      // Verificar parâmetros na URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasToken = urlParams.has('access_token');
+      const hasCode = urlParams.has('code');
+      const hasState = urlParams.has('state');
+      
+      if (hasToken || hasCode || hasState) {
+        console.log("CampanhaManual: Parâmetros de autenticação encontrados na URL");
+        setIsMetaConnected(true);
+        localStorage.setItem('metaConnected', 'true');
+        return true;
+      }
+      
+      console.log("CampanhaManual: Nenhuma conexão Meta detectada");
+      return false;
+    };
+    
+    // Verificar imediatamente
+    const isConnected = checkMetaConnection();
+    setIsMetaConnected(isConnected);
+    
+    // Verificar novamente após um pequeno delay
+    setTimeout(() => {
+      const delayedCheck = checkMetaConnection();
+      setIsMetaConnected(delayedCheck);
+      
+      // Se ainda não estiver conectado, verificar uma última vez após um delay maior
+      if (!delayedCheck) {
         setTimeout(() => {
           const finalCheck = checkMetaConnection();
-          console.log("CampanhaManual: Verificação final:", finalCheck);
-        }, 2000);
+          setIsMetaConnected(finalCheck);
+        }, 1500);
       }
     }, 500);
     
-    // Adicionar listener para o evento personalizado de atualização da conexão Meta
-    const handleMetaConnectionUpdate = (event) => {
-      console.log("CampanhaManual: Evento de atualização de conexão Meta detectado", event.detail);
-      const isConnected = checkMetaConnection();
-      console.log("CampanhaManual: Status de conexão atualizado:", isConnected);
-      
-      // Forçar atualização do estado
-      setIsMetaConnected(isConnected);
-    };
-    
-    // Adicionar listener para mudanças no localStorage
-    const handleStorageChange = (event) => {
-      if (event.key === 'metaInfo' || event.key === 'userInfo') {
-        console.log("CampanhaManual: Mudança detectada no localStorage:", event.key);
-        const isConnected = checkMetaConnection();
-        console.log("CampanhaManual: Status de conexão após mudança no storage:", isConnected);
-      }
-    };
-    
-    window.addEventListener('metaConnectionUpdated', handleMetaConnectionUpdate);
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Também verificar periodicamente para garantir
+    // Verificar a cada 3 segundos (polling limitado)
     const intervalId = setInterval(() => {
       checkMetaConnection();
-    }, 1500);
+    }, 3000);
     
-    // Limpar listeners ao desmontar
     return () => {
-      window.removeEventListener('metaConnectionUpdated', handleMetaConnectionUpdate);
-      window.removeEventListener('storage', handleStorageChange);
       clearInterval(intervalId);
     };
   }, []);
@@ -651,175 +482,297 @@ const CampanhaManual = () => {
                 className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
               />
               <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>1km</span>
-                <span>2km</span>
-                <span>3km</span>
-                <span>4km</span>
-                <span>5km</span>
-                <span>6km</span>
-                <span>7km</span>
+                <span>1 Km</span>
+                <span>7 Km</span>
               </div>
             </div>
           </div>
 
-          {/* Lado direito - Formulário Simplificado */}
+          {/* Lado direito - Formulário */}
           <div className="space-y-4">
             <div>
-              <label htmlFor="nomeCampanha" className="block text-sm font-medium mb-1">
-                Nome da Campanha *
+              <label htmlFor="nomeCampanha" className="block mb-2">
+                Nome da Campanha
               </label>
               <input
-                id="nomeCampanha"
                 type="text"
+                id="nomeCampanha"
                 value={nomeCampanha}
                 onChange={(e) => setNomeCampanha(e.target.value)}
-                placeholder="Ex: Campanha de Verão"
-                className="w-full p-2 border rounded-md"
+                placeholder="Ex: Promoção de Fim de Semana"
+                className="w-full p-2 border border-gray-300 rounded-md"
                 required
               />
             </div>
-            
+
             <div>
-              <label htmlFor="orcamento" className="block text-sm font-medium mb-1">
-                Orçamento semanal (R$) *
+              <label htmlFor="orcamento" className="block mb-2">
+                Orçamento Diário (R$)
               </label>
               <input
-                id="orcamento"
                 type="number"
+                id="orcamento"
                 value={orcamento}
-                onChange={(e) => setOrcamento(e.target.value)}
-                min="10"
-                className="w-full p-2 border rounded-md"
+                onChange={(e) => setOrcamento(Number(e.target.value))}
+                min="50"
+                max="1000"
+                step="10"
+                className="w-full p-2 border border-gray-300 rounded-md"
                 required
               />
               <p className="text-xs text-gray-500 mt-1">
-                Para melhores resultados recomendamos um orçamento mínimo semanal de R$70.
+                Valor mínimo: R$ 50,00
               </p>
             </div>
-            
+
             <div>
-              <label htmlFor="linkPublicacao" className="block text-sm font-medium mb-1">
-                Link da Publicação
+              <label htmlFor="textoAnuncio" className="block mb-2">
+                Texto do Anúncio
               </label>
-              <input
-                id="linkPublicacao"
-                type="text"
-                value={linkPublicacao}
-                onChange={(e) => setLinkPublicacao(e.target.value)}
-                placeholder="https://facebook.com/suapagina/posts/123..."
-                className="w-full p-2 border rounded-md"
+              <textarea
+                id="textoAnuncio"
+                value={textoAnuncio}
+                onChange={(e) => setTextoAnuncio(e.target.value)}
+                placeholder="Descreva seu anúncio de forma atrativa"
+                className="w-full p-2 border border-gray-300 rounded-md h-24"
+                required
               />
             </div>
           </div>
         </div>
 
-        {/* Texto do Anúncio */}
-        <div>
-          <label htmlFor="textoAnuncio" className="block text-sm font-medium mb-1">
-            Texto do Anúncio *
-          </label>
-          <textarea
-            id="textoAnuncio"
-            value={textoAnuncio}
-            onChange={(e) => setTextoAnuncio(e.target.value)}
-            placeholder="Ex: Promoção especial esta semana!"
-            className="w-full p-2 border rounded-md"
-            rows="3"
-            required
-          />
-        </div>
+        {/* Upload de Imagem/Vídeo ou Link */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Mídia do Anúncio</h3>
+          <p className="text-sm text-gray-500">
+            Escolha uma das opções abaixo para adicionar ao seu anúncio.
+          </p>
 
-        {/* Upload de Imagem/Vídeo ou Link do Cardápio - Simplificado */}
-        <div className="p-6 border rounded-md bg-gray-50">
-          <h3 className="text-lg font-semibold mb-4 text-center">
-            Adicione seu Cardápio ou Imagem
-          </h3>
-          
-          <div className="flex flex-col items-center space-y-6">
-            <div className="w-full max-w-md">
-              <div className="text-center mb-2 text-gray-700">Opção 1: Faça upload da foto do cardápio</div>
-              <div className="flex justify-center">
-                <label htmlFor="imagem-video-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-blue-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-blue-50 transition-colors">
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <svg className="w-8 h-8 mb-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                    </svg>
-                    <p className="mb-1 text-sm text-gray-500">Clique para selecionar</p>
-                    <p className="text-xs text-gray-500">PNG, JPG ou JPEG</p>
-                  </div>
-                  <input
-                    id="imagem-video-upload"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImagemVideoChange}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-            </div>
-            
-            <div className="text-center text-gray-500">- OU -</div>
-            
-            <div className="w-full max-w-md">
-              <div className="text-center mb-2 text-gray-700">Opção 2: Cole o link do cardápio ou publicação</div>
-              <input
-                id="linkPublicacao"
-                type="text"
-                value={linkPublicacao}
-                onChange={(e) => setLinkPublicacao(e.target.value)}
-                placeholder="https://facebook.com/suapagina/posts/123... ou link do cardápio"
-                className="w-full p-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
-          
-          {imagemPreview && (
-            <div className="mt-6 text-center">
-              <p className="text-green-600 font-medium mb-2">Imagem selecionada:</p>
-              <div className="relative inline-block">
-                <img 
-                  src={imagemPreview} 
-                  alt="Preview" 
-                  className="max-w-full max-h-[200px] mx-auto rounded-lg border border-gray-200 shadow-sm" 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Upload de Imagem */}
+            <div className="border border-gray-200 rounded-md p-4">
+              <h4 className="font-medium mb-2">Upload de Imagem</h4>
+              <div className="space-y-4">
+                <input
+                  type="file"
+                  id="imagemVideo"
+                  accept="image/*,video/*"
+                  onChange={handleImagemVideoChange}
+                  className="hidden"
                 />
-                <button 
-                  onClick={() => {setImagemVideo(null); setImagemPreview('');}}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center"
-                  type="button"
+                <label
+                  htmlFor="imagemVideo"
+                  className="block w-full p-4 border-2 border-dashed border-gray-300 rounded-md text-center cursor-pointer hover:bg-gray-50 transition"
                 >
-                  ×
-                </button>
+                  <div className="flex flex-col items-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-10 w-10 text-gray-400 mb-2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                    <span className="text-gray-600">
+                      Clique para fazer upload
+                    </span>
+                    <span className="text-xs text-gray-500 mt-1">
+                      JPG, PNG ou GIF (máx. 5MB)
+                    </span>
+                  </div>
+                </label>
+
+                {imagemPreview && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium mb-2">Pré-visualização:</p>
+                    <div className="relative w-full h-40 bg-gray-100 rounded-md overflow-hidden">
+                      <img
+                        src={imagemPreview}
+                        alt="Pré-visualização"
+                        className="w-full h-full object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImagemVideo(null);
+                          setImagemPreview('');
+                        }}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          )}
+
+            {/* Link da Publicação */}
+            <div className="border border-gray-200 rounded-md p-4">
+              <h4 className="font-medium mb-2">Link do Cardápio ou Publicação</h4>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="linkPublicacao" className="block mb-2 text-sm">
+                    Cole o link do seu cardápio ou de uma publicação existente
+                  </label>
+                  <input
+                    type="url"
+                    id="linkPublicacao"
+                    value={linkPublicacao}
+                    onChange={(e) => setLinkPublicacao(e.target.value)}
+                    placeholder="https://exemplo.com/cardapio"
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+                <p className="text-xs text-gray-500">
+                  O link deve ser público e acessível para todos.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Mensagem de erro */}
+        {/* Botões de Ação */}
+        <div className="flex justify-end space-x-4">
+          <button
+            type="button"
+            onClick={() => {
+              setNomeCampanha('');
+              setOrcamento(70);
+              setRaioAlcance(5);
+              setLinkPublicacao('');
+              setTextoAnuncio('');
+              setImagemVideo(null);
+              setImagemPreview('');
+            }}
+            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Limpar
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className={`px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center ${
+              loading ? 'opacity-70 cursor-not-allowed' : ''
+            }`}
+          >
+            {loading ? (
+              <>
+                <svg
+                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Processando...
+              </>
+            ) : (
+              'Criar Anúncio'
+            )}
+          </button>
+        </div>
+
+        {/* Mensagens de Erro e Sucesso */}
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
-            {error}
+          <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-600">
+            <div className="flex items-start">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 mr-2 mt-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span>{error}</span>
+            </div>
           </div>
         )}
 
-        {/* Botão de Envio */}
-        <button 
-          type="submit" 
-          className="w-full py-3 bg-blue-600 text-white rounded-md font-medium"
-          disabled={loading}
-        >
-          {loading ? 'Processando...' : 'Criar Anúncio no Meta Ads'}
-        </button>
-
-        {/* Mensagem de sucesso */}
         {success && (
-          <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-md">
-            Anúncio criado com sucesso! Verifique a seção de produtos anunciados abaixo.
-            <button 
-              onClick={handleCloseSuccess}
-              className="ml-2 text-sm underline"
-            >
-              Fechar
-            </button>
+          <div className="p-4 bg-green-50 border border-green-200 rounded-md text-green-600">
+            <div className="flex items-start">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 mr-2 mt-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+              <div className="flex-1">
+                <p className="font-medium">Anúncio criado com sucesso!</p>
+                <p className="text-sm mt-1">
+                  Seu anúncio foi enviado para o Meta Ads e começará a ser
+                  exibido em breve.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseSuccess}
+                className="text-green-700 hover:text-green-900"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
       </form>
