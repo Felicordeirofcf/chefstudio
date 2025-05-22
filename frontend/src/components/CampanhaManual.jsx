@@ -121,14 +121,25 @@ const CampanhaManual = () => {
       // URL base correta para o backend
       const API_BASE_URL = "https://chefstudio-production.up.railway.app/api";
 
-      // Preparar dados para envio
+      // Preparar dados para envio - formato corrigido conforme esperado pelo backend
       const campaignData = {
-        name: nomeCampanha,
-        budget: orcamento,
+        // Campos obrigatórios
+        campaignName: nomeCampanha,
+        dailyBudget: parseFloat(orcamento) / 7, // Converter orçamento semanal para diário
         radius: raioAlcance,
-        menuUrl: linkCardapio,
-        postUrl: linkPublicacao || ''
+        
+        // Campos opcionais
+        menuUrl: linkCardapio || null,
+        postUrl: linkPublicacao || null,
+        
+        // Campos adicionais que podem ser necessários
+        location: {
+          latitude: -23.5505,
+          longitude: -46.6333
+        }
       };
+
+      console.log('Enviando dados para criação de campanha:', campaignData);
 
       // Determinar qual endpoint usar com base nos dados fornecidos
       let endpoint = `${API_BASE_URL}/meta-ads/create-from-post`;
@@ -138,8 +149,6 @@ const CampanhaManual = () => {
         endpoint = `${API_BASE_URL}/meta-ads/create-from-image`;
       }
 
-      console.log(`Usando endpoint: ${endpoint} para criar campanha`);
-
       // Enviar dados da campanha para a API
       const response = await axios({
         method: 'post',
@@ -147,7 +156,8 @@ const CampanhaManual = () => {
         data: campaignData,
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
       });
 
@@ -169,9 +179,9 @@ const CampanhaManual = () => {
     } catch (error) {
       console.error('Erro ao criar campanha:', error);
       
-      // Tratamento específico para erro 405 Method Not Allowed
-      if (error.response && error.response.status === 405) {
-        setError('Erro no servidor: método não permitido. Por favor, entre em contato com o suporte.');
+      // Tratamento específico para erro 400 Bad Request
+      if (error.response && error.response.status === 400) {
+        setError(`Erro no formato dos dados: ${error.response.data?.message || 'Verifique os campos e tente novamente.'}`);
       } else if (error.response && error.response.status === 401) {
         setError('Sessão expirada ou usuário não autenticado. Por favor, faça login novamente.');
         // Redirecionar para login após um breve delay
