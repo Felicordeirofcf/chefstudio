@@ -37,7 +37,8 @@ const AuthForm = ({ isLogin = true }) => {
 
   const fetchUserInfo = async (token) => {
     try {
-      const response = await api.get('/auth/me', {
+      // Corrigido para usar /api/profile em vez de /auth/me
+      const response = await api.get('/api/profile', {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -75,11 +76,11 @@ const AuthForm = ({ isLogin = true }) => {
       let response;
       
       if (isLogin) {
-        // Login tradicional - Corrigido para remover prefixo '/api' duplicado
-        response = await api.post('/auth/login', { email, password });
+        // Login tradicional - Corrigido para usar prefixo '/api'
+        response = await api.post('/api/auth/login', { email, password });
       } else {
-        // Registro - Corrigido para remover prefixo '/api' duplicado
-        response = await api.post('/auth/register', { name, email, password });
+        // Registro - Corrigido para usar prefixo '/api'
+        response = await api.post('/api/auth/register', { name, email, password });
       }
       
       // Salvar token e informações do usuário
