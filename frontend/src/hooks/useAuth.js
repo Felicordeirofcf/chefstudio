@@ -53,18 +53,9 @@ export const useAuth = () => {
         
         // Tentar obter perfil atualizado da API
         try {
-          // Obter ID do usuário do localStorage
-          const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-          const userId = userInfo._id;
-          
-          if (!userId) {
-            console.error('ID do usuário não encontrado no localStorage');
-            throw new Error('ID do usuário não encontrado');
-          }
-          
-          // CORREÇÃO: Usar a rota correta do backend para buscar o perfil do usuário
-          // Alterado de /api/auth/profile para /api/users/{userId}
-          const response = await axios.get(`/api/users/${userId}`, {
+          // CORREÇÃO: Usar a rota /profile para buscar o perfil do usuário autenticado
+          // Esta rota usa o token para identificar o usuário, sem necessidade de ID
+          const response = await axios.get('/api/profile', {
             headers: {
               Authorization: `Bearer ${token}`
             },
@@ -74,18 +65,12 @@ export const useAuth = () => {
           if (response.data) {
             // Garantir que o _id seja preservado
             const currentUserInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-            const userId = response.data._id || currentUserInfo._id;
             
-            if (!userId) {
-              console.error('ID do usuário não encontrado na resposta da API nem no localStorage');
-              throw new Error('ID do usuário não encontrado');
-            }
-            
-            // Atualizar localStorage com dados mais recentes, preservando o _id
+            // Atualizar localStorage com dados mais recentes, preservando o _id e token
             const updatedUserInfo = {
               ...response.data,
-              _id: userId,
               token,
+              _id: response.data._id || currentUserInfo._id,
               metaUserId: response.data.metaUserId || currentUserInfo.metaUserId,
               metaConnectionStatus: response.data.metaConnectionStatus || currentUserInfo.metaConnectionStatus,
               isMetaConnected: (response.data.metaConnectionStatus === "connected") || (currentUserInfo.metaConnectionStatus === "connected")
@@ -98,9 +83,43 @@ export const useAuth = () => {
             setUser(updatedUserInfo);
           }
         } catch (apiErr) {
-          console.warn('Erro ao buscar perfil da API:', apiErr);
-          // Não definir erro aqui para não interromper o fluxo
-          // Se já temos dados do localStorage, continuamos com eles
+          console.warn('Erro ao buscar perfil da API com /profile:', apiErr);
+          
+          // Tentar rota alternativa se a primeira falhar
+          try {
+            console.log('Tentando rota alternativa /auth/me para perfil...');
+            
+            const response = await axios.get('/api/auth/me', {
+              headers: {
+                Authorization: `Bearer ${token}`
+              },
+              timeout: 5000
+            });
+            
+            if (response.data) {
+              const currentUserInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+              
+              // Atualizar localStorage com dados mais recentes
+              const updatedUserInfo = {
+                ...response.data,
+                token,
+                _id: response.data._id || currentUserInfo._id,
+                metaUserId: response.data.metaUserId || currentUserInfo.metaUserId,
+                metaConnectionStatus: response.data.metaConnectionStatus || currentUserInfo.metaConnectionStatus,
+                isMetaConnected: (response.data.metaConnectionStatus === "connected") || (currentUserInfo.metaConnectionStatus === "connected")
+              };
+              
+              localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
+              localStorage.setItem('token', token);
+              
+              console.log('Perfil atualizado com sucesso via rota alternativa:', updatedUserInfo);
+              setUser(updatedUserInfo);
+            }
+          } catch (secondApiErr) {
+            console.warn('Erro ao buscar perfil da API com /auth/me:', secondApiErr);
+            // Não definir erro aqui para não interromper o fluxo
+            // Se já temos dados do localStorage, continuamos com eles
+          }
         }
       } catch (err) {
         console.error('Erro ao carregar usuário:', err);
@@ -138,18 +157,16 @@ export const useAuth = () => {
         throw new Error("Login mal sucedido: token ausente na resposta.");
       }
       
-      if (!_id) {
-        throw new Error("Login mal sucedido: ID do usuário ausente na resposta.");
-      }
-      
+      // Mesmo que não tenha _id, continuamos com o login
+      // O _id pode ser obtido posteriormente via perfil
       const userInfo = {
         token,
-        _id,
-        name,
-        email,
-        metaUserId,
-        metaConnectionStatus,
-        plan,
+        _id: _id || '',
+        name: name || '',
+        email: email || '',
+        metaUserId: metaUserId || '',
+        metaConnectionStatus: metaConnectionStatus || 'disconnected',
+        plan: plan || '',
         isMetaConnected: metaConnectionStatus === "connected"
       };
       
@@ -188,34 +205,40 @@ export const useAuth = () => {
         throw new Error('Usuário não autenticado');
       }
       
-      // Obter ID do usuário atual
-      const currentUserInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-      const userId = currentUserInfo._id;
-      
-      if (!userId) {
-        throw new Error('ID do usuário não encontrado');
-      }
-      
-      // CORREÇÃO: Usar a rota correta do backend para atualizar o perfil
-      // Alterado de /api/auth/profile para /api/users/{userId}
+      // CORREÇÃO: Usar a rota /profile para atualizar o perfil
       let response;
       try {
-        response = await axios.put(`/api/users/${userId}`, userData, {
+        response = await axios.put('/api/profile', userData, {
           headers: {
             Authorization: `Bearer ${token}`
           }
         });
       } catch (err) {
-        throw err;
+        // Se falhar, tentar rota alternativa
+        if (err.response && err.response.status === 404) {
+          console.log('Tentando rota alternativa para atualizar perfil...');
+          response = await axios.put('/api/auth/profile', userData, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
+        } else {
+          throw err;
+        }
       }
       
       // Atualizar localStorage com dados atualizados, preservando o _id e token
+      const currentUserInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
       const updatedUserInfo = {
         ...currentUserInfo,
         ...response.data,
-        _id: userId, // Garantir que o ID seja preservado
         token // Garantir que o token seja preservado
       };
+      
+      // Garantir que o _id seja preservado se existir
+      if (currentUserInfo._id) {
+        updatedUserInfo._id = currentUserInfo._id;
+      }
       
       localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
       localStorage.setItem('token', token); // Garantir que o token também esteja armazenado separadamente
