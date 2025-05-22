@@ -128,6 +128,9 @@ const CampanhaManual = () => {
         dailyBudget: parseFloat(orcamento) / 7, // Converter orçamento semanal para diário
         radius: raioAlcance,
         
+        // Data de início (obrigatória) - usando data atual se não for especificada
+        startDate: new Date().toISOString().split('T')[0], // Formato YYYY-MM-DD
+        
         // Campos opcionais
         menuUrl: linkCardapio || null,
         postUrl: linkPublicacao || null,
