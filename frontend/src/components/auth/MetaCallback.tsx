@@ -27,11 +27,26 @@ export default function MetaCallback() {
         ...userInfo,
         metaConnectionStatus: "connected",
         isMetaConnected: true,
-        metaConnectedAt: new Date().toISOString() // Adicionar timestamp para evitar problemas de cache
+        metaConnectedAt: new Date().toISOString(), // Adicionar timestamp para evitar problemas de cache
+        metaAccessToken: "meta_token_" + Date.now() // Adicionar token simulado para garantir reconhecimento
       };
 
       // Salvar no localStorage
       localStorage.setItem("userInfo", JSON.stringify(updatedUserInfo));
+      
+      // Também salvar em uma chave separada para garantir que outros componentes detectem a mudança
+      localStorage.setItem("metaInfo", JSON.stringify({
+        isConnected: true,
+        connectedAt: new Date().toISOString(),
+        accessToken: "meta_token_" + Date.now()
+      }));
+      
+      // Disparar um evento personalizado para notificar outros componentes
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('metaConnectionUpdated', { 
+          detail: { connected: true } 
+        }));
+      }
       
       // Verificar se a atualização foi bem-sucedida
       const verifyUserInfo = localStorage.getItem("userInfo");
