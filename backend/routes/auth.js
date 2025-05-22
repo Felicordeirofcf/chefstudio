@@ -484,57 +484,55 @@ router.post('/refresh-token', async (req, res) => {
 
 /**
  * @swagger
- * /api/auth/profile:
+ * /api/auth/me:
  *   get:
- *     summary: Obtém informações do perfil do usuário autenticado
+ *     summary: Obtém informações do usuário autenticado
  *     tags: [Autenticação]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Perfil obtido com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 _id:
- *                   type: string
- *                   example: 60d21b4667d0d8992e610c85
- *                 name:
- *                   type: string
- *                   example: João Silva
- *                 email:
- *                   type: string
- *                   example: joao@exemplo.com
+ *         description: Informações do usuário obtidas com sucesso
  *       401:
  *         description: Não autorizado
  *       500:
  *         description: Erro interno do servidor
  */
-router.get('/profile', authMiddleware, async (req, res) => {
+router.get('/me', authMiddleware, async (req, res) => {
   try {
-    console.log('Obtendo perfil do usuário:', req.user._id);
+    console.log('Obtendo informações do usuário autenticado');
     
-    // Buscar usuário com informações atualizadas
-    const user = await User.findById(req.user._id).select('-password');
+    // O middleware authMiddleware já verifica o token e adiciona req.user
+    const userId = req.user.userId;
+    console.log('ID do usuário autenticado:', userId);
+    
+    const user = await User.findById(userId);
     if (!user) {
-      console.log('Usuário não encontrado:', req.user._id);
+      console.log('Usuário não encontrado:', userId);
       return res.status(404).json({ message: 'Usuário não encontrado' });
     }
     
-    console.log('Perfil obtido com sucesso');
+    // Verificar status de conexão com Meta
+    // Se o usuário tiver metaAccessToken e metaTokenExpires, verificar se expirou
+    let metaConnectionStatus = user.metaConnectionStatus || "disconnected";
+    if (user.metaAccessToken && user.metaTokenExpires) {
+      if (new Date(user.metaTokenExpires) < new Date()) {
+        metaConnectionStatus = "expired";
+      }
+    }
+    
+    console.log('Informações do usuário obtidas com sucesso');
     
     // Formato alinhado com o que o frontend espera
     res.status(200).json({
       _id: user._id,
       name: user.name,
       email: user.email,
-      metaUserId: user.facebookId || null,
-      metaConnectionStatus: user.facebookId ? "connected" : "disconnected",
-      adsAccountId: user.adsAccountId || null,
-      adsAccountName: user.adsAccountName || null,
-      instagramAccounts: user.instagramAccounts || [],
+      metaUserId: user.metaId || null,
+      metaConnectionStatus: metaConnectionStatus,
+      metaPrimaryAdAccountId: user.metaPrimaryAdAccountId || null,
+      metaPrimaryAdAccountName: user.metaPrimaryAdAccountName || null,
+      metaAdAccounts: user.metaAdAccounts || [],
       plan: user.plan || "free",
       establishmentName: user.establishmentName,
       businessType: user.businessType,
@@ -544,7 +542,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
       cep: user.cep
     });
   } catch (error) {
-    console.error('Erro ao obter perfil:', error);
+    console.error('Erro ao obter informações do usuário:', error);
     // Log detalhado do erro
     console.error('Detalhes do erro:', {
       message: error.message,
@@ -554,7 +552,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
     });
     
     res.status(500).json({ 
-      message: 'Erro ao obter perfil',
+      message: 'Erro ao obter informações do usuário',
       error: error.message
     });
   }
@@ -562,9 +560,9 @@ router.get('/profile', authMiddleware, async (req, res) => {
 
 /**
  * @swagger
- * /api/auth/meta-connect:
+ * /api/auth/logout:
  *   post:
- *     summary: Conecta a conta do usuário com o Meta/Facebook
+ *     summary: Realiza logout do usuário
  *     tags: [Autenticação]
  *     security:
  *       - bearerAuth: []
@@ -575,81 +573,38 @@ router.get('/profile', authMiddleware, async (req, res) => {
  *           schema:
  *             type: object
  *             required:
- *               - code
+ *               - refreshToken
  *             properties:
- *               code:
+ *               refreshToken:
  *                 type: string
- *                 description: Código de autorização do Facebook
+ *                 description: Refresh token a ser invalidado
  *     responses:
  *       200:
- *         description: Conta conectada com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Conta Meta conectada com sucesso
- *                 metaUserId:
- *                   type: string
- *                   example: 123456789
+ *         description: Logout realizado com sucesso
  *       400:
- *         description: Código de autorização ausente
- *       401:
- *         description: Não autorizado
+ *         description: Refresh token ausente
  *       500:
  *         description: Erro interno do servidor
  */
-router.post('/meta-connect', authMiddleware, async (req, res) => {
+router.post('/logout', async (req, res) => {
   try {
-    console.log('Iniciando conexão com Meta');
+    console.log('Iniciando logout');
     console.log('Dados recebidos:', JSON.stringify(req.body));
     
-    const { code } = req.body;
-    if (!code) {
-      console.log('Erro de validação: código de autorização ausente');
-      return res.status(400).json({ message: 'Código de autorização é obrigatório' });
+    const { refreshToken: refreshTokenString } = req.body;
+    if (!refreshTokenString) {
+      console.log('Erro de validação: refresh token ausente');
+      return res.status(400).json({ message: 'Refresh token é obrigatório' });
     }
     
-    // Em um cenário real, trocaríamos o código por um token de acesso
-    // e obteríamos informações do usuário do Facebook
-    // Aqui, vamos simular esse processo
+    console.log('Removendo refresh token:', refreshTokenString.substring(0, 10) + '...');
+    await refreshToken.deleteOne({ token: refreshTokenString });
     
-    console.log('Simulando troca de código por token de acesso');
-    // Normalmente, faríamos uma requisição para o Facebook
-    // const response = await axios.get(`https://graph.facebook.com/v18.0/oauth/access_token?client_id=${process.env.FB_APP_ID}&redirect_uri=${process.env.FACEBOOK_REDIRECT_URI}&client_secret=${process.env.FB_APP_SECRET}&code=${code}`);
-    // const { access_token } = response.data;
+    console.log('Logout concluído com sucesso');
     
-    // Simulando um ID do Facebook
-    const facebookId = `fb_${Date.now()}`;
-    
-    console.log('Atualizando usuário com ID do Facebook:', facebookId);
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { 
-        facebookId,
-        adsAccountId: `act_${Date.now()}`,
-        adsAccountName: 'Conta Principal de Anúncios',
-        instagramAccounts: [
-          { id: `ig_${Date.now()}`, name: 'Instagram Principal' }
-        ]
-      },
-      { new: true }
-    );
-    
-    console.log('Usuário atualizado com sucesso');
-    
-    res.status(200).json({
-      message: 'Conta Meta conectada com sucesso',
-      metaUserId: facebookId,
-      metaConnectionStatus: "connected",
-      adsAccountId: user.adsAccountId,
-      adsAccountName: user.adsAccountName,
-      instagramAccounts: user.instagramAccounts
-    });
+    res.status(200).json({ message: 'Logout realizado com sucesso' });
   } catch (error) {
-    console.error('Erro ao conectar com Meta:', error);
+    console.error('Erro ao fazer logout:', error);
     // Log detalhado do erro
     console.error('Detalhes do erro:', {
       message: error.message,
@@ -659,35 +614,10 @@ router.post('/meta-connect', authMiddleware, async (req, res) => {
     });
     
     res.status(500).json({ 
-      message: 'Erro ao conectar com Meta',
+      message: 'Erro ao fazer logout',
       error: error.message
     });
   }
-});
-
-/**
- * @swagger
- * /api/auth/test:
- *   get:
- *     summary: Testa a autenticação
- *     tags: [Autenticação]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Autenticação bem-sucedida
- *       401:
- *         description: Não autorizado
- */
-router.get('/test', authMiddleware, (req, res) => {
-  res.status(200).json({ 
-    message: 'Autenticação bem-sucedida',
-    user: {
-      id: req.user._id,
-      name: req.user.name,
-      email: req.user.email
-    }
-  });
 });
 
 module.exports = router;
