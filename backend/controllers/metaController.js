@@ -881,16 +881,40 @@ const createAdFromImage = asyncHandler(async (req, res) => {
         startDate,
         endDate,
         targetCountry: targetCountry || "BR",
-        adAccountId: adAccountId
-      },
-    });
-    
-  } catch (error) {
-    console.error("Erro ao criar anúncio com imagem:", error);
-    res.status(500);
-    throw new Error("Erro ao criar anúncio com imagem: " + error.message);
+// Função auxiliar para obter métricas de forma assíncrona
+async function getMetricsAsync(adAccountId, since, until, accessToken) {
+  const metricsResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/insights?fields=impressions,clicks,ctr,spend,reach,frequency&time_range={"since":"${since}","until":"${until}"}&access_token=${accessToken}`, {
+    method: "GET",
+  });
+  
+  const metricsData = await metricsResponse.json();
+  return metricsData;
+}
+
+// @desc    Obter métricas do Meta Ads
+// @route   GET /api/meta/metrics
+// @access  Private
+const getMetrics = asyncHandler(async (req, res) => {
+  const { timeRange = 'last_30_days' } = req.query;
+  
+  const user = await User.findById(req.user._id);
+  
+  if (!user) {
+    res.status(404);
+    throw new Error("Usuário não encontrado");
   }
-});
+  
+  // Verificar se o usuário está conectado ao Meta
+  if (user.metaConnectionStatus !== "connected" || !user.metaAccessToken) {
+    res.status(400);
+    throw new Error("Usuário não está conectado ao Meta");
+  }
+  
+  // Verificar se o token expirou
+  if (user.metaTokenExpires && user.metaTokenExpires < Date.now()) {
+    res.status(401);
+    throw new Error("Seu token do Meta expirou. Por favor, reconecte sua conta.");
+  }
   
   try {
     // Verificar se há conta de anúncios disponível
@@ -952,12 +976,8 @@ const createAdFromImage = asyncHandler(async (req, res) => {
         until = now.toISOString().split('T')[0];
     }
     
-    // Obter métricas
-    const metricsResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/insights?fields=impressions,clicks,ctr,spend,reach,frequency&time_range={"since":"${since}","until":"${until}"}&access_token=${user.metaAccessToken}`, {
-      method: "GET",
-    });
-    
-    const metricsData = await metricsResponse.json();
+    // Obter métricas usando a função assíncrona
+    const metricsData = await getMetricsAsync(adAccountId, since, until, user.metaAccessToken);
     
     if (metricsData.error) {
       throw new Error(metricsData.error.message);
@@ -996,13 +1016,3 @@ const createAdFromImage = asyncHandler(async (req, res) => {
     throw new Error("Erro ao obter métricas: " + error.message);
   }
 });
-
-module.exports = {
-  facebookLogin,
-  facebookCallback,
-  getConnectionStatus,
-  verifyConnection,
-  createAdFromPost,
-  getCampaigns,
-  getMetrics
-};
