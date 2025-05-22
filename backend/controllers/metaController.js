@@ -1,354 +1,373 @@
-// Implementação completa do fluxo OAuth2 para Meta Ads
-// Arquivo: backend/controllers/metaController.js
+const fetch = require("node-fetch");
+const jwt = require("jsonwebtoken");
+const User = require("../models/userModel");
+const asyncHandler = require("express-async-handler");
 
-const axios = require('axios');
-const User = require('../models/user');
+// Configurações do Meta
+const APP_ID = process.env.META_APP_ID;
+const APP_SECRET = process.env.META_APP_SECRET;
+const REDIRECT_URI = process.env.META_REDIRECT_URI || "https://chefstudio-production.up.railway.app/api/meta/callback";
+const SCOPES = "ads_management,ads_read,business_management,public_profile,email";
 
-// Gerar URL de autorização para o Facebook/Meta
-exports.getAuthUrl = async (req, res) => {
+// Função para extrair ID da publicação a partir da URL
+const extractPostIdFromUrl = (url) => {
   try {
-    // Configuração do Facebook
-    const appId = process.env.FB_APP_ID;
-    const redirectUri = process.env.FACEBOOK_REDIRECT_URI || 'https://chefstudio.vercel.app/meta-callback';
-    
-    if (!appId) {
-      return res.status(500).json({ 
-        message: 'Configuração do Facebook incompleta: FB_APP_ID não encontrado',
-      });
+    // Tentar extrair o ID da publicação de diferentes formatos de URL
+    // Formato: https://www.facebook.com/photo/?fbid=122102873852863870&set=a.122102873882863870
+    const fbidMatch = url.match(/fbid=(\d+)/);
+    if (fbidMatch && fbidMatch[1]) {
+      return fbidMatch[1];
     }
     
-    // Construir URL de login do Facebook com todas as permissões necessárias
-    const scopes = 'email,ads_management,ads_read,business_management,instagram_basic,instagram_content_publish,pages_read_engagement,pages_show_list';
+    // Formato: https://www.facebook.com/username/posts/123456789
+    const postsMatch = url.match(/\/posts\/(\d+)/);
+    if (postsMatch && postsMatch[1]) {
+      return postsMatch[1];
+    }
     
-    // Usar o ID do usuário como state para recuperá-lo no callback
-    const state = req.user.userId;
+    // Formato: https://www.facebook.com/permalink.php?story_fbid=123456789
+    const storyMatch = url.match(/story_fbid=(\d+)/);
+    if (storyMatch && storyMatch[1]) {
+      return storyMatch[1];
+    }
     
-    const loginUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}&response_type=code`;
-    
-    // Retornar a URL para o frontend redirecionar
-    res.json({ url: loginUrl });
+    throw new Error("Não foi possível extrair o ID da publicação da URL fornecida");
   } catch (error) {
-    console.error('Erro ao gerar URL de autorização:', error);
-    res.status(500).json({ 
-      message: 'Erro ao gerar URL de autorização',
-      error: error.message
-    });
+    console.error("Erro ao extrair ID da publicação:", error);
+    throw new Error("Formato de URL inválido ou não suportado");
   }
 };
 
-// Processar o código de autorização e obter token de acesso
-exports.handleCallback = async (req, res) => {
+// @desc    Iniciar login com Facebook
+// @route   GET /api/meta/login
+// @access  Public
+const facebookLogin = (req, res) => {
   try {
-    const { code, state } = req.body;
+    // Gerar URL de autorização do Facebook
+    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SCOPES)}&response_type=code&state=${req.query.userId || ""}`;
+    
+    // Redirecionar para a URL de autorização
+    res.redirect(authUrl);
+  } catch (error) {
+    console.error("Erro ao iniciar login com Facebook:", error);
+    res.redirect(`/connect-meta?meta_error=true&message=${encodeURIComponent(error.message)}`);
+  }
+};
+
+// @desc    Callback do Facebook após autorização
+// @route   GET /api/meta/callback
+// @access  Public
+const facebookCallback = asyncHandler(async (req, res) => {
+  try {
+    const { code, state } = req.query;
     
     if (!code) {
-      return res.status(400).json({ message: 'Código de autorização ausente' });
+      throw new Error("Código de autorização não recebido");
     }
     
-    // O state contém o ID do usuário
-    const userId = state;
+    // Trocar código por token de acesso
+    const tokenResponse = await fetch(`https://graph.facebook.com/v18.0/oauth/access_token?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_secret=${APP_SECRET}&code=${code}`, {
+      method: "GET",
+    });
     
-    // Buscar o usuário no banco de dados
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
+    const tokenData = await tokenResponse.json();
+    
+    if (!tokenData.access_token) {
+      throw new Error("Token de acesso não recebido");
     }
     
-    // Configuração do Facebook
-    const appId = process.env.FB_APP_ID;
-    const appSecret = process.env.FB_APP_SECRET;
-    const redirectUri = process.env.FACEBOOK_REDIRECT_URI || 'https://chefstudio.vercel.app/meta-callback';
+    // Obter informações do usuário
+    const userResponse = await fetch(`https://graph.facebook.com/v18.0/me?fields=id,name,email&access_token=${tokenData.access_token}`, {
+      method: "GET",
+    });
     
-    if (!appId || !appSecret) {
-      return res.status(500).json({ 
-        message: 'Configuração do Facebook incompleta',
-        details: {
-          appId: !!appId,
-          appSecret: !!appSecret
-        }
-      });
+    const userData = await userResponse.json();
+    
+    if (!userData.id) {
+      throw new Error("ID do usuário não recebido");
     }
     
-    // Trocar o código de autorização por um token de acesso
-    const tokenResponse = await axios.get(`https://graph.facebook.com/v18.0/oauth/access_token`, {
-      params: {
-        client_id: appId,
-        client_secret: appSecret,
-        redirect_uri: redirectUri,
-        code: code
-      }
+    // Obter contas de anúncios
+    const adAccountsResponse = await fetch(`https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name,account_status&access_token=${tokenData.access_token}`, {
+      method: "GET",
     });
     
-    const { access_token, expires_in } = tokenResponse.data;
+    const adAccountsData = await adAccountsResponse.json();
     
-    if (!access_token) {
-      return res.status(400).json({ message: 'Token de acesso não recebido' });
+    // Verificar se o usuário tem pelo menos uma conta de anúncios
+    if (!adAccountsData.data || adAccountsData.data.length === 0) {
+      throw new Error("Nenhuma conta de anúncios encontrada");
     }
     
-    // Obter informações do usuário do Facebook
-    const userResponse = await axios.get(`https://graph.facebook.com/v18.0/me`, {
-      params: {
-        access_token,
-        fields: 'id,name,email'
-      }
-    });
+    // Atualizar usuário no banco de dados
+    let userId = state;
     
-    const { id: facebookId, name: facebookName } = userResponse.data;
-    
-    // Obter contas de anúncios do usuário
-    const adAccountsResponse = await axios.get(`https://graph.facebook.com/v18.0/me/adaccounts`, {
-      params: {
-        access_token,
-        fields: 'id,name,account_status'
-      }
-    });
-    
-    // Filtrar apenas contas ativas
-    const adAccounts = adAccountsResponse.data.data.filter(account => account.account_status === 1);
-    
-    // Usar a primeira conta de anúncios ativa, se disponível
-    const primaryAdAccount = adAccounts.length > 0 ? adAccounts[0] : null;
-    
-    // Atualizar o usuário com as informações do Meta
-    user.facebookId = facebookId;
-    user.facebookName = facebookName;
-    user.metaAccessToken = access_token;
-    user.metaTokenExpires = new Date(Date.now() + expires_in * 1000);
-    user.metaConnectionStatus = 'connected';
-    user.metaConnectedAt = new Date();
-    
-    if (primaryAdAccount) {
-      user.adsAccountId = primaryAdAccount.id.replace('act_', '');
-      user.adsAccountName = primaryAdAccount.name;
-    }
-    
-    // Salvar todas as contas de anúncios disponíveis
-    user.adAccounts = adAccounts.map(account => ({
-      id: account.id,
-      name: account.name,
-      status: account.account_status
-    }));
-    
-    // Salvar as alterações no usuário
-    await user.save();
-    
-    // Retornar sucesso
-    res.json({
-      success: true,
-      message: 'Conta conectada com sucesso ao Meta',
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        facebookId: user.facebookId,
-        facebookName: user.facebookName,
-        metaConnectionStatus: user.metaConnectionStatus,
-        metaConnectedAt: user.metaConnectedAt,
-        adsAccountId: user.adsAccountId,
-        adsAccountName: user.adsAccountName,
-        adAccounts: user.adAccounts
-      }
-    });
-  } catch (error) {
-    console.error('Erro ao processar callback do Facebook:', error);
-    res.status(500).json({ 
-      message: 'Erro ao processar callback do Facebook',
-      error: error.message,
-      details: error.response?.data
-    });
-  }
-};
-
-// Verificar status da conexão com o Meta
-exports.getConnectionStatus = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    
-    // Buscar o usuário no banco de dados
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
-    }
-    
-    // Verificar se o token de acesso existe e não expirou
-    const isConnected = user.metaAccessToken && 
-                        user.metaConnectionStatus === 'connected' &&
-                        (!user.metaTokenExpires || new Date(user.metaTokenExpires) > new Date());
-    
-    res.json({
-      connected: isConnected,
-      status: user.metaConnectionStatus || 'disconnected',
-      facebookId: user.facebookId,
-      facebookName: user.facebookName,
-      adsAccountId: user.adsAccountId,
-      adsAccountName: user.adsAccountName,
-      connectedAt: user.metaConnectedAt,
-      tokenExpires: user.metaTokenExpires,
-      adAccounts: user.adAccounts || []
-    });
-  } catch (error) {
-    console.error('Erro ao verificar status da conexão:', error);
-    res.status(500).json({ 
-      message: 'Erro ao verificar status da conexão',
-      error: error.message
-    });
-  }
-};
-
-// Desconectar do Meta
-exports.disconnect = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    
-    // Buscar o usuário no banco de dados
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
-    }
-    
-    // Se houver um token de acesso, revogar no Facebook
-    if (user.metaAccessToken) {
+    if (!userId) {
+      // Se não tiver userId no state, tentar obter do token
       try {
-        await axios.delete(`https://graph.facebook.com/v18.0/me/permissions`, {
-          params: {
-            access_token: user.metaAccessToken
-          }
-        });
-      } catch (revokeError) {
-        console.warn('Erro ao revogar permissões no Facebook:', revokeError);
-        // Continuar mesmo se a revogação falhar
+        const token = req.headers.authorization?.split(" ")[1];
+        if (token) {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET);
+          userId = decoded.id;
+        }
+      } catch (error) {
+        console.error("Erro ao decodificar token:", error);
       }
     }
     
-    // Limpar informações do Meta no usuário
-    user.facebookId = null;
-    user.facebookName = null;
-    user.metaAccessToken = null;
-    user.metaTokenExpires = null;
-    user.metaConnectionStatus = 'disconnected';
-    user.metaConnectedAt = null;
-    user.adsAccountId = null;
-    user.adsAccountName = null;
-    user.adAccounts = [];
+    if (userId) {
+      const user = await User.findById(userId);
+      
+      if (user) {
+        user.metaId = userData.id;
+        user.metaName = userData.name;
+        user.metaEmail = userData.email;
+        user.metaAccessToken = tokenData.access_token;
+        user.metaTokenExpires = Date.now() + (tokenData.expires_in * 1000);
+        user.metaAdAccounts = adAccountsData.data.map(account => ({
+          id: account.id,
+          name: account.name,
+          status: account.account_status
+        }));
+        user.metaConnectionStatus = "connected";
+        
+        await user.save();
+      }
+    }
     
-    // Salvar as alterações no usuário
-    await user.save();
+    // Adicionar timestamp para evitar problemas de cache
+    const timestamp = Date.now();
     
-    // Retornar sucesso
-    res.json({
-      success: true,
-      message: 'Conta desconectada com sucesso do Meta'
-    });
+    // Redirecionar para a página de callback no frontend
+    res.redirect(`/meta-callback?meta_connected=true&userId=${userId || ""}&timestamp=${timestamp}`);
+    
   } catch (error) {
-    console.error('Erro ao desconectar do Meta:', error);
-    res.status(500).json({ 
-      message: 'Erro ao desconectar do Meta',
-      error: error.message
-    });
+    console.error("Erro no callback do Facebook:", error);
+    res.redirect(`/meta-callback?meta_error=true&message=${encodeURIComponent(error.message)}`);
   }
-};
+});
 
-// Obter contas de anúncios do usuário
-exports.getAdAccounts = async (req, res) => {
+// @desc    Obter status de conexão com Meta
+// @route   GET /api/meta/connection-status
+// @access  Private
+const getConnectionStatus = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  
+  if (!user) {
+    res.status(404);
+    throw new Error("Usuário não encontrado");
+  }
+  
+  // Verificar se o token expirou
+  const tokenExpired = user.metaTokenExpires && user.metaTokenExpires < Date.now();
+  
+  res.json({
+    connected: user.metaConnectionStatus === "connected" && !tokenExpired,
+    metaId: user.metaId,
+    metaName: user.metaName,
+    metaEmail: user.metaEmail,
+    adAccounts: user.metaAdAccounts || [],
+    tokenExpired: tokenExpired
+  });
+});
+
+// @desc    Obter perfil do usuário no Meta
+// @route   GET /api/meta/profile
+// @access  Private
+const getUserProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  
+  if (!user) {
+    res.status(404);
+    throw new Error("Usuário não encontrado");
+  }
+  
+  if (user.metaConnectionStatus !== "connected" || !user.metaAccessToken) {
+    res.status(401);
+    throw new Error("Usuário não conectado ao Meta");
+  }
+  
   try {
-    const userId = req.user.userId;
+    // Obter informações do usuário
+    const userResponse = await fetch(`https://graph.facebook.com/v18.0/me?fields=id,name,email,picture&access_token=${user.metaAccessToken}`, {
+      method: "GET",
+    });
     
-    // Buscar o usuário no banco de dados
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
+    const userData = await userResponse.json();
+    
+    if (userData.error) {
+      throw new Error(userData.error.message);
     }
     
-    // Verificar se o usuário está conectado ao Meta
-    if (!user.metaAccessToken || user.metaConnectionStatus !== 'connected') {
-      return res.status(400).json({ message: 'Usuário não está conectado ao Meta' });
-    }
+    res.json(userData);
+  } catch (error) {
+    console.error("Erro ao obter perfil do usuário:", error);
+    res.status(500);
+    throw new Error("Erro ao obter perfil do usuário: " + error.message);
+  }
+});
+
+// @desc    Criar anúncio a partir de uma publicação
+// @route   POST /api/meta/create-ad-from-post
+// @access  Private
+const createAdFromPost = asyncHandler(async (req, res) => {
+  const { postUrl, adName, dailyBudget, startDate, endDate, targetCountry } = req.body;
+  
+  if (!postUrl) {
+    res.status(400);
+    throw new Error("URL da publicação é obrigatória");
+  }
+  
+  if (!adName) {
+    res.status(400);
+    throw new Error("Nome do anúncio é obrigatório");
+  }
+  
+  if (!dailyBudget || isNaN(dailyBudget) || parseFloat(dailyBudget) < 1) {
+    res.status(400);
+    throw new Error("Orçamento diário deve ser um número maior que 1");
+  }
+  
+  if (!startDate) {
+    res.status(400);
+    throw new Error("Data de início é obrigatória");
+  }
+  
+  if (endDate && new Date(endDate) <= new Date(startDate)) {
+    res.status(400);
+    throw new Error("Data de término deve ser posterior à data de início");
+  }
+  
+  const user = await User.findById(req.user._id);
+  
+  if (!user) {
+    res.status(404);
+    throw new Error("Usuário não encontrado");
+  }
+  
+  if (user.metaConnectionStatus !== "connected" || !user.metaAccessToken) {
+    res.status(401);
+    throw new Error("Usuário não conectado ao Meta");
+  }
+  
+  if (!user.metaAdAccounts || user.metaAdAccounts.length === 0) {
+    res.status(400);
+    throw new Error("Nenhuma conta de anúncios encontrada");
+  }
+  
+  try {
+    // Extrair ID da publicação da URL
+    const postId = extractPostIdFromUrl(postUrl);
     
-    // Obter contas de anúncios do usuário
-    const response = await axios.get(`https://graph.facebook.com/v18.0/me/adaccounts`, {
-      params: {
+    // Selecionar a primeira conta de anúncios ativa
+    const adAccount = user.metaAdAccounts.find(account => account.status === 1) || user.metaAdAccounts[0];
+    
+    // Criar campanha
+    const campaignResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccount.id}/campaigns`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: `${adName} - Campanha`,
+        objective: "OUTCOME_AWARENESS",
+        status: "PAUSED",
+        special_ad_categories: [],
         access_token: user.metaAccessToken,
-        fields: 'id,name,account_status,amount_spent,balance,currency,funding_source_details'
-      }
+      }),
     });
     
-    // Filtrar apenas contas ativas
-    const adAccounts = response.data.data.filter(account => account.account_status === 1);
+    const campaignData = await campaignResponse.json();
     
-    // Atualizar as contas de anúncios do usuário
-    user.adAccounts = adAccounts.map(account => ({
-      id: account.id,
-      name: account.name,
-      status: account.account_status,
-      amountSpent: account.amount_spent,
-      balance: account.balance,
-      currency: account.currency,
-      fundingSource: account.funding_source_details
-    }));
+    if (campaignData.error) {
+      throw new Error(`Erro ao criar campanha: ${campaignData.error.message}`);
+    }
     
-    // Salvar as alterações no usuário
-    await user.save();
-    
-    // Retornar as contas de anúncios
-    res.json(adAccounts);
-  } catch (error) {
-    console.error('Erro ao obter contas de anúncios:', error);
-    res.status(500).json({ 
-      message: 'Erro ao obter contas de anúncios',
-      error: error.message,
-      details: error.response?.data
+    // Criar conjunto de anúncios
+    const adSetResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccount.id}/adsets`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: `${adName} - Conjunto`,
+        campaign_id: campaignData.id,
+        daily_budget: parseFloat(dailyBudget) * 100, // Em centavos
+        bid_amount: 1000, // 10 reais em centavos
+        billing_event: "IMPRESSIONS",
+        optimization_goal: "REACH",
+        targeting: {
+          geo_locations: {
+            countries: [targetCountry],
+          },
+          age_min: 18,
+          age_max: 65,
+        },
+        status: "PAUSED",
+        start_time: new Date(startDate).toISOString(),
+        end_time: endDate ? new Date(endDate).toISOString() : null,
+        access_token: user.metaAccessToken,
+      }),
     });
-  }
-};
-
-// Selecionar conta de anúncios principal
-exports.selectAdAccount = async (req, res) => {
-  try {
-    const { adAccountId } = req.body;
     
-    if (!adAccountId) {
-      return res.status(400).json({ message: 'ID da conta de anúncios ausente' });
+    const adSetData = await adSetResponse.json();
+    
+    if (adSetData.error) {
+      throw new Error(`Erro ao criar conjunto de anúncios: ${adSetData.error.message}`);
     }
     
-    const userId = req.user.userId;
+    // Criar anúncio
+    const adResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccount.id}/ads`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: adName,
+        adset_id: adSetData.id,
+        creative: {
+          object_story_id: postId,
+        },
+        status: "PAUSED",
+        access_token: user.metaAccessToken,
+      }),
+    });
     
-    // Buscar o usuário no banco de dados
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
+    const adData = await adResponse.json();
+    
+    if (adData.error) {
+      throw new Error(`Erro ao criar anúncio: ${adData.error.message}`);
     }
     
-    // Verificar se o usuário está conectado ao Meta
-    if (!user.metaAccessToken || user.metaConnectionStatus !== 'connected') {
-      return res.status(400).json({ message: 'Usuário não está conectado ao Meta' });
-    }
-    
-    // Verificar se a conta de anúncios existe nas contas do usuário
-    const adAccount = user.adAccounts?.find(account => account.id === `act_${adAccountId}` || account.id === adAccountId);
-    
-    if (!adAccount) {
-      return res.status(400).json({ message: 'Conta de anúncios não encontrada ou não pertence ao usuário' });
-    }
-    
-    // Atualizar a conta de anúncios principal do usuário
-    user.adsAccountId = adAccountId.replace('act_', '');
-    user.adsAccountName = adAccount.name;
-    
-    // Salvar as alterações no usuário
-    await user.save();
-    
-    // Retornar sucesso
-    res.json({
+    // Retornar detalhes do anúncio criado
+    res.status(201).json({
       success: true,
-      message: 'Conta de anúncios selecionada com sucesso',
-      adsAccountId: user.adsAccountId,
-      adsAccountName: user.adsAccountName
+      message: "Anúncio criado com sucesso",
+      adDetails: {
+        name: adName,
+        campaignId: campaignData.id,
+        adSetId: adSetData.id,
+        adId: adData.id,
+        status: "PAUSED",
+        dailyBudget: parseFloat(dailyBudget),
+        startDate,
+        endDate,
+        targetCountry,
+        postId,
+      },
     });
+    
   } catch (error) {
-    console.error('Erro ao selecionar conta de anúncios:', error);
-    res.status(500).json({ 
-      message: 'Erro ao selecionar conta de anúncios',
-      error: error.message
-    });
+    console.error("Erro ao criar anúncio:", error);
+    res.status(500);
+    throw new Error("Erro ao criar anúncio: " + error.message);
   }
+});
+
+module.exports = {
+  facebookLogin,
+  facebookCallback,
+  getConnectionStatus,
+  getUserProfile,
+  createAdFromPost,
 };
