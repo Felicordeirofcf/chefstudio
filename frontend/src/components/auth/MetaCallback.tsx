@@ -15,53 +15,90 @@ export default function MetaCallback() {
   // Função para atualizar o localStorage e garantir que a atualização seja concluída
   const updateLocalStorage = (metaConnected = true) => {
     try {
-      const userInfoStr = localStorage.getItem("userInfo");
-      if (!userInfoStr) {
-        throw new Error("Informações do usuário não encontradas");
-      }
-
-      const userInfo = JSON.parse(userInfoStr);
+      console.log("MetaCallback: Atualizando localStorage com status de conexão:", metaConnected);
       
-      // Atualizar informações do usuário no localStorage
-      const updatedUserInfo = {
-        ...userInfo,
-        metaConnectionStatus: "connected",
-        isMetaConnected: true,
-        metaConnectedAt: new Date().toISOString(), // Adicionar timestamp para evitar problemas de cache
-        metaAccessToken: "meta_token_" + Date.now() // Adicionar token simulado para garantir reconhecimento
-      };
-
-      // Salvar no localStorage
-      localStorage.setItem("userInfo", JSON.stringify(updatedUserInfo));
+      // Criar token simulado com timestamp para garantir unicidade
+      const simulatedToken = "meta_token_" + Date.now();
+      const timestamp = new Date().toISOString();
       
-      // Também salvar em uma chave separada para garantir que outros componentes detectem a mudança
-      localStorage.setItem("metaInfo", JSON.stringify({
+      // Atualizar metaInfo primeiro (chave separada)
+      const metaInfo = {
         isConnected: true,
-        connectedAt: new Date().toISOString(),
-        accessToken: "meta_token_" + Date.now()
-      }));
+        connectedAt: timestamp,
+        accessToken: simulatedToken,
+        lastUpdated: timestamp
+      };
       
-      // Disparar um evento personalizado para notificar outros componentes
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('metaConnectionUpdated', { 
-          detail: { connected: true } 
+      localStorage.setItem("metaInfo", JSON.stringify(metaInfo));
+      console.log("MetaCallback: metaInfo atualizado no localStorage");
+      
+      // Atualizar userInfo se existir
+      const userInfoStr = localStorage.getItem("userInfo");
+      if (userInfoStr) {
+        try {
+          const userInfo = JSON.parse(userInfoStr);
+          
+          // Atualizar informações do usuário no localStorage
+          const updatedUserInfo = {
+            ...userInfo,
+            metaConnectionStatus: "connected",
+            isMetaConnected: true,
+            metaConnectedAt: timestamp,
+            metaAccessToken: simulatedToken
+          };
+
+          // Salvar no localStorage
+          localStorage.setItem("userInfo", JSON.stringify(updatedUserInfo));
+          console.log("MetaCallback: userInfo atualizado no localStorage");
+        } catch (parseError) {
+          console.error("MetaCallback: Erro ao processar userInfo:", parseError);
+          // Criar um userInfo básico se não for possível parsear o existente
+          localStorage.setItem("userInfo", JSON.stringify({
+            metaConnectionStatus: "connected",
+            isMetaConnected: true,
+            metaConnectedAt: timestamp,
+            metaAccessToken: simulatedToken
+          }));
+        }
+      } else {
+        // Criar um userInfo básico se não existir
+        localStorage.setItem("userInfo", JSON.stringify({
+          metaConnectionStatus: "connected",
+          isMetaConnected: true,
+          metaConnectedAt: timestamp,
+          metaAccessToken: simulatedToken
         }));
+        console.log("MetaCallback: Novo userInfo criado no localStorage");
       }
       
-      // Verificar se a atualização foi bem-sucedida
-      const verifyUserInfo = localStorage.getItem("userInfo");
-      if (!verifyUserInfo) {
-        throw new Error("Falha ao verificar atualização do localStorage");
-      }
-      
-      const parsedVerify = JSON.parse(verifyUserInfo);
-      if (parsedVerify.metaConnectionStatus !== "connected") {
-        throw new Error("Falha ao atualizar status de conexão no localStorage");
+      // Disparar múltiplos eventos para garantir que os componentes sejam notificados
+      if (typeof window !== 'undefined') {
+        // Evento principal
+        window.dispatchEvent(new CustomEvent('metaConnectionUpdated', { 
+          detail: { connected: true, timestamp, token: simulatedToken } 
+        }));
+        
+        // Evento de storage simulado para componentes que escutam mudanças no localStorage
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'metaInfo',
+          newValue: JSON.stringify(metaInfo),
+          url: window.location.href
+        }));
+        
+        console.log("MetaCallback: Eventos de atualização disparados");
+        
+        // Disparar novamente após um pequeno delay para garantir que os componentes capturem
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('metaConnectionUpdated', { 
+            detail: { connected: true, timestamp, token: simulatedToken, delayed: true } 
+          }));
+          console.log("MetaCallback: Evento de atualização disparado com delay");
+        }, 500);
       }
       
       return true;
     } catch (err) {
-      console.error("Erro ao atualizar localStorage:", err);
+      console.error("MetaCallback: Erro ao atualizar localStorage:", err);
       return false;
     }
   };

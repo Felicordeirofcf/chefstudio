@@ -77,11 +77,15 @@ const CampanhaManual = () => {
   useEffect(() => {
     const checkMetaConnection = () => {
       try {
+        console.log("CampanhaManual: Verificando status de conexão Meta");
+        
         // Verificar se há informações do Meta salvas
         const metaInfoStr = localStorage.getItem('metaInfo');
         if (metaInfoStr) {
           const metaInfo = JSON.parse(metaInfoStr);
+          console.log("CampanhaManual: metaInfo encontrado:", metaInfo);
           if (metaInfo.accessToken || metaInfo.isConnected) {
+            console.log("CampanhaManual: Meta conectado via metaInfo");
             setIsMetaConnected(true);
             return true;
           }
@@ -91,15 +95,47 @@ const CampanhaManual = () => {
         const storedUserInfo = localStorage.getItem('userInfo');
         if (storedUserInfo) {
           const parsedInfo = JSON.parse(storedUserInfo);
+          console.log("CampanhaManual: userInfo encontrado:", {
+            isMetaConnected: parsedInfo.isMetaConnected,
+            metaConnectionStatus: parsedInfo.metaConnectionStatus,
+            hasMetaToken: !!parsedInfo.metaAccessToken
+          });
+          
           const connected = (
             parsedInfo.isMetaConnected || 
             parsedInfo.metaConnectionStatus === "connected" ||
             parsedInfo.metaAccessToken
           );
+          
           setUserInfo(parsedInfo);
           setIsMetaConnected(connected);
+          
+          if (connected) {
+            console.log("CampanhaManual: Meta conectado via userInfo");
+          }
+          
           return connected;
         }
+        
+        // Verificar URL para parâmetros de redirecionamento
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const accessToken = urlParams.get('access_token');
+        
+        if (code || accessToken) {
+          console.log("CampanhaManual: Parâmetros de autenticação encontrados na URL");
+          setIsMetaConnected(true);
+          
+          // Salvar informações simuladas para garantir que o estado seja mantido
+          localStorage.setItem('metaInfo', JSON.stringify({
+            isConnected: true,
+            connectedAt: new Date().toISOString(),
+            accessToken: accessToken || `meta_token_${Date.now()}`
+          }));
+          
+          return true;
+        }
+        
         return false;
       } catch (error) {
         console.error('Erro ao carregar informações do usuário:', error);
@@ -108,25 +144,54 @@ const CampanhaManual = () => {
     };
 
     // Verificar status inicial
-    checkMetaConnection();
+    const initialStatus = checkMetaConnection();
+    console.log("CampanhaManual: Status inicial de conexão:", initialStatus);
+    
+    // Forçar verificação após um pequeno delay para garantir que localStorage foi atualizado
+    setTimeout(() => {
+      const delayedStatus = checkMetaConnection();
+      console.log("CampanhaManual: Status após delay:", delayedStatus);
+      
+      // Se ainda não estiver conectado, verificar novamente após um delay maior
+      if (!delayedStatus) {
+        setTimeout(() => {
+          const finalCheck = checkMetaConnection();
+          console.log("CampanhaManual: Verificação final:", finalCheck);
+        }, 2000);
+      }
+    }, 500);
     
     // Adicionar listener para o evento personalizado de atualização da conexão Meta
-    const handleMetaConnectionUpdate = () => {
-      console.log("CampanhaManual: Evento de atualização de conexão Meta detectado");
+    const handleMetaConnectionUpdate = (event) => {
+      console.log("CampanhaManual: Evento de atualização de conexão Meta detectado", event.detail);
       const isConnected = checkMetaConnection();
       console.log("CampanhaManual: Status de conexão atualizado:", isConnected);
+      
+      // Forçar atualização do estado
+      setIsMetaConnected(isConnected);
+    };
+    
+    // Adicionar listener para mudanças no localStorage
+    const handleStorageChange = (event) => {
+      if (event.key === 'metaInfo' || event.key === 'userInfo') {
+        console.log("CampanhaManual: Mudança detectada no localStorage:", event.key);
+        const isConnected = checkMetaConnection();
+        console.log("CampanhaManual: Status de conexão após mudança no storage:", isConnected);
+      }
     };
     
     window.addEventListener('metaConnectionUpdated', handleMetaConnectionUpdate);
+    window.addEventListener('storage', handleStorageChange);
     
     // Também verificar periodicamente para garantir
     const intervalId = setInterval(() => {
       checkMetaConnection();
-    }, 2000);
+    }, 1500);
     
     // Limpar listeners ao desmontar
     return () => {
       window.removeEventListener('metaConnectionUpdated', handleMetaConnectionUpdate);
+      window.removeEventListener('storage', handleStorageChange);
       clearInterval(intervalId);
     };
   }, []);
