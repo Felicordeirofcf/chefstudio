@@ -50,8 +50,19 @@ const DashboardMetrics = () => {
           }
         };
 
-        // Tentar obter métricas da API usando a instância centralizada
+        // Verificar primeiro se o usuário está conectado ao Meta
         try {
+          // Verificar status de conexão Meta antes de buscar métricas
+          const connectionResponse = await api.get('/api/meta/connection-status');
+          
+          if (!connectionResponse.data.connected) {
+            console.warn('Usuário não está conectado ao Meta, usando dados simulados');
+            setMetrics(demoMetrics[timeRange] || demoMetrics.last_30_days);
+            setLoading(false);
+            return;
+          }
+          
+          // Se estiver conectado, buscar métricas
           const response = await api.get(`/api/meta/metrics?timeRange=${timeRange}`);
           
           if (response.data && typeof response.data === 'object') {

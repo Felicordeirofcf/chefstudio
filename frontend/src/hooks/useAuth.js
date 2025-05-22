@@ -53,8 +53,8 @@ export const useAuth = () => {
         
         // Tentar obter perfil atualizado da API
         try {
-          // CORREÇÃO: Usar a instância api centralizada e a rota /profile para buscar o perfil
-          const response = await api.get('/profile');
+          // CORREÇÃO: Usar a instância api centralizada e a rota /api/profile para buscar o perfil
+          const response = await api.get('/api/profile');
           
           if (response.data) {
             // Garantir que o _id seja preservado
@@ -81,9 +81,9 @@ export const useAuth = () => {
           
           // Tentar rota alternativa se a primeira falhar
           try {
-            console.log('Tentando rota alternativa /auth/me para perfil...');
+            console.log('Tentando rota alternativa /api/auth/me para perfil...');
             
-            const response = await api.get('/auth/me');
+            const response = await api.get('/api/auth/me');
             
             if (response.data) {
               const currentUserInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
