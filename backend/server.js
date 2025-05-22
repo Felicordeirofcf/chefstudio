@@ -98,9 +98,9 @@ app.use(errorHandler);
 
 // Conectar ao MongoDB
 mongoose
-  .connect(process.env.MONGODB_URI)
+  .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/test')
   .then(() => {
-    console.log('Conectado ao MongoDB');
+    console.log('Conectado ao MongoDB (database: test)');
   })
   .catch((error) => {
     console.error('Erro ao conectar ao MongoDB:', error.message);
