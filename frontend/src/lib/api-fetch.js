@@ -1,4 +1,4 @@
-// api-fetch-corrected.js - Versão corrigida para evitar duplicação de /api
+// api-fetch.js - Versão otimizada para evitar duplicação de /api
 // Esta implementação substitui axios por fetch nativo e corrige os problemas de URL
 
 // Definir a URL base correta para o backend na Railway (com /api no final)
