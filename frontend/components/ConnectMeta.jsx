@@ -20,7 +20,7 @@ const ConnectMeta = () => {
       }
       
       // Usar a URL correta do backend para iniciar o fluxo de autenticação Meta
-      window.location.href = `${API_BASE_URL}/meta/login?userId=${userId}`;
+      window.location.href = `${import.meta.env.VITE_API_URL || API_BASE_URL}/api/meta/login?userId=${userId}`;
     } catch (err) {
       console.error('Erro ao iniciar conexão Meta:', err);
       setError(err.message || 'Erro ao iniciar conexão com Meta');
