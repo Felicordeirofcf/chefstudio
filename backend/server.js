@@ -1,14 +1,15 @@
-// Versão simplificada do server.js que funciona apenas com as rotas essenciais
+// Versão completa do server.js com todas as rotas e Swagger
 const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const path = require('path');
 const cors = require('./middleware/corsMiddleware');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
 
-// Importar apenas as rotas que são essenciais para a integração Meta
-// Comentando as rotas que não foram incluídas no pacote
-// const authRoutes = require('./routes/authRoutes');
+// Importar todas as rotas necessárias
+const authRoutes = require('./routes/authRoutes');
 // const userRoutes = require('./routes/userRoutes');
 const metaRoutes = require('./routes/metaRoutes');
 // const menuRoutes = require('./routes/menuRoutes');
@@ -16,6 +17,40 @@ const healthRoutes = require('./routes/healthRoutes');
 
 // Configurar variáveis de ambiente
 dotenv.config();
+
+// Configuração do Swagger
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'ChefStudio API',
+      version: '1.0.0',
+      description: 'API para o ChefStudio - Plataforma de Marketing Digital',
+    },
+    servers: [
+      {
+        url: process.env.BASE_URL || 'https://chefstudio-production.up.railway.app',
+        description: 'Servidor de Produção',
+      },
+      {
+        url: 'http://localhost:5000',
+        description: 'Servidor de Desenvolvimento',
+      },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },
+  },
+  apis: ['./routes/*.js'], // Caminho para os arquivos com anotações JSDoc
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
 // Inicializar Express
 const app = express();
@@ -27,8 +62,11 @@ app.use(express.urlencoded({ extended: true }));
 // Aplicar middleware CORS personalizado
 app.use(cors);
 
-// Rotas de API - apenas as essenciais
-// app.use('/api/auth', authRoutes);
+// Configurar Swagger
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Rotas de API - incluindo todas as necessárias
+app.use('/api/auth', authRoutes);
 // app.use('/api/users', userRoutes);
 app.use('/api/meta', metaRoutes);
 // app.use('/api/menu', menuRoutes);
@@ -58,6 +96,23 @@ app.use(errorHandler);
 
 // Conectar ao MongoDB
 mongoose
+  .connect(process.env.MONGODB_URI)
+  .then(() => {
+    console.log('Conectado ao MongoDB');
+  })
+  .catch((error) => {
+    console.error('Erro ao conectar ao MongoDB:', error.message);
+  });
+
+// Definir porta
+const PORT = process.env.PORT || 5000;
+
+// Iniciar servidor
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+});
+
+module.exports = app;
   .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('Conectado ao MongoDB');
