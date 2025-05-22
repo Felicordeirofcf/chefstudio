@@ -85,7 +85,8 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/chefstudi
 
 // Rotas
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/user', require('./routes/user'));
+// Corrigido o prefixo da rota de usuário para alinhar com o frontend
+app.use('/api/users', require('./routes/user'));
 app.use('/api/profile', require('./routes/profile'));
 app.use('/api/meta', require('./routes/meta'));
 app.use('/api/meta-ads', require('./routes/meta-ads'));
