@@ -1,7 +1,7 @@
-// Componente DashboardMetrics corrigido sem dependência de api.ts
+// Componente DashboardMetrics corrigido para usar api.ts
 // Arquivo: frontend/src/components/DashboardMetrics.jsx
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '../lib/api';
 
 // Componente simplificado para dashboard de métricas
 const DashboardMetrics = () => {
@@ -14,25 +14,6 @@ const DashboardMetrics = () => {
   });
   const [timeRange, setTimeRange] = useState('last_30_days');
   const [error, setError] = useState(null);
-
-  // Função segura para obter token do usuário
-  const getToken = () => {
-    try {
-      // Primeiro tenta obter o token diretamente
-      let token = localStorage.getItem('token');
-      
-      // Se não encontrar, tenta obter do userInfo
-      if (!token) {
-        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-        token = userInfo?.token;
-      }
-      
-      return token;
-    } catch (err) {
-      console.error('Erro ao obter token:', err);
-      return null;
-    }
-  };
 
   // Carregar métricas (com fallback para dados simulados)
   useEffect(() => {
@@ -69,37 +50,29 @@ const DashboardMetrics = () => {
           }
         };
 
-        // Tentar obter métricas da API
-        const token = getToken();
-        if (token) {
-          try {
-            const response = await axios.get(`/api/meta/metrics?timeRange=${timeRange}`, {
-              headers: {
-                Authorization: `Bearer ${token}`
-              },
-              timeout: 5000 // Timeout para evitar requisições pendentes
-            });
+        // Tentar obter métricas da API usando a instância centralizada
+        try {
+          const response = await api.get(`/meta/metrics?timeRange=${timeRange}`);
+          
+          if (response.data && typeof response.data === 'object') {
+            // Verificar se os dados da API têm a estrutura esperada
+            const apiMetrics = {
+              impressions: response.data.impressions || response.data.impressoes || 0,
+              clicks: response.data.clicks || response.data.cliques || 0,
+              spend: response.data.spend || response.data.gastos || 0,
+              ctr: response.data.ctr || response.data.taxa_cliques || 0
+            };
             
-            if (response.data && typeof response.data === 'object') {
-              // Verificar se os dados da API têm a estrutura esperada
-              const apiMetrics = {
-                impressions: response.data.impressions || response.data.impressoes || 0,
-                clicks: response.data.clicks || response.data.cliques || 0,
-                spend: response.data.spend || response.data.gastos || 0,
-                ctr: response.data.ctr || response.data.taxa_cliques || 0
-              };
-              
-              // Verificar se há pelo menos um valor válido
-              if (apiMetrics.impressions || apiMetrics.clicks || apiMetrics.spend || apiMetrics.ctr) {
-                setMetrics(apiMetrics);
-                setLoading(false);
-                return;
-              }
+            // Verificar se há pelo menos um valor válido
+            if (apiMetrics.impressions || apiMetrics.clicks || apiMetrics.spend || apiMetrics.ctr) {
+              setMetrics(apiMetrics);
+              setLoading(false);
+              return;
             }
-          } catch (err) {
-            console.warn('Erro ao buscar métricas da API, usando dados simulados:', err);
-            // Não definir erro aqui para não interromper o fluxo
           }
+        } catch (err) {
+          console.warn('Erro ao buscar métricas da API, usando dados simulados:', err);
+          // Não definir erro aqui para não interromper o fluxo
         }
         
         // Fallback para dados simulados se a API falhar

@@ -2,7 +2,7 @@
 // Arquivo: frontend/src/components/MetaAdsMetrics.jsx
 
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '../lib/api';
 import { Box, Typography, Grid, CircularProgress, Paper } from '@mui/material';
 
 const MetricCard = ({ title, value, change, loading }) => {
@@ -47,18 +47,9 @@ const MetaAdsMetrics = () => {
       try {
         setLoading(true);
         
-        // Obter token do localStorage
-        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-        if (!userInfo.token) {
-          throw new Error('Usuário não autenticado');
-        }
-        
-        // Buscar métricas da API
-        const response = await axios.get('/api/meta/metrics', {
-          headers: {
-            Authorization: `Bearer ${userInfo.token}`
-          }
-        });
+        // Buscar métricas da API usando a instância centralizada
+        // Não é necessário adicionar o token manualmente, pois o interceptor em api.ts já faz isso
+        const response = await api.get('/meta/metrics');
         
         setMetrics(response.data);
         setLoading(false);

@@ -1,7 +1,7 @@
 // Componente MetaAdsConnection corrigido para autenticação adequada
 // Arquivo: frontend/src/components/MetaAdsConnection.jsx
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '../lib/api';
 
 const MetaAdsConnection = () => {
   const [connected, setConnected] = useState(false);
@@ -45,26 +45,14 @@ const MetaAdsConnection = () => {
     try {
       setLoading(true);
       
-      // Verificar status da conexão com Meta Ads
+      // Verificar status da conexão com Meta Ads usando a instância api centralizada
       try {
-        const response = await axios.get('/api/meta/connection-status', {
-          headers: {
-            Authorization: `Bearer ${token}`
-          },
-          timeout: 5000 // Timeout para evitar requisições pendentes
-        });
-        
+        const response = await api.get('/meta/connection-status');
         setConnected(response.data?.connected || response.data?.status === 'connected' || false);
       } catch (err) {
         // Se o primeiro endpoint falhar, tentar endpoint alternativo
         if (err.response && err.response.status === 404) {
-          const altResponse = await axios.get('/api/users/meta-status', {
-            headers: {
-              Authorization: `Bearer ${token}`
-            },
-            timeout: 5000
-          });
-          
+          const altResponse = await api.get('/users/meta-status');
           setConnected(altResponse.data?.connected || altResponse.data?.status === 'connected' || false);
         } else {
           // Se ambos falharem, verificar no localStorage
@@ -100,13 +88,9 @@ const MetaAdsConnection = () => {
         throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
       }
       
-      // Obter URL de autorização
+      // Obter URL de autorização usando a instância api centralizada
       try {
-        const response = await axios.get('/api/meta/auth-url', {
-          headers: {
-            Authorization: `Bearer ${userToken}`
-          }
-        });
+        const response = await api.get('/meta/auth-url');
         
         // Redirecionar para página de autorização do Facebook
         if (response.data && response.data.url) {
@@ -118,11 +102,7 @@ const MetaAdsConnection = () => {
       } catch (err) {
         // Se o primeiro endpoint falhar, tentar endpoint alternativo
         if (err.response && err.response.status === 404) {
-          const altResponse = await axios.get('/api/auth/meta-connect', {
-            headers: {
-              Authorization: `Bearer ${userToken}`
-            }
-          });
+          const altResponse = await api.get('/auth/meta-connect');
           
           if (altResponse.data && altResponse.data.url) {
             window.location.href = altResponse.data.url;
@@ -153,22 +133,12 @@ const MetaAdsConnection = () => {
       }
       
       try {
-        await axios.post('/api/meta/disconnect', {}, {
-          headers: {
-            Authorization: `Bearer ${userToken}`
-          }
-        });
-        
+        await api.post('/meta/disconnect', {});
         setConnected(false);
       } catch (err) {
         // Se o primeiro endpoint falhar, tentar endpoint alternativo
         if (err.response && err.response.status === 404) {
-          await axios.post('/api/users/meta-disconnect', {}, {
-            headers: {
-              Authorization: `Bearer ${userToken}`
-            }
-          });
-          
+          await api.post('/users/meta-disconnect', {});
           setConnected(false);
         } else {
           throw err;

@@ -2,7 +2,7 @@
 // Arquivo: frontend/src/components/FacebookPostSelector.jsx
 
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '../lib/api';
 import { Box, Typography, Paper, Grid, CircularProgress, styled } from '@mui/material';
 
 const PostContainer = styled(Paper)(({ theme, selected }) => ({
@@ -39,18 +39,9 @@ const FacebookPostSelector = ({ onSelectPost, selectedPostId }) => {
       try {
         setLoading(true);
         
-        // Obter token do localStorage
-        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-        if (!userInfo.token) {
-          throw new Error('Usuário não autenticado');
-        }
-        
-        // Buscar publicações da API
-        const response = await axios.get('/api/meta/posts', {
-          headers: {
-            Authorization: `Bearer ${userInfo.token}`
-          }
-        });
+        // Buscar publicações da API usando a instância centralizada
+        // Não é necessário adicionar o token manualmente, pois o interceptor em api.ts já faz isso
+        const response = await api.get('/meta/posts');
         
         setPosts(response.data || []);
         setLoading(false);

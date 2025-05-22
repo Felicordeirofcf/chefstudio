@@ -1,31 +1,12 @@
 // Componente para exibir produtos anunciados com tratamento de erros aprimorado
 // Arquivo: frontend/src/components/ProdutosAnunciados.jsx
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '../lib/api';
 
 const ProdutosAnunciados = () => {
   const [anuncios, setAnuncios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // Função segura para obter token do usuário
-  const getToken = () => {
-    try {
-      // Primeiro tenta obter o token diretamente
-      let token = localStorage.getItem('token');
-      
-      // Se não encontrar, tenta obter do userInfo
-      if (!token) {
-        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-        token = userInfo?.token;
-      }
-      
-      return token;
-    } catch (err) {
-      console.error('Erro ao obter token:', err);
-      return null;
-    }
-  };
 
   // Carregar anúncios ao inicializar o componente
   const carregarAnuncios = async () => {
@@ -33,19 +14,9 @@ const ProdutosAnunciados = () => {
       setLoading(true);
       setError(null);
       
-      const token = getToken();
-      if (!token) {
-        throw new Error('Usuário não autenticado');
-      }
-      
-      // Tentar primeiro endpoint
+      // Tentar primeiro endpoint usando a instância api centralizada
       try {
-        const response = await axios.get('/api/meta/campaigns', {
-          headers: {
-            Authorization: `Bearer ${token}`
-          },
-          timeout: 8000 // Timeout para evitar requisições pendentes
-        });
+        const response = await api.get('/meta/campaigns');
         
         // Garantir que o resultado seja um array
         if (Array.isArray(response.data)) {
@@ -61,12 +32,7 @@ const ProdutosAnunciados = () => {
       } catch (err) {
         // Se o primeiro endpoint falhar, tentar endpoint alternativo
         if (err.response && err.response.status === 404) {
-          const altResponse = await axios.get('/api/campaigns', {
-            headers: {
-              Authorization: `Bearer ${token}`
-            },
-            timeout: 8000
-          });
+          const altResponse = await api.get('/campaigns');
           
           // Garantir que o resultado seja um array
           if (Array.isArray(altResponse.data)) {
