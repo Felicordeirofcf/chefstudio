@@ -80,8 +80,8 @@ router.get('/login', async (req, res) => {
       });
     }
     
-    // Construir URL de login do Facebook
-    const scopes = 'email,ads_management,ads_read,business_management,instagram_basic,instagram_content_publish,pages_read_engagement,pages_show_list';
+    // Construir URL de login do Facebook com todas as permissões necessárias para criação automática de anúncios
+    const scopes = 'email,ads_management,ads_read,business_management,instagram_basic,instagram_content_publish,pages_read_engagement,pages_show_list,ads_management_standard_access,catalog_management,attribution_read,pages_manage_ads,pages_manage_metadata,pages_manage_posts,pages_manage_engagement';
     const state = token; // Usar o token como state para recuperá-lo no callback
     
     const loginUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}&response_type=code`;
