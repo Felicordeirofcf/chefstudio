@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
 
 const CampanhaManual = () => {
   // Estados para os campos do formulário (simplificados)
@@ -18,40 +17,18 @@ const CampanhaManual = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
-  const [isMetaConnected, setIsMetaConnected] = useState(false);
-  
-  // Hook de navegação
-  const navigate = useNavigate();
 
-  // Verificar status de conexão com Meta Ads ao carregar o componente
+  // Buscar informações do usuário ao carregar o componente
   useEffect(() => {
     try {
       const storedUserInfo = localStorage.getItem('userInfo');
       if (storedUserInfo) {
-        const parsedUserInfo = JSON.parse(storedUserInfo);
-        setUserInfo(parsedUserInfo);
-        
-        // Verificar se o usuário está conectado ao Meta Ads
-        const metaConnectionStatus = parsedUserInfo.metaConnectionStatus || 'disconnected';
-        const metaConnected = metaConnectionStatus === 'connected';
-        setIsMetaConnected(metaConnected);
-        
-        console.log('Status de conexão Meta Ads:', metaConnectionStatus);
-        
-        // Se não estiver conectado, redirecionar para a página de conexão
-        if (!metaConnected) {
-          setError('Você precisa conectar sua conta ao Meta Ads antes de criar campanhas.');
-        }
+        setUserInfo(JSON.parse(storedUserInfo));
       }
     } catch (error) {
       console.error('Erro ao carregar informações do usuário:', error);
     }
-  }, [navigate]);
-
-  // Função para redirecionar para a página de conexão com Meta Ads
-  const handleConnectMeta = () => {
-    navigate('/connect-meta');
-  };
+  }, []);
 
   // Inicializar o mapa quando o componente montar
   useEffect(() => {
@@ -125,12 +102,6 @@ const CampanhaManual = () => {
       return;
     }
 
-    // Verificar se o usuário está conectado ao Meta Ads
-    if (!isMetaConnected) {
-      setError('Você precisa conectar sua conta ao Meta Ads antes de criar campanhas.');
-      return;
-    }
-
     try {
       setLoading(true);
       setError(null);
@@ -139,6 +110,12 @@ const CampanhaManual = () => {
       const token = localStorage.getItem('token') || (userInfo && userInfo.token);
       if (!token) {
         throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
+      }
+
+      // Verificar se o usuário está conectado ao Meta Ads
+      const userMetaStatus = userInfo?.metaConnectionStatus || 'disconnected';
+      if (userMetaStatus !== 'connected') {
+        throw new Error('Você precisa conectar sua conta ao Meta Ads antes de criar campanhas. Vá para seu perfil e conecte-se.');
       }
 
       // URL base correta para o backend
@@ -204,13 +181,7 @@ const CampanhaManual = () => {
       
       // Tratamento específico para erro 400 Bad Request
       if (error.response && error.response.status === 400) {
-        // Verificar se o erro é relacionado à conexão com o Meta Ads
-        if (error.response.data?.message?.includes('Meta Ads')) {
-          setError('Você precisa conectar sua conta ao Meta Ads antes de criar campanhas.');
-          setIsMetaConnected(false);
-        } else {
-          setError(`Erro no formato dos dados: ${error.response.data?.message || 'Verifique os campos e tente novamente.'}`);
-        }
+        setError(`Erro no formato dos dados: ${error.response.data?.message || 'Verifique os campos e tente novamente.'}`);
       } else if (error.response && error.response.status === 401) {
         setError('Sessão expirada ou usuário não autenticado. Por favor, faça login novamente.');
         // Redirecionar para login após um breve delay
@@ -232,19 +203,6 @@ const CampanhaManual = () => {
 
   return (
     <div className="w-full">
-      {!isMetaConnected && (
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-md">
-          <p className="font-medium mb-2">Conexão com Meta Ads necessária</p>
-          <p className="mb-3">Para criar campanhas de anúncios, você precisa conectar sua conta ao Meta Ads primeiro.</p>
-          <button 
-            onClick={handleConnectMeta}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors"
-          >
-            Conectar com Meta Ads
-          </button>
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="space-y-6">
         <h2 className="text-xl font-semibold">
           Configurações da Campanha Manual
@@ -296,7 +254,6 @@ const CampanhaManual = () => {
                 placeholder="Ex: Campanha de Verão"
                 className="w-full p-2 border rounded-md"
                 required
-                disabled={!isMetaConnected}
               />
             </div>
             
@@ -312,7 +269,6 @@ const CampanhaManual = () => {
                 min="10"
                 className="w-full p-2 border rounded-md"
                 required
-                disabled={!isMetaConnected}
               />
               <p className="text-xs text-gray-500 mt-1">
                 Para melhores resultados recomendamos um orçamento mínimo semanal de R$70.
@@ -330,7 +286,6 @@ const CampanhaManual = () => {
                 onChange={(e) => setLinkCardapio(e.target.value)}
                 placeholder="https://seurestaurante.com/cardapio"
                 className="w-full p-2 border rounded-md"
-                disabled={!isMetaConnected}
               />
             </div>
             
@@ -345,7 +300,6 @@ const CampanhaManual = () => {
                 onChange={(e) => setLinkPublicacao(e.target.value)}
                 placeholder="https://facebook.com/suapagina/posts/123..."
                 className="w-full p-2 border rounded-md"
-                disabled={!isMetaConnected}
               />
             </div>
           </div>
@@ -362,7 +316,7 @@ const CampanhaManual = () => {
         <button 
           type="submit" 
           className="w-full py-3 bg-blue-600 text-white rounded-md font-medium"
-          disabled={loading || !isMetaConnected}
+          disabled={loading}
         >
           {loading ? 'Processando...' : 'Criar Anúncio no Meta Ads'}
         </button>
