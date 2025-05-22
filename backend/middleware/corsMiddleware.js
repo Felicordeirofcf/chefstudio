@@ -4,6 +4,7 @@ const cors = require('cors');
 // Lista de origens permitidas
 const allowedOrigins = [
   'https://chefstudio.vercel.app',
+  'https://chefstudio-production.up.railway.app',
   'http://localhost:3000',
   'http://localhost:5173'
 ];
