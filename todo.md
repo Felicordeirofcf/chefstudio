@@ -1,35 +1,34 @@
-# Lista de Tarefas para Correção do ChefStudio
+# Tarefas para Implementação
 
-## Análise do Código
-- [x] Clonar o repositório do GitHub
-- [x] Analisar a estrutura do projeto
-- [x] Examinar o arquivo server.js do backend
-- [x] Verificar a configuração do Swagger
-- [x] Analisar as rotas de autenticação
-- [x] Verificar o arquivo .env e variáveis de ambiente
-- [ ] Analisar o frontend e sua integração com o backend
+## Fluxo de Autenticação e Integração Meta Ads
+- [x] Analisar código existente e estrutura do projeto
+- [x] Identificar rotas de autenticação no backend
+- [x] Identificar componentes de autenticação no frontend
+- [x] Modificar componente de login para redirecionar para Meta Ads após autenticação
+- [x] Garantir que o token JWT seja corretamente armazenado e utilizado
 
-## Identificação de Problemas
-- [x] Identificar problemas no Swagger (sem operações definidas)
-- [x] Identificar problemas nas rotas de autenticação (login)
-- [x] Verificar problemas de CORS e conexão entre frontend e backend
-- [x] Verificar problemas de conexão com o MongoDB
+## Ajustes no Dashboard
+- [x] Remover menu lateral "Planos"
+- [x] Manter navegação responsiva e funcional
+- [x] Garantir que a remoção não afete outros elementos do layout
 
-## Correções
-- [x] Corrigir configuração do Swagger
-- [x] Corrigir rotas de autenticação
-- [ ] Ajustar configurações de CORS se necessário
-- [ ] Corrigir problemas de conexão com o banco de dados
-- [ ] Ajustar integrações entre frontend e backend
+## Simplificação da Criação Manual de Anúncios
+- [x] Simplificar formulário mantendo apenas campos essenciais
+- [x] Manter campo de link do cardápio
+- [x] Manter campo de link da publicação
+- [x] Manter mapa funcional
+- [x] Manter campo de orçamento
+- [x] Remover campos desnecessários
+- [x] Garantir que o formulário continue responsivo
 
-## Testes e Validação
-- [ ] Testar o Swagger localmente
-- [ ] Testar o login localmente
-- [ ] Realizar deploy do backend (se necessário)
-- [ ] Realizar deploy do frontend (se necessário)
-- [ ] Validar funcionamento completo da aplicação
+## Validação e Testes
+- [ ] Testar fluxo completo de login
+- [ ] Testar redirecionamento para conexão Meta Ads
+- [ ] Testar navegação no dashboard sem o menu de planos
+- [ ] Testar criação de anúncios com o formulário simplificado
+- [ ] Verificar responsividade em diferentes tamanhos de tela
 
 ## Entrega
-- [ ] Documentar todas as alterações realizadas
-- [ ] Preparar instruções de uso
-- [ ] Entregar código corrigido ao usuário
+- [ ] Preparar arquivos para entrega
+- [ ] Documentar alterações realizadas
+- [ ] Criar instruções de uso para o cliente

@@ -1,17 +1,13 @@
-// Componente CampanhaManual corrigido com mapa funcional e endpoints ajustados
-// Arquivo: frontend/src/components/CampanhaManual.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const CampanhaManual = () => {
-  // Estados para os campos do formulário
+  // Estados para os campos do formulário (simplificados)
   const [nomeCampanha, setNomeCampanha] = useState('');
   const [orcamento, setOrcamento] = useState(70);
   const [raioAlcance, setRaioAlcance] = useState(5);
+  const [linkCardapio, setLinkCardapio] = useState('');
   const [linkPublicacao, setLinkPublicacao] = useState('');
-  const [textoAnuncio, setTextoAnuncio] = useState('');
-  const [imagemVideo, setImagemVideo] = useState(null);
-  const [imagemPreview, setImagemPreview] = useState('');
   const [mapLoaded, setMapLoaded] = useState(false);
   const [map, setMap] = useState(null);
   const [circle, setCircle] = useState(null);
@@ -97,25 +93,12 @@ const CampanhaManual = () => {
     }
   }, [raioAlcance, circle, map]);
 
-  // Função para lidar com o upload de imagem/vídeo
-  const handleImagemVideoChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setImagemVideo(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagemPreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   // Função para criar a campanha
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!nomeCampanha || !orcamento || !textoAnuncio || (!linkPublicacao && !imagemVideo)) {
-      setError('Por favor, preencha todos os campos obrigatórios.');
+    if (!nomeCampanha || !orcamento) {
+      setError('Por favor, preencha o nome da campanha e o orçamento.');
       return;
     }
 
@@ -134,15 +117,14 @@ const CampanhaManual = () => {
         name: nomeCampanha,
         budget: orcamento,
         radius: raioAlcance,
-        adText: textoAnuncio,
+        menuLink: linkCardapio,
         postUrl: linkPublicacao || ''
       };
 
       // Enviar dados da campanha para a API
-      // Usando endpoint correto e método POST
       const response = await axios({
         method: 'post',
-        url: '/api/campaigns/create',  // Endpoint ajustado
+        url: '/api/campaigns/create',
         data: campaignData,
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -150,31 +132,12 @@ const CampanhaManual = () => {
         }
       });
 
-      // Se houver imagem/vídeo, fazer upload separado
-      if (imagemVideo) {
-        const formData = new FormData();
-        formData.append('media', imagemVideo);
-        formData.append('campaignId', response.data.id || response.data._id);
-        
-        await axios({
-          method: 'post',
-          url: '/api/campaigns/upload-media',  // Endpoint para upload de mídia
-          data: formData,
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        });
-      }
-
       // Limpar formulário após sucesso
       setNomeCampanha('');
       setOrcamento(70);
       setRaioAlcance(5);
+      setLinkCardapio('');
       setLinkPublicacao('');
-      setTextoAnuncio('');
-      setImagemVideo(null);
-      setImagemPreview('');
       
       // Exibir mensagem de sucesso
       setSuccess(true);
@@ -278,6 +241,20 @@ const CampanhaManual = () => {
             </div>
             
             <div>
+              <label htmlFor="linkCardapio" className="block text-sm font-medium mb-1">
+                Link do Cardápio
+              </label>
+              <input
+                id="linkCardapio"
+                type="text"
+                value={linkCardapio}
+                onChange={(e) => setLinkCardapio(e.target.value)}
+                placeholder="https://seurestaurante.com/cardapio"
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            
+            <div>
               <label htmlFor="linkPublicacao" className="block text-sm font-medium mb-1">
                 Link da Publicação
               </label>
@@ -291,52 +268,6 @@ const CampanhaManual = () => {
               />
             </div>
           </div>
-        </div>
-
-        {/* Texto do Anúncio */}
-        <div>
-          <label htmlFor="textoAnuncio" className="block text-sm font-medium mb-1">
-            Texto do Anúncio *
-          </label>
-          <textarea
-            id="textoAnuncio"
-            value={textoAnuncio}
-            onChange={(e) => setTextoAnuncio(e.target.value)}
-            placeholder="Ex: Promoção especial esta semana!"
-            className="w-full p-2 border rounded-md"
-            rows="3"
-            required
-          />
-        </div>
-
-        {/* Upload de Imagem/Vídeo */}
-        <div className="p-4 border rounded-md">
-          <h3 className="text-sm font-semibold mb-2">
-            Imagem/Vídeo para o Anúncio
-          </h3>
-          
-          <label htmlFor="imagem-video-upload" className="inline-block">
-            <span className="px-4 py-2 bg-blue-600 text-white rounded-md cursor-pointer">
-              Selecionar Arquivo
-            </span>
-            <input
-              id="imagem-video-upload"
-              type="file"
-              accept="image/*,video/*"
-              onChange={handleImagemVideoChange}
-              className="hidden"
-            />
-          </label>
-          
-          {imagemPreview && (
-            <div className="mt-4 text-center">
-              <img 
-                src={imagemPreview} 
-                alt="Preview" 
-                className="max-w-full max-h-[200px] mx-auto" 
-              />
-            </div>
-          )}
         </div>
 
         {/* Mensagem de erro */}

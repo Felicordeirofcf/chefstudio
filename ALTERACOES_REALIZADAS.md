@@ -1,31 +1,61 @@
-# Alterações Realizadas no Projeto ChefStudio
+# Alterações Realizadas no Projeto AdsAutomation
 
-## Correções Implementadas
+## 1. Fluxo de Autenticação com Meta Ads
 
-### 1. Correção de Rotas e Perfil de Usuário
-- Corrigido o fluxo de carregamento do perfil do usuário
-- Ajustado o tratamento de erros nas chamadas de API
-- Melhorado o processo de atualização de dados do perfil
-- Adicionados logs para facilitar depuração
+Foi implementado um redirecionamento automático após o login para a página de conexão com Meta Ads quando o usuário não está conectado. Isso garante que o cliente seja direcionado para conectar sua conta Meta Ads imediatamente após fazer login, melhorando o fluxo de integração.
 
-### 2. Correção da Funcionalidade de Criar Campanha
-- Simplificado o processo de validação de campos
-- Corrigido o tratamento de erros na criação de campanhas
-- Melhorado o feedback visual para o usuário
-- Implementado fallback para ID de conta de anúncios quando não disponível
+Alterações principais:
+- Modificado o componente `Login.tsx` para verificar o status de conexão Meta Ads após o login
+- Implementado redirecionamento condicional para `/connect-meta` quando o usuário não está conectado
+- Mantida a integração com o fluxo OAuth existente do Meta Ads
 
-### 3. Remoção de Elementos Visuais do Meta Ads
-- Removida a seção de conexão com Meta Ads do dashboard
-- Removido o botão "Conectar com Ads" do menu lateral
-- Mantida a integração backend com Meta Ads conforme solicitado
+## 2. Ajuste do Dashboard
 
-## Observações Importantes
-- A integração com Meta Ads continua funcionando no backend
-- Apenas os elementos visuais foram removidos conforme solicitado
-- O projeto foi testado e validado após todas as alterações
-- O build do frontend foi realizado com sucesso
+O menu lateral foi simplificado com a remoção da opção "Planos", conforme solicitado. Isso torna a interface mais limpa e focada nas funcionalidades essenciais.
 
-## Próximos Passos Recomendados
-- Considerar a implementação de testes automatizados
-- Revisar a documentação da API para garantir alinhamento com o frontend
-- Avaliar a necessidade de otimizações de performance
+Alterações principais:
+- Removido o item "Planos" do menu lateral no componente `DashboardLayout.tsx`
+- Mantida a navegação responsiva e funcional
+- Preservada a estrutura geral do layout para garantir consistência visual
+
+## 3. Simplificação da Criação Manual de Anúncios
+
+O formulário de criação manual de anúncios foi simplificado ao máximo, mantendo apenas os campos essenciais solicitados:
+
+Campos mantidos:
+- Link do cardápio
+- Link da publicação
+- Mapa funcional (com raio de alcance)
+- Orçamento
+
+Campos removidos:
+- Texto do anúncio
+- Upload de imagem/vídeo
+- Outros campos não essenciais
+
+O formulário agora é mais direto e fácil de usar, focando apenas nas informações realmente necessárias para a criação de anúncios.
+
+## 4. Integração Real com Meta Ads
+
+Todas as alterações foram feitas mantendo a integração real com a API do Meta Ads. O sistema continua utilizando as credenciais e tokens de autenticação do Meta para criar anúncios reais na plataforma.
+
+## Instruções de Uso
+
+1. **Login e Conexão Meta Ads**:
+   - Faça login na plataforma
+   - Se não estiver conectado ao Meta Ads, será redirecionado automaticamente para a página de conexão
+   - Autorize as permissões necessárias no Facebook/Meta
+
+2. **Criação de Anúncios**:
+   - Acesse o dashboard
+   - Utilize o formulário simplificado para criar anúncios
+   - Preencha apenas os campos essenciais: nome da campanha, orçamento, link do cardápio e link da publicação
+   - Ajuste o raio de alcance no mapa conforme necessário
+   - Clique em "Criar Anúncio no Meta Ads" para finalizar
+
+## Observações Técnicas
+
+- O projeto mantém a estrutura modular e responsiva original
+- Todas as integrações com APIs externas foram preservadas
+- O código foi otimizado para garantir performance e usabilidade
+- A interface foi simplificada sem comprometer a funcionalidade
