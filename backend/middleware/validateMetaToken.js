@@ -1,6 +1,36 @@
-// Middleware para validação de token Meta
-const fetch = require('node-fetch');
+// Middleware para validação de token Meta usando https nativo em vez de node-fetch
+const https = require('https');
 const User = require('../models/userModel');
+
+/**
+ * Função auxiliar para fazer requisições HTTP usando o módulo https nativo
+ * @param {string} url - URL completa para a requisição
+ * @returns {Promise<Object>} - Promise que resolve para o objeto JSON da resposta
+ */
+const httpsRequest = (url) => {
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      let data = '';
+      
+      // Receber os dados em chunks
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      
+      // Quando a resposta terminar, parsear o JSON
+      res.on('end', () => {
+        try {
+          const parsedData = JSON.parse(data);
+          resolve(parsedData);
+        } catch (error) {
+          reject(new Error(`Erro ao parsear resposta: ${error.message}`));
+        }
+      });
+    }).on('error', (error) => {
+      reject(new Error(`Erro na requisição: ${error.message}`));
+    });
+  });
+};
 
 /**
  * Middleware para validar token Meta antes de acessar rotas protegidas
@@ -44,8 +74,8 @@ const validateMetaToken = async (req, res, next) => {
     
     // Verificar se o token é válido fazendo uma chamada de teste à API do Meta
     try {
-      const response = await fetch(`https://graph.facebook.com/v18.0/me?access_token=${user.metaAccessToken}`);
-      const data = await response.json();
+      const url = `https://graph.facebook.com/v18.0/me?access_token=${user.metaAccessToken}`;
+      const data = await httpsRequest(url);
       
       if (data.error) {
         // Token inválido, atualizar status
