@@ -6,7 +6,7 @@ import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { getUserProfile, updateUserProfile } from "../../lib/api";
 import { useToast } from "../../hooks/use-toast";
-import { Loader2, CreditCard } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 // Define type for user profile data
 interface UserProfile {
@@ -19,7 +19,7 @@ interface UserProfile {
   menuLink?: string;
   address?: string;
   cep?: string;
-  plan?: string;
+  // Plan info is handled in PlansPage
 }
 
 const ProfilePage: React.FC = () => {
@@ -33,22 +33,6 @@ const ProfilePage: React.FC = () => {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-
-  // Função para obter o nome do plano formatado
-  const getPlanName = (planCode: string | undefined): string => {
-    if (!planCode) return "Gratuito";
-    
-    switch(planCode) {
-      case "free":
-        return "Gratuito";
-      case "basic":
-        return "3 Anúncios (R$ 100,00/mês)";
-      case "premium":
-        return "5 Anúncios (R$ 300,00/mês)";
-      default:
-        return planCode;
-    }
-  };
 
   // Fetch user profile on component mount with retry logic
   useEffect(() => {
@@ -201,23 +185,6 @@ const ProfilePage: React.FC = () => {
     setRetryCount(0); // Resetar contador para forçar nova tentativa
   };
 
-  // Função para obter plano do localStorage se não estiver no perfil
-  const getUserPlan = (): string => {
-    if (userProfile?.plan) return userProfile.plan;
-    
-    try {
-      const userInfo = localStorage.getItem('userInfo');
-      if (userInfo) {
-        const parsedInfo = JSON.parse(userInfo);
-        return parsedInfo.plan || 'free';
-      }
-    } catch (error) {
-      console.error("Erro ao obter plano do localStorage:", error);
-    }
-    
-    return 'free';
-  };
-
   return (
     <Card className="shadow-lg">
       <CardHeader className="flex flex-row justify-between items-start">
@@ -294,33 +261,15 @@ const ProfilePage: React.FC = () => {
             </form>
           ) : (
             // DISPLAY PROFILE
-            <div className="space-y-6">
-              <div className="space-y-2 text-sm text-gray-700 grid sm:grid-cols-2 gap-x-4 gap-y-2">
-                <p><strong>Nome Responsável:</strong> {userProfile.name}</p>
-                <p><strong>Email:</strong> {userProfile.email}</p>
-                <p><strong>Endereço:</strong> {userProfile.address || "Não informado"}</p>
-                <p><strong>CEP:</strong> {userProfile.cep || "Não informado"}</p>
-                <p><strong>Estabelecimento:</strong> {userProfile.establishmentName || "Não informado"}</p>
-                <p><strong>Tipo:</strong> {userProfile.businessType || "Não informado"}</p>
-                <p><strong>WhatsApp:</strong> {userProfile.whatsapp || "Não informado"}</p>
-                <p><strong>Cardápio:</strong> {userProfile.menuLink ? <a href={userProfile.menuLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{userProfile.menuLink}</a> : "Não informado"}</p>
-              </div>
-              
-              {/* Seção de Plano Ativo */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <div className="flex items-center mb-3">
-                  <CreditCard className="h-5 w-5 text-purple-600 mr-2" />
-                  <h3 className="text-lg font-medium">Plano Ativo</h3>
-                </div>
-                <div className="bg-purple-50 border border-purple-100 rounded-lg p-4">
-                  <p className="text-purple-800 font-medium">{getPlanName(getUserPlan())}</p>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {getUserPlan() === 'free' 
-                      ? 'Plano gratuito com recursos limitados.' 
-                      : 'Plano pago com recursos avançados e suporte prioritário.'}
-                  </p>
-                </div>
-              </div>
+            <div className="space-y-2 text-sm text-gray-700 grid sm:grid-cols-2 gap-x-4 gap-y-2">
+              <p><strong>Nome Responsável:</strong> {userProfile.name}</p>
+              <p><strong>Email:</strong> {userProfile.email}</p>
+              <p><strong>Endereço:</strong> {userProfile.address || "Não informado"}</p>
+              <p><strong>CEP:</strong> {userProfile.cep || "Não informado"}</p>
+              <p><strong>Estabelecimento:</strong> {userProfile.establishmentName || "Não informado"}</p>
+              <p><strong>Tipo:</strong> {userProfile.businessType || "Não informado"}</p>
+              <p><strong>WhatsApp:</strong> {userProfile.whatsapp || "Não informado"}</p>
+              <p><strong>Cardápio:</strong> {userProfile.menuLink ? <a href={userProfile.menuLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{userProfile.menuLink}</a> : "Não informado"}</p>
             </div>
           )
         ) : (
