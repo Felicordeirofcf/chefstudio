@@ -49,7 +49,7 @@ const MetaAdsMetrics = () => {
         
         // Buscar métricas da API usando a instância centralizada
         // Não é necessário adicionar o token manualmente, pois o interceptor em api.ts já faz isso
-        const response = await api.get('/meta/metrics');
+        const response = await api.get('/api/meta/metrics');
         
         setMetrics(response.data);
         setLoading(false);
