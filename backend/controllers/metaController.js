@@ -124,14 +124,25 @@ const facebookCallback = asyncHandler(async (req, res) => {
         user.metaEmail = userData.email;
         user.metaAccessToken = tokenData.access_token;
         user.metaTokenExpires = Date.now() + (tokenData.expires_in * 1000);
+        
+        // Salvar todas as contas de anúncios
         user.metaAdAccounts = adAccountsData.data.map(account => ({
           id: account.id,
           name: account.name,
           status: account.account_status
         }));
+        
+        // Selecionar e salvar a conta de anúncios principal (a primeira ativa ou a primeira da lista)
+        const primaryAdAccount = adAccountsData.data.find(account => account.account_status === 1) || adAccountsData.data[0];
+        user.metaPrimaryAdAccountId = primaryAdAccount.id;
+        user.metaPrimaryAdAccountName = primaryAdAccount.name;
+        
         user.metaConnectionStatus = "connected";
         
         await user.save();
+        
+        // Registrar no log para debug
+        console.log(`Meta login successful for user ${userId}. Primary Ad Account ID: ${user.metaPrimaryAdAccountId}`);
       }
     }
     
@@ -167,6 +178,8 @@ const getConnectionStatus = asyncHandler(async (req, res) => {
     metaName: user.metaName,
     metaEmail: user.metaEmail,
     adAccounts: user.metaAdAccounts || [],
+    primaryAdAccountId: user.metaPrimaryAdAccountId || null,
+    primaryAdAccountName: user.metaPrimaryAdAccountName || null,
     tokenExpired: tokenExpired
   });
 });
@@ -245,25 +258,42 @@ const createAdFromPost = asyncHandler(async (req, res) => {
     throw new Error("Usuário não encontrado");
   }
   
+  // Verificar se o usuário está conectado ao Meta
   if (user.metaConnectionStatus !== "connected" || !user.metaAccessToken) {
-    res.status(401);
-    throw new Error("Usuário não conectado ao Meta");
+    res.status(400);
+    throw new Error("Você precisa conectar sua conta ao Meta Ads primeiro");
   }
   
+  // Verificar se o token expirou
+  if (user.metaTokenExpires && user.metaTokenExpires < Date.now()) {
+    res.status(401);
+    throw new Error("Seu token do Meta expirou. Por favor, reconecte sua conta.");
+  }
+  
+  // Verificar se há conta de anúncios disponível
   if (!user.metaAdAccounts || user.metaAdAccounts.length === 0) {
     res.status(400);
-    throw new Error("Nenhuma conta de anúncios encontrada");
+    throw new Error("Nenhuma conta de anúncios encontrada. Por favor, reconecte sua conta Meta.");
   }
   
   try {
     // Extrair ID da publicação da URL
     const postId = extractPostIdFromUrl(postUrl);
     
-    // Selecionar a primeira conta de anúncios ativa
-    const adAccount = user.metaAdAccounts.find(account => account.status === 1) || user.metaAdAccounts[0];
+    // Usar a conta de anúncios principal se disponível, ou selecionar a primeira ativa, ou a primeira da lista
+    let adAccountId;
+    if (user.metaPrimaryAdAccountId) {
+      adAccountId = user.metaPrimaryAdAccountId;
+    } else {
+      const adAccount = user.metaAdAccounts.find(account => account.status === 1) || user.metaAdAccounts[0];
+      adAccountId = adAccount.id;
+    }
+    
+    // Registrar no log para debug
+    console.log(`Creating ad using account ID: ${adAccountId} for user ${user._id}`);
     
     // Criar campanha
-    const campaignResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccount.id}/campaigns`, {
+    const campaignResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/campaigns`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -284,7 +314,7 @@ const createAdFromPost = asyncHandler(async (req, res) => {
     }
     
     // Criar conjunto de anúncios
-    const adSetResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccount.id}/adsets`, {
+    const adSetResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/adsets`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -317,7 +347,7 @@ const createAdFromPost = asyncHandler(async (req, res) => {
     }
     
     // Criar anúncio
-    const adResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccount.id}/ads`, {
+    const adResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/ads`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -354,6 +384,7 @@ const createAdFromPost = asyncHandler(async (req, res) => {
         endDate,
         targetCountry,
         postId,
+        adAccountId: adAccountId
       },
     });
     
