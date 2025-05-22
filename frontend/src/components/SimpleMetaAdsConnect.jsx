@@ -15,6 +15,7 @@ const SimpleMetaAdsConnect = () => {
   const [adName, setAdName] = useState('');
   const [budget, setBudget] = useState(50);
   const [radius, setRadius] = useState(5);
+  const [accessToken, setAccessToken] = useState('');
 
   // Verificar status de conexão ao carregar
   useEffect(() => {
@@ -25,12 +26,26 @@ const SimpleMetaAdsConnect = () => {
   const checkConnectionStatus = () => {
     // Verificar parâmetros na URL (após redirecionamento do Facebook)
     const urlParams = new URLSearchParams(window.location.search);
-    const hasToken = urlParams.has('access_token');
-    const hasCode = urlParams.has('code');
+    const urlHash = window.location.hash;
     
-    if (hasToken || hasCode) {
-      console.log("Parâmetros de autenticação detectados na URL");
-      handleSuccessfulConnection();
+    // Verificar se há token no hash da URL (formato #access_token=ABC&expires_in=123)
+    if (urlHash && urlHash.includes('access_token')) {
+      const hashParams = new URLSearchParams(urlHash.substring(1));
+      const token = hashParams.get('access_token');
+      if (token) {
+        console.log("Token de acesso detectado na URL hash");
+        handleSuccessfulConnection(token);
+        return true;
+      }
+    }
+    
+    // Verificar código de autorização na URL
+    const hasCode = urlParams.has('code');
+    if (hasCode) {
+      const code = urlParams.get('code');
+      console.log("Código de autorização detectado na URL");
+      // Em produção, trocar o código por um token via backend
+      exchangeCodeForToken(code);
       return true;
     }
     
@@ -41,33 +56,76 @@ const SimpleMetaAdsConnect = () => {
     if (metaConnected && metaToken) {
       console.log("Conexão Meta detectada no localStorage");
       setIsConnected(true);
+      setAccessToken(metaToken);
       return true;
     }
     
     return false;
   };
 
+  // Função para trocar código por token (via backend)
+  const exchangeCodeForToken = async (code) => {
+    try {
+      setLoading(true);
+      const response = await axios.post('/api/meta/exchange-code', { code });
+      const token = response.data.access_token;
+      handleSuccessfulConnection(token);
+    } catch (err) {
+      console.error("Erro ao trocar código por token:", err);
+      setError('Falha ao autenticar com o Facebook. Por favor, tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Função para lidar com conexão bem-sucedida
-  const handleSuccessfulConnection = () => {
-    // Salvar status no localStorage
+  const handleSuccessfulConnection = (token) => {
+    // Salvar status e token no localStorage
     localStorage.setItem('metaConnected', 'true');
-    localStorage.setItem('metaToken', `token_${Date.now()}`);
+    localStorage.setItem('metaToken', token);
     localStorage.setItem('metaConnectedAt', new Date().toISOString());
     
     // Atualizar estado
     setIsConnected(true);
+    setAccessToken(token);
     
     // Limpar parâmetros da URL
     window.history.replaceState({}, document.title, window.location.pathname);
+    
+    // Verificar status da conexão com o backend
+    verifyConnectionStatus(token);
+  };
+
+  // Verificar status da conexão com o backend
+  const verifyConnectionStatus = async (token) => {
+    try {
+      const response = await axios.get('/api/meta/status', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      console.log("Status da conexão Meta:", response.data);
+    } catch (err) {
+      console.error("Erro ao verificar status da conexão:", err);
+    }
   };
 
   // Função para conectar com Meta Ads
-  const handleConnectMeta = () => {
-    // Construir URL de autorização do Facebook
-    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&scope=${encodeURIComponent(FB_SCOPE)}&response_type=token`;
-    
-    // Redirecionar para a página de autorização do Facebook
-    window.location.href = authUrl;
+  const handleConnectMeta = async () => {
+    try {
+      setLoading(true);
+      
+      // Obter URL de login do backend
+      const response = await axios.get('/api/meta/login');
+      const loginUrl = response.data.url;
+      
+      // Redirecionar para a página de autorização do Facebook
+      window.location.href = loginUrl;
+    } catch (err) {
+      console.error("Erro ao iniciar conexão com Meta Ads:", err);
+      setError('Falha ao conectar com o Meta Ads. Por favor, tente novamente.');
+      setLoading(false);
+    }
   };
 
   // Função para criar anúncio
@@ -83,7 +141,7 @@ const SimpleMetaAdsConnect = () => {
       setLoading(true);
       setError(null);
       
-      // Obter localização do usuário (simplificado)
+      // Obter localização do usuário
       let userLocation = { lat: -23.5505, lng: -46.6333 }; // São Paulo como padrão
       
       try {
@@ -123,13 +181,18 @@ const SimpleMetaAdsConnect = () => {
           publisher_platforms: ["facebook", "instagram"],
           device_platforms: ["mobile", "desktop"]
         },
+        access_token: accessToken,
         status: "ACTIVE"
       };
       
       console.log("Enviando dados para criação de anúncio:", adData);
       
       // Enviar para o backend
-      const response = await axios.post('/api/meta/create-ad', adData);
+      const response = await axios.post('/api/meta/create-ad', adData, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
       
       console.log("Anúncio criado com sucesso:", response.data);
       
@@ -163,17 +226,43 @@ const SimpleMetaAdsConnect = () => {
         
         <button 
           onClick={handleConnectMeta}
-          className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md flex items-center justify-center"
+          disabled={loading}
+          className={`w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md flex items-center justify-center ${
+            loading ? 'opacity-70 cursor-not-allowed' : ''
+          }`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-          </svg>
-          Conectar com Meta Ads
+          {loading ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Conectando...
+            </>
+          ) : (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+              </svg>
+              Conectar com Meta Ads
+            </>
+          )}
         </button>
         
         <p className="text-sm text-gray-500 mt-4 text-center">
           Você será redirecionado para o Facebook para autorizar o acesso.
         </p>
+        
+        {error && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
+            <div className="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              {error}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -241,7 +330,7 @@ const SimpleMetaAdsConnect = () => {
         
         <div>
           <label htmlFor="radius" className="block text-sm font-medium text-gray-700 mb-1">
-            Raio de Alcance (km)
+            Raio de Alcance: {radius} km
           </label>
           <input
             type="range"
@@ -255,7 +344,6 @@ const SimpleMetaAdsConnect = () => {
           />
           <div className="flex justify-between text-xs text-gray-500 mt-1">
             <span>1 km</span>
-            <span>{radius} km</span>
             <span>10 km</span>
           </div>
         </div>
