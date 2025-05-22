@@ -14,29 +14,65 @@ const SCOPES = "ads_management,ads_read,business_management,public_profile,email
 // Função para extrair ID da publicação a partir da URL
 const extractPostIdFromUrl = (url) => {
   try {
-    // Tentar extrair o ID da publicação de diferentes formatos de URL
+    if (!url) {
+      throw new Error("URL da publicação não fornecida");
+    }
+    
+    console.log(`Tentando extrair ID da publicação da URL: ${url}`);
+    
     // Formato: https://www.facebook.com/photo/?fbid=122102873852863870&set=a.122102873882863870
     const fbidMatch = url.match(/fbid=(\d+)/);
     if (fbidMatch && fbidMatch[1]) {
+      console.log(`ID extraído via fbid: ${fbidMatch[1]}`);
       return fbidMatch[1];
     }
     
     // Formato: https://www.facebook.com/username/posts/123456789
     const postsMatch = url.match(/\/posts\/(\d+)/);
     if (postsMatch && postsMatch[1]) {
+      console.log(`ID extraído via posts: ${postsMatch[1]}`);
       return postsMatch[1];
     }
     
     // Formato: https://www.facebook.com/permalink.php?story_fbid=123456789
     const storyMatch = url.match(/story_fbid=(\d+)/);
     if (storyMatch && storyMatch[1]) {
+      console.log(`ID extraído via story_fbid: ${storyMatch[1]}`);
       return storyMatch[1];
     }
     
+    // Formato: https://www.facebook.com/pagename/videos/123456789
+    const videosMatch = url.match(/\/videos\/(\d+)/);
+    if (videosMatch && videosMatch[1]) {
+      console.log(`ID extraído via videos: ${videosMatch[1]}`);
+      return videosMatch[1];
+    }
+    
+    // Formato: https://www.facebook.com/pagename/photos/a.123456789/987654321/
+    const photosMatch = url.match(/\/photos\/(?:a\.\d+\/)?(\d+)/);
+    if (photosMatch && photosMatch[1]) {
+      console.log(`ID extraído via photos: ${photosMatch[1]}`);
+      return photosMatch[1];
+    }
+    
+    // Formato: https://www.instagram.com/p/ABC123/
+    const instagramMatch = url.match(/instagram\.com\/p\/([A-Za-z0-9_-]+)/);
+    if (instagramMatch && instagramMatch[1]) {
+      console.log(`ID extraído via Instagram: ${instagramMatch[1]}`);
+      return instagramMatch[1];
+    }
+    
+    // Verificar se a URL já é um ID puro (apenas dígitos)
+    if (/^\d+$/.test(url)) {
+      console.log(`URL já é um ID puro: ${url}`);
+      return url;
+    }
+    
+    // Se chegou aqui, não conseguiu extrair o ID
     throw new Error("Não foi possível extrair o ID da publicação da URL fornecida");
   } catch (error) {
     console.error("Erro ao extrair ID da publicação:", error);
-    throw new Error("Formato de URL inválido ou não suportado");
+    throw new Error("Formato de URL inválido ou não suportado: " + error.message);
   }
 };
 
