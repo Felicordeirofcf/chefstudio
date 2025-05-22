@@ -164,32 +164,24 @@ export const getUserProfile = async () => {
       throw new Error("Você precisa estar autenticado para acessar seu perfil.");
     }
     
-    // Obter ID do usuário do localStorage
-    const userInfo = localStorage.getItem('userInfo');
-    let userId = null;
-    
-    if (userInfo) {
-      const parsedUserInfo = JSON.parse(userInfo);
-      userId = parsedUserInfo._id;
-    }
-    
-    if (!userId) {
-      throw new Error("ID do usuário não encontrado. Por favor, faça login novamente.");
-    }
-    
-    // CORREÇÃO: Usar a rota correta do backend para buscar o perfil do usuário
-    // Alterado de /auth/profile para /users/{userId}
-    const response = await api.get(`/users/${userId}`);
+    // CORREÇÃO: Usar a rota /profile para buscar o perfil do usuário autenticado
+    // Esta rota usa o token para identificar o usuário, sem necessidade de ID
+    const response = await api.get(`/profile`);
     
     // Atualizar informações do usuário no localStorage se necessário
-    if (response.data && response.data._id) {
+    if (response.data) {
       const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
       const updatedUser = { 
         ...currentUser, 
-        ...response.data, 
-        _id: userId, // Garantir que o ID seja preservado
+        ...response.data,
         token: currentUser.token // Garantir que o token seja preservado
       };
+      
+      // Garantir que o _id seja preservado se existir
+      if (currentUser._id) {
+        updatedUser._id = currentUser._id;
+      }
+      
       localStorage.setItem('userInfo', JSON.stringify(updatedUser));
     }
     
@@ -197,14 +189,49 @@ export const getUserProfile = async () => {
   } catch (error: any) {
     console.error('Erro ao buscar perfil:', error);
     
-    // Se for erro de autenticação, tratar especificamente
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem('userInfo');
-      localStorage.removeItem('token');
-      throw new Error("Sessão expirada. Por favor, faça login novamente.");
+    // Tentar rota alternativa se a primeira falhar
+    try {
+      console.log('Tentando rota alternativa para perfil...');
+      const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      
+      // Tentar com /auth/me como alternativa
+      const response = await api.get(`/auth/me`);
+      
+      if (response.data) {
+        const updatedUser = { 
+          ...currentUser, 
+          ...response.data,
+          token: currentUser.token // Garantir que o token seja preservado
+        };
+        
+        // Garantir que o _id seja preservado se existir
+        if (currentUser._id) {
+          updatedUser._id = currentUser._id;
+        }
+        
+        localStorage.setItem('userInfo', JSON.stringify(updatedUser));
+      }
+      
+      return response.data;
+    } catch (secondError) {
+      console.error('Erro na rota alternativa para perfil:', secondError);
+      
+      // Se for erro de autenticação, tratar especificamente
+      if (error.response && error.response.status === 401) {
+        localStorage.removeItem('userInfo');
+        localStorage.removeItem('token');
+        throw new Error("Sessão expirada. Por favor, faça login novamente.");
+      }
+      
+      // Se temos dados no localStorage, retornar esses dados como fallback
+      const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      if (userInfo && userInfo._id) {
+        console.log('Usando dados do localStorage como fallback para perfil');
+        return userInfo;
+      }
+      
+      throw new Error(error.response?.data?.message || "Erro ao buscar perfil do usuário.");
     }
-    
-    throw new Error(error.response?.data?.message || "Erro ao buscar perfil do usuário.");
   }
 };
 
@@ -215,26 +242,55 @@ export const updateUserProfile = async (userData: any) => {
       throw new Error("Você precisa estar autenticado para atualizar seu perfil.");
     }
     
-    const userId = JSON.parse(localStorage.getItem('userInfo') || '{}')._id;
-    if (!userId) throw new Error("ID do usuário não encontrado.");
-    
-    // Corrigido para usar o endpoint correto
-    const response = await api.put(`/users/${userId}`, userData);
+    // CORREÇÃO: Usar a rota /profile para atualizar o perfil do usuário autenticado
+    const response = await api.put(`/profile`, userData);
     
     // Atualizar informações do usuário no localStorage
     const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
     const updatedUser = { 
       ...currentUser, 
       ...userData,
-      _id: userId, // Garantir que o ID seja preservado
       token: currentUser.token // Garantir que o token seja preservado
     };
+    
+    // Garantir que o _id seja preservado se existir
+    if (currentUser._id) {
+      updatedUser._id = currentUser._id;
+    }
+    
     localStorage.setItem('userInfo', JSON.stringify(updatedUser));
     
     return response.data;
   } catch (error: any) {
     console.error('Erro ao atualizar perfil:', error);
-    throw new Error(error.response?.data?.message || "Erro ao atualizar perfil.");
+    
+    // Tentar rota alternativa se a primeira falhar
+    try {
+      console.log('Tentando rota alternativa para atualizar perfil...');
+      const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      
+      // Tentar com /auth/profile como alternativa
+      const response = await api.put(`/auth/profile`, userData);
+      
+      // Atualizar informações do usuário no localStorage
+      const updatedUser = { 
+        ...currentUser, 
+        ...userData,
+        token: currentUser.token // Garantir que o token seja preservado
+      };
+      
+      // Garantir que o _id seja preservado se existir
+      if (currentUser._id) {
+        updatedUser._id = currentUser._id;
+      }
+      
+      localStorage.setItem('userInfo', JSON.stringify(updatedUser));
+      
+      return response.data;
+    } catch (secondError) {
+      console.error('Erro na rota alternativa para atualizar perfil:', secondError);
+      throw new Error(error.response?.data?.message || "Erro ao atualizar perfil.");
+    }
   }
 };
 
