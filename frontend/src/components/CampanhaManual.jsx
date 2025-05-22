@@ -142,11 +142,11 @@ const CampanhaManual = () => {
       console.log('Enviando dados para criação de campanha:', campaignData);
 
       // Determinar qual endpoint usar com base nos dados fornecidos
-      let endpoint = `${API_BASE_URL}/meta-ads/create-from-post`;
+      let endpoint = `${API_BASE_URL}/meta/create-ad-from-post`;
       
       // Se não tiver link de publicação, usar o endpoint de criação por imagem
       if (!linkPublicacao) {
-        endpoint = `${API_BASE_URL}/meta-ads/create-from-image`;
+        endpoint = `${API_BASE_URL}/meta/create-from-image`;
       }
 
       // Enviar dados da campanha para a API
