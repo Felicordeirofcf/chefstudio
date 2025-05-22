@@ -14,37 +14,19 @@ const ProdutosAnunciados = () => {
       setLoading(true);
       setError(null);
       
-      // Tentar primeiro endpoint usando a instância api centralizada
-      try {
-        const response = await api.get('/meta/campaigns');
-        
-        // Garantir que o resultado seja um array
-        if (Array.isArray(response.data)) {
-          setAnuncios(response.data);
-        } else if (response.data && Array.isArray(response.data.campaigns)) {
-          // Caso a API retorne um objeto com propriedade campaigns
-          setAnuncios(response.data.campaigns);
-        } else {
-          // Caso a API retorne um formato inesperado, usar array vazio
-          console.warn('Formato de resposta inesperado:', response.data);
-          setAnuncios([]);
-        }
-      } catch (err) {
-        // Se o primeiro endpoint falhar, tentar endpoint alternativo
-        if (err.response && err.response.status === 404) {
-          const altResponse = await api.get('/campaigns');
-          
-          // Garantir que o resultado seja um array
-          if (Array.isArray(altResponse.data)) {
-            setAnuncios(altResponse.data);
-          } else if (altResponse.data && Array.isArray(altResponse.data.campaigns)) {
-            setAnuncios(altResponse.data.campaigns);
-          } else {
-            setAnuncios([]);
-          }
-        } else {
-          throw err;
-        }
+      // Usar o endpoint correto com prefixo /api
+      const response = await api.get('/api/meta/campaigns');
+      
+      // Garantir que o resultado seja um array
+      if (Array.isArray(response.data)) {
+        setAnuncios(response.data);
+      } else if (response.data && Array.isArray(response.data.campaigns)) {
+        // Caso a API retorne um objeto com propriedade campaigns
+        setAnuncios(response.data.campaigns);
+      } else {
+        // Caso a API retorne um formato inesperado, usar array vazio
+        console.warn('Formato de resposta inesperado:', response.data);
+        setAnuncios([]);
       }
     } catch (err) {
       console.error('Erro ao carregar anúncios:', err);

@@ -43,7 +43,7 @@ export default function SimplifiedAdCreation() {
         });
         
         // Verificar status de conexão Meta
-        const connectionResponse = await api.get("/meta/connection-status");
+        const connectionResponse = await api.get("/api/meta/connection-status");
         
         if (!connectionResponse.data.connected) {
           toast({
@@ -55,7 +55,7 @@ export default function SimplifiedAdCreation() {
         }
         
         // Buscar perfil do usuário com informações do restaurante
-        const profileResponse = await api.get("/users/profile");
+        const profileResponse = await api.get("/api/profile");
         setUserProfile(profileResponse.data);
         
       } catch (err) {
@@ -148,7 +148,7 @@ export default function SimplifiedAdCreation() {
       
       if (activeTab === "link") {
         // Criar anúncio a partir de URL de publicação
-        response = await api.post("/meta/create-ad-from-post", {
+        response = await api.post("/api/meta/create-ad-from-post", {
           postUrl: formData.postUrl,
           // Valores padrão otimizados
           adName: `Anúncio ${userProfile?.restaurantName || 'Restaurante'} ${new Date().toLocaleDateString('pt-BR')}`,
@@ -166,7 +166,7 @@ export default function SimplifiedAdCreation() {
         formDataObj.append('startDate', new Date().toISOString());
         formDataObj.append('targetCountry', "BR");
         
-        response = await api.post("/meta/create-ad-from-image", formDataObj, {
+        response = await api.post("/api/meta/create-ad-from-image", formDataObj, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
