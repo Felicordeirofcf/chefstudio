@@ -112,10 +112,10 @@ const CampanhaManual = () => {
         throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
       }
 
-      // Verificar se o ID do usuário está disponível
-      const userId = userInfo?._id;
-      if (!userId) {
-        throw new Error('ID do usuário não encontrado. Por favor, faça login novamente.');
+      // Verificar se o usuário está conectado ao Meta Ads
+      const userMetaStatus = userInfo?.metaConnectionStatus || 'disconnected';
+      if (userMetaStatus !== 'connected') {
+        throw new Error('Você precisa conectar sua conta ao Meta Ads antes de criar campanhas. Vá para seu perfil e conecte-se.');
       }
 
       // Preparar dados para envio
@@ -123,7 +123,7 @@ const CampanhaManual = () => {
         name: nomeCampanha,
         budget: orcamento,
         radius: raioAlcance,
-        menuLink: linkCardapio,
+        menuUrl: linkCardapio,
         postUrl: linkPublicacao || ''
       };
 
@@ -134,6 +134,8 @@ const CampanhaManual = () => {
       if (!linkPublicacao) {
         endpoint = '/api/meta-ads/create-from-image';
       }
+
+      console.log(`Usando endpoint: ${endpoint} para criar campanha`);
 
       // Enviar dados da campanha para a API
       const response = await axios({
@@ -167,8 +169,14 @@ const CampanhaManual = () => {
       // Tratamento específico para erro 405 Method Not Allowed
       if (error.response && error.response.status === 405) {
         setError('Erro no servidor: método não permitido. Por favor, entre em contato com o suporte.');
+      } else if (error.response && error.response.status === 401) {
+        setError('Sessão expirada ou usuário não autenticado. Por favor, faça login novamente.');
+        // Redirecionar para login após um breve delay
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
       } else {
-        setError(error.response?.data?.message || 'Erro ao criar campanha. Por favor, tente novamente.');
+        setError(error.message || error.response?.data?.message || 'Erro ao criar campanha. Por favor, tente novamente.');
       }
     } finally {
       setLoading(false);
