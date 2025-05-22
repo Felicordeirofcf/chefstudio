@@ -37,8 +37,14 @@ export default function Login() {
         isMetaConnected: response.metaConnectionStatus === "connected"
       }));
       
-      // Redireciona para o dashboard diretamente
-      navigate("/dashboard");
+      // Verifica se o usuário está conectado ao Meta Ads
+      if (response.metaConnectionStatus !== "connected") {
+        // Se não estiver conectado, redireciona para a página de conexão Meta
+        navigate("/connect-meta");
+      } else {
+        // Se já estiver conectado, redireciona para o dashboard
+        navigate("/dashboard");
+      }
     } catch (err: any) {
       console.error("Erro no login:", err);
       setError(err.message || "Falha ao fazer login. Verifique suas credenciais.");
