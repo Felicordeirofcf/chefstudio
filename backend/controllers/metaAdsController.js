@@ -10,15 +10,26 @@ const META_API_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 // Armazenamento em memória para campanhas criadas (backup local)
 const campaignsStore = {};
 
-// // Função para obter o token de acesso do ambiente (REMOVIDA - Usar token do usuário)
-// const getAccessToken = () => {
-//     const accessToken = process.env.META_ACCESS_TOKEN;
-//     if (!accessToken) {
-//         console.error('META_ACCESS_TOKEN não encontrado no ambiente');
-//         throw new Error('Token de acesso do Meta não configurado');
-//     }
-//     return accessToken;
-// };
+// Objetivos válidos para campanhas do Meta Ads
+const VALID_OBJECTIVES = [
+    'LINK_CLICKS',
+    'OUTCOME_TRAFFIC',
+    'POST_ENGAGEMENT',
+    'LEAD_GENERATION',
+    'CONVERSIONS',
+    'OUTCOME_AWARENESS',
+    'OUTCOME_ENGAGEMENT',
+    'OUTCOME_LEADS',
+    'OUTCOME_SALES',
+    'REACH',
+    'BRAND_AWARENESS',
+    'VIDEO_VIEWS',
+    'APP_INSTALLS',
+    'MESSAGES'
+];
+
+// Objetivo padrão para campanhas de tráfego
+const DEFAULT_TRAFFIC_OBJECTIVE = 'OUTCOME_TRAFFIC';
 
 /**
  * Função auxiliar para obter o token Meta do usuário
@@ -31,6 +42,15 @@ const getUserMetaToken = (user) => {
 };
 
 /**
+ * Valida se o objetivo da campanha é aceito pela API do Meta
+ * @param {string} objective - Objetivo da campanha
+ * @returns {boolean} - True se o objetivo é válido, false caso contrário
+ */
+const isValidObjective = (objective) => {
+    return VALID_OBJECTIVES.includes(objective);
+};
+
+/**
  * Cria uma campanha no Meta Ads
  * @param {string} userAccessToken - Token de acesso do usuário Meta
  * @param {string} adAccountId - ID da conta de anúncios
@@ -40,11 +60,21 @@ const getUserMetaToken = (user) => {
 const createCampaign = async (userAccessToken, adAccountId, campaignData) => {
     try {
         console.log(`Criando campanha real no Meta Ads para conta ${adAccountId}`);
+        
+        // Validar o objetivo da campanha
+        const objective = campaignData.objective || DEFAULT_TRAFFIC_OBJECTIVE;
+        if (!isValidObjective(objective)) {
+            console.error(`Objetivo inválido: ${objective}. Usando objetivo padrão: ${DEFAULT_TRAFFIC_OBJECTIVE}`);
+            objective = DEFAULT_TRAFFIC_OBJECTIVE;
+        }
+        
+        console.log(`Usando objetivo: ${objective}`);
+        
         const response = await axios.post(
             `${META_API_BASE_URL}/${adAccountId}/campaigns`,
             {
                 name: campaignData.name,
-                objective: 'TRAFFIC',
+                objective: objective,
                 status: 'ACTIVE',
                 special_ad_categories: '[]',
                 access_token: userAccessToken // Usar token do usuário
@@ -54,6 +84,9 @@ const createCampaign = async (userAccessToken, adAccountId, campaignData) => {
         return response.data;
     } catch (error) {
         console.error('Erro ao criar campanha no Meta Ads:', error.response?.data || error.message);
+        if (error.response?.data) {
+            console.error('Detalhes do erro:', JSON.stringify(error.response.data));
+        }
         throw error;
     }
 };
@@ -101,6 +134,9 @@ const createAdSet = async (userAccessToken, adAccountId, campaignId, adSetData) 
         return response.data;
     } catch (error) {
         console.error('Erro ao criar conjunto de anúncios no Meta Ads:', error.response?.data || error.message);
+        if (error.response?.data) {
+            console.error('Detalhes do erro:', JSON.stringify(error.response.data));
+        }
         throw error;
     }
 };
@@ -149,6 +185,10 @@ const uploadImage = async (userAccessToken, adAccountId, file) => {
         return imageHash;
     } catch (error) {
         console.error('Erro ao fazer upload de imagem:', error.response?.data || error.message);
+        if (error.response?.data) {
+            console.error('Detalhes do erro:', JSON.stringify(error.response.data));
+        }
+        
         if (error.response) {
             console.error('Detalhes do erro de upload:', {
                 status: error.response.status,
@@ -226,6 +266,10 @@ const createAdCreative = async (userAccessToken, adAccountId, pageId, creativeDa
         return response.data;
     } catch (error) {
         console.error('Erro ao criar criativo de anúncio no Meta Ads:', error.response?.data || error.message);
+        if (error.response?.data) {
+            console.error('Detalhes do erro:', JSON.stringify(error.response.data));
+        }
+        
         if (error.response) {
             console.error('Detalhes do erro de criação de criativo:', {
                 status: error.response.status,
@@ -263,6 +307,10 @@ const createAd = async (userAccessToken, adAccountId, adSetId, creativeId, adDat
         return response.data;
     } catch (error) {
         console.error('Erro ao criar anúncio no Meta Ads:', error.response?.data || error.message);
+        if (error.response?.data) {
+            console.error('Detalhes do erro:', JSON.stringify(error.response.data));
+        }
+        
         if (error.response) {
             console.error('Detalhes do erro de criação de anúncio:', {
                 status: error.response.status,
@@ -314,7 +362,8 @@ const createFromImage = async (req, res) => {
             adDescription,
             adTitle,
             callToAction,
-            menuUrl
+            menuUrl,
+            objective
         } = req.body;
 
         // Log detalhado dos campos recebidos
@@ -328,7 +377,8 @@ const createFromImage = async (req, res) => {
             adDescription: adDescription ? `${adDescription.substring(0, 20)}...` : null,
             adTitle,
             callToAction,
-            menuUrl
+            menuUrl,
+            objective
         });
 
         // Verificar campos obrigatórios
@@ -360,6 +410,15 @@ const createFromImage = async (req, res) => {
                 camposFaltantes 
             });
         }
+        
+        // Validar objetivo da campanha se fornecido
+        if (objective && !isValidObjective(objective)) {
+            console.error('❌ Erro: Objetivo inválido:', objective);
+            return res.status(400).json({ 
+                message: `Objetivo inválido: ${objective}. Valores válidos: ${VALID_OBJECTIVES.join(', ')}`,
+                objetivosValidos: VALID_OBJECTIVES
+            });
+        }
 
         // Obter informações de localização
         let location = { latitude: -23.5505, longitude: -46.6333, radius: 10 }; // Padrão: São Paulo com raio de 10km
@@ -386,7 +445,7 @@ const createFromImage = async (req, res) => {
         console.log('Iniciando criação de campanha...');
         const campaignResult = await createCampaign(userAccessToken, adAccountId, {
             name: campaignName,
-            objective: 'TRAFFIC'
+            objective: objective || DEFAULT_TRAFFIC_OBJECTIVE
         });
 
         console.log('Iniciando criação de ad set...');
@@ -436,7 +495,8 @@ const createFromImage = async (req, res) => {
             adId: adResult.id,
             creativeId: creativeResult.id,
             createdAt: new Date(),
-            type: 'image'
+            type: 'image',
+            objective: objective || DEFAULT_TRAFFIC_OBJECTIVE
         };
 
         // Armazenar a campanha em memória (backup local)
@@ -457,6 +517,10 @@ const createFromImage = async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Erro ao criar anúncio a partir de imagem:', error.response?.data || error.message);
+        if (error.response?.data) {
+            console.error('Detalhes do erro:', JSON.stringify(error.response.data));
+        }
+        
         if (error.response) {
             console.error('Detalhes do erro:', {
                 status: error.response.status,
@@ -515,7 +579,8 @@ const createFromPost = async (req, res) => {
             endDate,
             postUrl,
             callToAction,
-            menuUrl
+            menuUrl,
+            objective
         } = req.body;
 
         // Log detalhado dos campos recebidos
@@ -528,7 +593,8 @@ const createFromPost = async (req, res) => {
             endDate,
             postUrl,
             callToAction,
-            menuUrl
+            menuUrl,
+            objective
         });
 
         // Verificar campos obrigatórios
@@ -557,6 +623,15 @@ const createFromPost = async (req, res) => {
             return res.status(400).json({ 
                 message: 'Campos obrigatórios não preenchidos', 
                 camposFaltantes 
+            });
+        }
+        
+        // Validar objetivo da campanha se fornecido
+        if (objective && !isValidObjective(objective)) {
+            console.error('❌ Erro: Objetivo inválido:', objective);
+            return res.status(400).json({ 
+                message: `Objetivo inválido: ${objective}. Valores válidos: ${VALID_OBJECTIVES.join(', ')}`,
+                objetivosValidos: VALID_OBJECTIVES
             });
         }
 
@@ -657,7 +732,7 @@ const createFromPost = async (req, res) => {
         console.log('Iniciando criação de campanha...');
         const campaignResult = await createCampaign(userAccessToken, adAccountId, {
             name: campaignName,
-            objective: 'TRAFFIC'
+            objective: objective || DEFAULT_TRAFFIC_OBJECTIVE
         });
 
         console.log('Iniciando criação de ad set...');
@@ -702,7 +777,8 @@ const createFromPost = async (req, res) => {
             adId: adResult.id,
             creativeId: creativeResult.id,
             createdAt: new Date(),
-            type: 'post'
+            type: 'post',
+            objective: objective || DEFAULT_TRAFFIC_OBJECTIVE
         };
 
         // Armazenar a campanha em memória (backup local)
@@ -723,6 +799,10 @@ const createFromPost = async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Erro ao criar anúncio a partir de post:', error.response?.data || error.message);
+        if (error.response?.data) {
+            console.error('Detalhes do erro:', JSON.stringify(error.response.data));
+        }
+        
         if (error.response) {
             console.error('Detalhes do erro:', {
                 status: error.response.status,
@@ -798,6 +878,10 @@ const getCampaigns = async (req, res) => {
 
     } catch (error) {
         console.error('❌ Erro ao buscar campanhas do Meta Ads:', error.response?.data || error.message);
+        if (error.response?.data) {
+            console.error('Detalhes do erro:', JSON.stringify(error.response.data));
+        }
+        
         if (error.response) {
             console.error('Detalhes do erro:', {
                 status: error.response.status,
