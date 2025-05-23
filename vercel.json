@@ -1,4 +1,11 @@
 {
-  "buildCommand": "pnpm install --no-frozen-lockfile && pnpm build",
-  "outputDirectory": "dist"
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/node",
+      "config": {
+        "installCommand": "pnpm install --no-frozen-lockfile"
+      }
+    }
+  ]
 }
