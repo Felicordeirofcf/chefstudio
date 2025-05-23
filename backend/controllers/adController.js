@@ -1,5 +1,5 @@
 const fetch = require("node-fetch");
-const User = require("../models/User");
+const User = require("../models/user");
 
 // ----------- CAMPANHAS REAL META ADS -----------
 
