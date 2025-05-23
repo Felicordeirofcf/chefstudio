@@ -1,17 +1,10 @@
 {
-  "name": "new-frontend",
+  "name": "chefstudio-frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --config vite.config.ts --logLevel warn",
-    "dev:silent": "cross-env NODE_ENV=production vite --config vite.config.ts",
-    "build:dev": "vite build --mode development",
-    "build:prod": "vite build --mode production",
-    "build:analyze": "vite build --mode production --report",
-    "build:analyze:report": "vite build --mode production --report",
-    "build:analyze:report:json": "vite build --mode production --report --report-json",
-    "build:analyze:report:json:html": "vite build --mode production --report --report-json --report-html",
+    "dev": "vite --config vite.config.ts",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint ."
@@ -46,7 +39,6 @@
     "@radix-ui/react-toggle-group": "^1.1.9",
     "@radix-ui/react-tooltip": "^1.2.6",
     "axios": "^1.9.0",
-    "bcryptjs": "^3.0.2",
     "bootstrap": "^5.3.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
