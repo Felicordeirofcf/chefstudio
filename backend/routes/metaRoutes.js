@@ -5,6 +5,13 @@ const metaController = require("../controllers/metaController");
 
 /**
  * @swagger
+ * tags:
+ *   name: Meta
+ *   description: Endpoints para integração com Facebook/Meta Ads
+ */
+
+/**
+ * @swagger
  * /api/meta/auth-url:
  *   get:
  *     summary: Obtém a URL de autorização do Facebook/Meta
@@ -27,7 +34,7 @@ const metaController = require("../controllers/metaController");
  *       500:
  *         description: "Erro interno do servidor (ex: variáveis de ambiente faltando)"
  */
-router.get("/auth-url", protect, metaController.getMetaAuthUrl); // Rota adicionada
+router.get("/auth-url", protect, metaController.getMetaAuthUrl);
 
 /**
  * @swagger
@@ -46,22 +53,89 @@ router.get("/auth-url", protect, metaController.getMetaAuthUrl); // Rota adicion
  *         name: state
  *         schema:
  *           type: string
- *         required: false
- *         description: Parâmetro de estado opcional para segurança
+ *         required: true
+ *         description: Parâmetro de estado (userId) para segurança
  *     responses:
  *       302:
  *         description: Redireciona para o frontend após processar o callback (sucesso ou erro)
  *       400:
- *         description: Código de autorização não fornecido
+ *         description: Código de autorização ou state ausente
  *       500:
  *         description: Erro no processamento do callback
  */
 router.get("/callback", metaController.facebookCallback);
 
-// Manter as outras rotas existentes...
-// Exemplo:
-// router.get("/status", protect, metaController.getConnectionStatus);
-// router.post("/disconnect", protect, metaController.disconnectMeta);
+/**
+ * @swagger
+ * /api/meta/connection-status:
+ *   get:
+ *     summary: Obtém o status da conexão Meta e dados associados (contas, páginas)
+ *     tags: [Meta]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Status da conexão e dados obtidos com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 isConnected:
+ *                   type: boolean
+ *                   description: Indica se o usuário está conectado ao Meta
+ *                 adAccounts:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       account_id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                   description: Lista de contas de anúncios associadas
+ *                 metaPages:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       access_token:
+ *                         type: string
+ *                   description: Lista de páginas do Facebook associadas (com Page Access Token)
+ *       401:
+ *         description: Não autorizado
+ *       404:
+ *         description: Usuário não encontrado
+ *       500:
+ *         description: Erro interno ao verificar status da conexão Meta
+ */
+router.get("/connection-status", protect, metaController.getConnectionStatus); // Rota adicionada e protegida
+
+/**
+ * @swagger
+ * /api/meta/disconnect:
+ *   post:
+ *     summary: Desconecta a conta Meta do usuário
+ *     tags: [Meta]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Conta Meta desconectada com sucesso
+ *       401:
+ *         description: Não autorizado
+ *       404:
+ *         description: Usuário não encontrado
+ *       500:
+ *         description: Erro interno ao desconectar conta Meta
+ */
+router.post("/disconnect", protect, metaController.disconnectMeta); // Rota adicionada e protegida (se existir)
 
 module.exports = router;
 
