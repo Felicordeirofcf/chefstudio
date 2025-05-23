@@ -21,6 +21,16 @@ const campaignsStore = {};
 // };
 
 /**
+ * Função auxiliar para obter o token Meta do usuário
+ * @param {object} user - Objeto do usuário autenticado
+ * @returns {string|null} - Token de acesso Meta ou null se não encontrado
+ */
+const getUserMetaToken = (user) => {
+    // Verificar ambos os campos para compatibilidade
+    return user.metaAccessToken || user.facebookAccessToken || null;
+};
+
+/**
  * Cria uma campanha no Meta Ads
  * @param {string} userAccessToken - Token de acesso do usuário Meta
  * @param {string} adAccountId - ID da conta de anúncios
@@ -229,12 +239,19 @@ const createFromImage = async (req, res) => {
     try {
         console.log('Iniciando criação de anúncio a partir de imagem (integração real)');
 
-        // Obter token de acesso do usuário autenticado
-        if (!req.user || !req.user.facebookAccessToken) {
-            console.error('❌ Erro: Token de acesso Meta do usuário não encontrado.');
-            return res.status(401).json({ message: 'Usuário não autenticado ou token Meta não encontrado. Por favor, conecte sua conta Meta.' });
+        // Verificar se o usuário está autenticado
+        if (!req.user) {
+            console.error('❌ Erro: Usuário não autenticado.');
+            return res.status(401).json({ message: 'Usuário não autenticado. Por favor, faça login novamente.' });
         }
-        const userAccessToken = req.user.facebookAccessToken;
+        
+        // Obter token de acesso do usuário autenticado (verificar ambos os campos para compatibilidade)
+        const userAccessToken = getUserMetaToken(req.user);
+        
+        if (!userAccessToken) {
+            console.error('❌ Erro: Token de acesso Meta do usuário não encontrado.');
+            return res.status(401).json({ message: 'Token Meta não encontrado. Por favor, conecte sua conta Meta.' });
+        }
 
         const {
             adAccountId,
@@ -366,12 +383,19 @@ const createFromPost = async (req, res) => {
     try {
         console.log('Iniciando criação de anúncio a partir de publicação existente (integração real)');
 
-        // Obter token de acesso do usuário autenticado
-        if (!req.user || !req.user.facebookAccessToken) {
-            console.error('❌ Erro: Token de acesso Meta do usuário não encontrado.');
-            return res.status(401).json({ message: 'Usuário não autenticado ou token Meta não encontrado. Por favor, conecte sua conta Meta.' });
+        // Verificar se o usuário está autenticado
+        if (!req.user) {
+            console.error('❌ Erro: Usuário não autenticado.');
+            return res.status(401).json({ message: 'Usuário não autenticado. Por favor, faça login novamente.' });
         }
-        const userAccessToken = req.user.facebookAccessToken;
+        
+        // Obter token de acesso do usuário autenticado (verificar ambos os campos para compatibilidade)
+        const userAccessToken = getUserMetaToken(req.user);
+        
+        if (!userAccessToken) {
+            console.error('❌ Erro: Token de acesso Meta do usuário não encontrado.');
+            return res.status(401).json({ message: 'Token Meta não encontrado. Por favor, conecte sua conta Meta.' });
+        }
 
         const {
             adAccountId,
@@ -394,10 +418,10 @@ const createFromPost = async (req, res) => {
         }
 
         // Obter informações de localização
-        let location = { latitude: -23.5505, longitude: -46.6333, radius: 10 }; // Padrão: São Paulo
+        let location = { latitude: -23.5505, longitude: -46.6333, radius: 10 }; // Padrão: São Paulo com raio de 10km
         if (req.body.location) {
             try {
-                 if (typeof req.body.location === 'string') {
+                if (typeof req.body.location === 'string') {
                     location = JSON.parse(req.body.location);
                 } else if (req.body['location[latitude]'] && req.body['location[longitude]'] && req.body['location[radius]']) {
                     location = {
@@ -408,33 +432,43 @@ const createFromPost = async (req, res) => {
                 }
             } catch (error) {
                 console.error('Erro ao processar localização:', error);
-                 // Continuar com a localização padrão
+                 // Continuar com a localização padrão se houver erro
             }
         }
 
         // Extrair ID da publicação da URL
         let postId = null;
-        const urlParts = postUrl.split('/');
-        // Tenta encontrar o ID numérico após 'posts', 'photos', 'videos' ou como último elemento
-        const potentialIdIndex = urlParts.findIndex(part => ['posts', 'photos', 'videos', 'permalink'].includes(part));
-        if (potentialIdIndex !== -1 && potentialIdIndex + 1 < urlParts.length && /^[0-9]+$/.test(urlParts[potentialIdIndex + 1])) {
-            postId = urlParts[potentialIdIndex + 1];
-        } else if (/^[0-9]+$/.test(urlParts[urlParts.length - 1])) {
-            postId = urlParts[urlParts.length - 1];
-        } else {
-            // Tentar extrair de parâmetros como fbid= ou story_fbid=
-             const urlParams = new URLSearchParams(postUrl.split('?')[1]);
-             postId = urlParams.get('fbid') || urlParams.get('story_fbid');
+        try {
+            // Tentar extrair o ID da publicação da URL
+            // Exemplo: https://www.facebook.com/123456789/posts/987654321
+            // ou https://www.facebook.com/permalink.php?story_fbid=987654321&id=123456789
+            const postUrlObj = new URL(postUrl);
+            const pathname = postUrlObj.pathname;
+            const searchParams = postUrlObj.searchParams;
+            
+            if (pathname.includes('/posts/')) {
+                // Formato: /username/posts/postid
+                postId = pathname.split('/posts/')[1].split('/')[0];
+            } else if (pathname.includes('/permalink.php')) {
+                // Formato: /permalink.php?story_fbid=postid&id=pageid
+                postId = searchParams.get('story_fbid');
+            } else {
+                // Tentar extrair de outros formatos
+                const matches = postUrl.match(/\/(\d+)(?:\/|$)/g);
+                if (matches && matches.length > 0) {
+                    postId = matches[matches.length - 1].replace(/\//g, '');
+                }
+            }
+            
+            if (!postId) {
+                throw new Error('Não foi possível extrair o ID da publicação da URL');
+            }
+        } catch (error) {
+            console.error('Erro ao extrair ID da publicação:', error);
+            return res.status(400).json({ message: 'URL da publicação inválida ou não suportada' });
         }
 
-        if (!postId) {
-            return res.status(400).json({
-                message: 'Não foi possível extrair o ID da publicação da URL fornecida. Verifique o formato.',
-                postUrl
-            });
-        }
-
-        // Criar campanha, ad set, criativo e anúncio em sequência usando o token do usuário
+        // Criar campanha, ad set, criativo e anúncio em sequência
         const campaignResult = await createCampaign(userAccessToken, adAccountId, {
             name: campaignName,
             objective: 'TRAFFIC'
@@ -513,12 +547,19 @@ const getCampaigns = async (req, res) => {
     try {
         console.log('Buscando campanhas do Meta Ads (integração real)');
 
-        // Obter token de acesso do usuário autenticado
-        if (!req.user || !req.user.facebookAccessToken) {
-            console.error('❌ Erro: Token de acesso Meta do usuário não encontrado.');
-            return res.status(401).json({ message: 'Usuário não autenticado ou token Meta não encontrado. Por favor, conecte sua conta Meta.' });
+        // Verificar se o usuário está autenticado
+        if (!req.user) {
+            console.error('❌ Erro: Usuário não autenticado.');
+            return res.status(401).json({ message: 'Usuário não autenticado. Por favor, faça login novamente.' });
         }
-        const userAccessToken = req.user.facebookAccessToken;
+        
+        // Obter token de acesso do usuário autenticado (verificar ambos os campos para compatibilidade)
+        const userAccessToken = getUserMetaToken(req.user);
+        
+        if (!userAccessToken) {
+            console.error('❌ Erro: Token de acesso Meta do usuário não encontrado.');
+            return res.status(401).json({ message: 'Token Meta não encontrado. Por favor, conecte sua conta Meta.' });
+        }
 
         const { adAccountId } = req.query;
 
@@ -564,4 +605,3 @@ module.exports = {
     // Exportar funções auxiliares se forem usadas em outros lugares (não é o caso aqui)
     // createCampaign, createAdSet, uploadImage, createAdCreative, createAd
 };
-
