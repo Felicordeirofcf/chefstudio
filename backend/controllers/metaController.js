@@ -890,7 +890,18 @@ const createAdFromImage = asyncHandler(async (req, res) => {
         dailyBudget: parseFloat(dailyBudget),
         startDate,
         endDate,
-        targetCountry: targetCountry || "BR",
+        targetCountry: targetCountry || "BR"
+      }
+    });
+  } catch (error) {
+    console.error("Erro ao criar anúncio com imagem:", error);
+    res.status(500).json({
+      success: false,
+      message: `Erro ao criar anúncio: ${error.message}`
+    });
+  }
+});
+
 // Esta função já está definida no topo do arquivo como expressão de função
 // Removida para evitar duplicidade e erro de sintaxe
 
