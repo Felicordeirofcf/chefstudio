@@ -1,58 +1,27 @@
 const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
+const path = require('path');
 
 // Configurações da API do Meta
 const META_API_VERSION = 'v18.0'; // Usar a versão mais recente da API
 const META_API_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 
-// Armazenamento em memória para campanhas criadas (simulação)
-// Em um ambiente de produção, isso seria substituído por um banco de dados
-const campaignsStore = {
-    // Mapeamento de adAccountId para array de campanhas
-    // Exemplo: { 'act_123456789': [campaign1, campaign2, ...] }
-};
+// Armazenamento em memória para campanhas criadas (backup local)
+const campaignsStore = {};
 
-// Adicionar algumas campanhas de exemplo para cada conta
-const addExampleCampaigns = (adAccountId) => {
-    if (!campaignsStore[adAccountId]) {
-        campaignsStore[adAccountId] = [
-            {
-                id: '23848123456789',
-                campaignId: '23848123456789',
-                name: 'Campanha de Verão',
-                status: 'ACTIVE',
-                weeklyBudget: 350.00,
-                dailyBudget: 50.00,
-                startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-                endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-                adAccountId: adAccountId,
-                metrics: {
-                    reach: 1234,
-                    impressions: 5678,
-                    clicks: 89,
-                    spend: 123.45
-                }
-            },
-            {
-                id: '23848987654321',
-                campaignId: '23848987654321',
-                name: 'Promoção de Fim de Semana',
-                status: 'PAUSED',
-                weeklyBudget: 210.00,
-                dailyBudget: 30.00,
-                startDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-                endDate: null,
-                adAccountId: adAccountId,
-                metrics: {
-                    reach: 567,
-                    impressions: 2345,
-                    clicks: 45,
-                    spend: 67.89
-                }
-            }
-        ];
+// Função para obter o token de acesso do ambiente
+const getAccessToken = () => {
+    // Em produção, isso viria de um sistema seguro de gerenciamento de tokens
+    // Por exemplo, de variáveis de ambiente, banco de dados ou serviço de segredos
+    const accessToken = process.env.META_ACCESS_TOKEN;
+    
+    if (!accessToken) {
+        console.error('META_ACCESS_TOKEN não encontrado no ambiente');
+        throw new Error('Token de acesso do Meta não configurado');
     }
+    
+    return accessToken;
 };
 
 /**
@@ -64,29 +33,23 @@ const addExampleCampaigns = (adAccountId) => {
  */
 const createCampaign = async (accessToken, adAccountId, campaignData) => {
     try {
-        // Em um ambiente real, esta seria a chamada para a API do Meta
-        // const response = await axios.post(
-        //     `${META_API_BASE_URL}/${adAccountId}/campaigns`,
-        //     {
-        //         name: campaignData.name,
-        //         objective: 'TRAFFIC',
-        //         status: 'ACTIVE', // Definir explicitamente como ACTIVE
-        //         special_ad_categories: '[]',
-        //         access_token: accessToken
-        //     }
-        // );
-        // return response.data;
-
-        // Simulação da resposta da API
-        const campaignId = `23848${Math.floor(Math.random() * 10000000)}`;
-        return {
-            id: campaignId,
-            name: campaignData.name,
-            status: 'ACTIVE',
-            objective: 'TRAFFIC'
-        };
+        console.log(`Criando campanha real no Meta Ads para conta ${adAccountId}`);
+        
+        const response = await axios.post(
+            `${META_API_BASE_URL}/${adAccountId}/campaigns`,
+            {
+                name: campaignData.name,
+                objective: 'TRAFFIC',
+                status: 'ACTIVE', // Definir explicitamente como ACTIVE
+                special_ad_categories: '[]',
+                access_token: accessToken
+            }
+        );
+        
+        console.log('Campanha criada com sucesso:', response.data);
+        return response.data;
     } catch (error) {
-        console.error('Erro ao criar campanha no Meta Ads:', error);
+        console.error('Erro ao criar campanha no Meta Ads:', error.response?.data || error.message);
         throw error;
     }
 };
@@ -101,48 +64,79 @@ const createCampaign = async (accessToken, adAccountId, campaignData) => {
  */
 const createAdSet = async (accessToken, adAccountId, campaignId, adSetData) => {
     try {
-        // Em um ambiente real, esta seria a chamada para a API do Meta
-        // const dailyBudget = Math.round(adSetData.weeklyBudget / 7 * 100); // Converter para centavos
-        // const response = await axios.post(
-        //     `${META_API_BASE_URL}/${adAccountId}/adsets`,
-        //     {
-        //         name: `${adSetData.name} - AdSet`,
-        //         campaign_id: campaignId,
-        //         daily_budget: dailyBudget,
-        //         bid_amount: 1000, // 10 USD em centavos
-        //         billing_event: 'IMPRESSIONS',
-        //         optimization_goal: 'LINK_CLICKS',
-        //         targeting: {
-        //             geo_locations: {
-        //                 custom_locations: [
-        //                     {
-        //                         latitude: adSetData.location.latitude,
-        //                         longitude: adSetData.location.longitude,
-        //                         radius: adSetData.location.radius,
-        //                         distance_unit: 'kilometer'
-        //                     }
-        //                 ]
-        //             }
-        //         },
-        //         status: 'ACTIVE', // Definir explicitamente como ACTIVE
-        //         start_time: new Date(adSetData.startDate).toISOString(),
-        //         end_time: adSetData.endDate ? new Date(adSetData.endDate).toISOString() : null,
-        //         access_token: accessToken
-        //     }
-        // );
-        // return response.data;
-
-        // Simulação da resposta da API
-        const adSetId = `23848${Math.floor(Math.random() * 10000000)}`;
-        return {
-            id: adSetId,
-            name: `${adSetData.name} - AdSet`,
-            campaign_id: campaignId,
-            status: 'ACTIVE',
-            daily_budget: Math.round(adSetData.weeklyBudget / 7 * 100)
-        };
+        console.log(`Criando ad set real no Meta Ads para campanha ${campaignId}`);
+        
+        const dailyBudget = Math.round(adSetData.weeklyBudget / 7 * 100); // Converter para centavos
+        
+        const response = await axios.post(
+            `${META_API_BASE_URL}/${adAccountId}/adsets`,
+            {
+                name: `${adSetData.name} - AdSet`,
+                campaign_id: campaignId,
+                daily_budget: dailyBudget,
+                bid_amount: 1000, // 10 USD em centavos
+                billing_event: 'IMPRESSIONS',
+                optimization_goal: 'LINK_CLICKS',
+                targeting: {
+                    geo_locations: {
+                        custom_locations: [
+                            {
+                                latitude: adSetData.location.latitude,
+                                longitude: adSetData.location.longitude,
+                                radius: adSetData.location.radius,
+                                distance_unit: 'kilometer'
+                            }
+                        ]
+                    }
+                },
+                status: 'ACTIVE', // Definir explicitamente como ACTIVE
+                start_time: new Date(adSetData.startDate).toISOString(),
+                end_time: adSetData.endDate ? new Date(adSetData.endDate).toISOString() : null,
+                access_token: accessToken
+            }
+        );
+        
+        console.log('Ad Set criado com sucesso:', response.data);
+        return response.data;
     } catch (error) {
-        console.error('Erro ao criar conjunto de anúncios no Meta Ads:', error);
+        console.error('Erro ao criar conjunto de anúncios no Meta Ads:', error.response?.data || error.message);
+        throw error;
+    }
+};
+
+/**
+ * Faz upload de uma imagem para o Meta Ads
+ * @param {string} accessToken - Token de acesso do Meta
+ * @param {string} adAccountId - ID da conta de anúncios
+ * @param {object} file - Arquivo de imagem
+ * @returns {Promise<string>} - Hash da imagem
+ */
+const uploadImage = async (accessToken, adAccountId, file) => {
+    try {
+        console.log(`Fazendo upload de imagem para conta ${adAccountId}`);
+        
+        const formData = new FormData();
+        formData.append('access_token', accessToken);
+        formData.append('image', fs.createReadStream(file.path));
+        
+        const uploadResponse = await axios.post(
+            `${META_API_BASE_URL}/${adAccountId}/adimages`,
+            formData,
+            {
+                headers: {
+                    ...formData.getHeaders()
+                }
+            }
+        );
+        
+        // Extrair o hash da imagem da resposta
+        const images = uploadResponse.data.images;
+        const imageHash = Object.keys(images)[0];
+        
+        console.log('Upload de imagem concluído, hash:', imageHash);
+        return imageHash;
+    } catch (error) {
+        console.error('Erro ao fazer upload de imagem:', error.response?.data || error.message);
         throw error;
     }
 };
@@ -158,67 +152,49 @@ const createAdSet = async (accessToken, adAccountId, campaignId, adSetData) => {
  */
 const createAdCreative = async (accessToken, adAccountId, pageId, creativeData, file = null) => {
     try {
-        // Em um ambiente real, primeiro faríamos upload da imagem
-        // let imageHash = null;
-        // if (file) {
-        //     const formData = new FormData();
-        //     formData.append('access_token', accessToken);
-        //     formData.append('image', fs.createReadStream(file.path));
-        //     
-        //     const uploadResponse = await axios.post(
-        //         `${META_API_BASE_URL}/${adAccountId}/adimages`,
-        //         formData,
-        //         {
-        //             headers: formData.getHeaders()
-        //         }
-        //     );
-        //     
-        //     // Extrair o hash da imagem da resposta
-        //     const images = uploadResponse.data.images;
-        //     imageHash = Object.keys(images)[0];
-        // }
-        //
-        // // Criar o criativo com a imagem ou com o post
-        // const creativePayload = {
-        //     name: `${creativeData.name} - Creative`,
-        //     object_story_spec: {
-        //         page_id: pageId,
-        //         link_data: {
-        //             message: creativeData.adDescription,
-        //             link: creativeData.menuUrl || 'https://chefstudio.com',
-        //             call_to_action: {
-        //                 type: creativeData.callToAction || 'LEARN_MORE'
-        //             }
-        //         }
-        //     },
-        //     access_token: accessToken
-        // };
-        //
-        // // Adicionar imagem se disponível
-        // if (imageHash) {
-        //     creativePayload.object_story_spec.link_data.image_hash = imageHash;
-        // }
-        //
-        // // Adicionar título se disponível
-        // if (creativeData.adTitle) {
-        //     creativePayload.object_story_spec.link_data.name = creativeData.adTitle;
-        // }
-        //
-        // const response = await axios.post(
-        //     `${META_API_BASE_URL}/${adAccountId}/adcreatives`,
-        //     creativePayload
-        // );
-        // return response.data;
-
-        // Simulação da resposta da API
-        const creativeId = `23848${Math.floor(Math.random() * 10000000)}`;
-        return {
-            id: creativeId,
+        console.log(`Criando ad creative real no Meta Ads para conta ${adAccountId}`);
+        
+        // Fazer upload da imagem se fornecida
+        let imageHash = null;
+        if (file) {
+            imageHash = await uploadImage(accessToken, adAccountId, file);
+        }
+        
+        // Criar o criativo com a imagem ou com o post
+        const creativePayload = {
             name: `${creativeData.name} - Creative`,
-            effective_object_story_id: `${pageId}_${Math.floor(Math.random() * 10000000)}`
+            object_story_spec: {
+                page_id: pageId,
+                link_data: {
+                    message: creativeData.adDescription,
+                    link: creativeData.menuUrl || 'https://chefstudio.com',
+                    call_to_action: {
+                        type: creativeData.callToAction || 'LEARN_MORE'
+                    }
+                }
+            },
+            access_token: accessToken
         };
+        
+        // Adicionar imagem se disponível
+        if (imageHash) {
+            creativePayload.object_story_spec.link_data.image_hash = imageHash;
+        }
+        
+        // Adicionar título se disponível
+        if (creativeData.adTitle) {
+            creativePayload.object_story_spec.link_data.name = creativeData.adTitle;
+        }
+        
+        const response = await axios.post(
+            `${META_API_BASE_URL}/${adAccountId}/adcreatives`,
+            creativePayload
+        );
+        
+        console.log('Ad Creative criado com sucesso:', response.data);
+        return response.data;
     } catch (error) {
-        console.error('Erro ao criar criativo de anúncio no Meta Ads:', error);
+        console.error('Erro ao criar criativo de anúncio no Meta Ads:', error.response?.data || error.message);
         throw error;
     }
 };
@@ -234,30 +210,23 @@ const createAdCreative = async (accessToken, adAccountId, pageId, creativeData, 
  */
 const createAd = async (accessToken, adAccountId, adSetId, creativeId, adData) => {
     try {
-        // Em um ambiente real, esta seria a chamada para a API do Meta
-        // const response = await axios.post(
-        //     `${META_API_BASE_URL}/${adAccountId}/ads`,
-        //     {
-        //         name: `${adData.name} - Ad`,
-        //         adset_id: adSetId,
-        //         creative: { creative_id: creativeId },
-        //         status: 'ACTIVE', // Definir explicitamente como ACTIVE
-        //         access_token: accessToken
-        //     }
-        // );
-        // return response.data;
-
-        // Simulação da resposta da API
-        const adId = `23848${Math.floor(Math.random() * 10000000)}`;
-        return {
-            id: adId,
-            name: `${adData.name} - Ad`,
-            adset_id: adSetId,
-            creative: { id: creativeId },
-            status: 'ACTIVE'
-        };
+        console.log(`Criando anúncio real no Meta Ads para ad set ${adSetId}`);
+        
+        const response = await axios.post(
+            `${META_API_BASE_URL}/${adAccountId}/ads`,
+            {
+                name: `${adData.name} - Ad`,
+                adset_id: adSetId,
+                creative: { creative_id: creativeId },
+                status: 'ACTIVE', // Definir explicitamente como ACTIVE
+                access_token: accessToken
+            }
+        );
+        
+        console.log('Anúncio criado com sucesso:', response.data);
+        return response.data;
     } catch (error) {
-        console.error('Erro ao criar anúncio no Meta Ads:', error);
+        console.error('Erro ao criar anúncio no Meta Ads:', error.response?.data || error.message);
         throw error;
     }
 };
@@ -267,6 +236,8 @@ const createAd = async (accessToken, adAccountId, adSetId, creativeId, adData) =
  */
 const createFromImage = async (req, res) => {
     try {
+        console.log('Iniciando criação de anúncio a partir de imagem (integração real)');
+        
         const { 
             adAccountId, 
             pageId, 
@@ -308,11 +279,10 @@ const createFromImage = async (req, res) => {
             }
         }
         
-        // Em um ambiente real, obteríamos o token de acesso do usuário
-        const accessToken = 'SIMULATED_ACCESS_TOKEN';
+        // Obter token de acesso do ambiente
+        const accessToken = getAccessToken();
         
         // Criar campanha, ad set, criativo e anúncio em sequência
-        // Em um ambiente real, estas seriam chamadas reais para a API do Meta
         const campaignResult = await createCampaign(accessToken, adAccountId, {
             name: campaignName,
             objective: 'TRAFFIC'
@@ -354,8 +324,8 @@ const createFromImage = async (req, res) => {
             adTitle: adTitle || null,
             callToAction: callToAction || 'LEARN_MORE',
             menuUrl: menuUrl || null,
-            status: 'ACTIVE', // Definir explicitamente como ACTIVE
-            imageUrl: req.file ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` : null,
+            status: 'ACTIVE',
+            imageUrl: req.file ? `${req.protocol}://${req.get('host')}/uploads/${path.basename(req.file.path)}` : null,
             adSetId: adSetResult.id,
             adId: adResult.id,
             creativeId: creativeResult.id,
@@ -363,7 +333,7 @@ const createFromImage = async (req, res) => {
             type: 'image'
         };
         
-        // Armazenar a campanha em memória
+        // Armazenar a campanha em memória (backup local)
         if (!campaignsStore[adAccountId]) {
             campaignsStore[adAccountId] = [];
         }
@@ -381,10 +351,10 @@ const createFromImage = async (req, res) => {
             adDetails
         });
     } catch (error) {
-        console.error('Erro ao criar anúncio a partir de imagem:', error);
+        console.error('Erro ao criar anúncio a partir de imagem:', error.response?.data || error.message);
         res.status(500).json({ 
             message: 'Erro ao criar anúncio',
-            error: error.message
+            error: error.response?.data || error.message
         });
     }
 };
@@ -394,6 +364,8 @@ const createFromImage = async (req, res) => {
  */
 const createFromPost = async (req, res) => {
     try {
+        console.log('Iniciando criação de anúncio a partir de publicação existente (integração real)');
+        
         const { 
             adAccountId, 
             pageId, 
@@ -449,16 +421,16 @@ const createFromPost = async (req, res) => {
             });
         }
         
-        // Em um ambiente real, obteríamos o token de acesso do usuário
-        const accessToken = 'SIMULATED_ACCESS_TOKEN';
+        // Obter token de acesso do ambiente
+        const accessToken = getAccessToken();
         
-        // Criar campanha, ad set, criativo e anúncio em sequência
-        // Em um ambiente real, estas seriam chamadas reais para a API do Meta
+        // Criar campanha com status ACTIVE
         const campaignResult = await createCampaign(accessToken, adAccountId, {
             name: campaignName,
             objective: 'TRAFFIC'
         });
         
+        // Criar ad set com status ACTIVE
         const adSetResult = await createAdSet(accessToken, adAccountId, campaignResult.id, {
             name: campaignName,
             weeklyBudget: parseFloat(weeklyBudget),
@@ -467,15 +439,25 @@ const createFromPost = async (req, res) => {
             location: location
         });
         
-        // Para publicações existentes, o criativo seria diferente
-        // Simulação da resposta da API
-        const creativeId = `23848${Math.floor(Math.random() * 10000000)}`;
-        const creativeResult = {
-            id: creativeId,
+        // Para publicações existentes, o criativo é diferente
+        console.log(`Criando ad creative para publicação existente ${postId}`);
+        
+        // Criar criativo baseado em uma publicação existente
+        const creativePayload = {
             name: `${campaignName} - Creative`,
-            effective_object_story_id: `${pageId}_${postId}`
+            object_story_id: `${pageId}_${postId}`,
+            access_token: accessToken
         };
         
+        const creativeResponse = await axios.post(
+            `${META_API_BASE_URL}/${adAccountId}/adcreatives`,
+            creativePayload
+        );
+        
+        const creativeResult = creativeResponse.data;
+        console.log('Ad Creative criado com sucesso a partir de publicação:', creativeResult);
+        
+        // Criar anúncio com status ACTIVE
         const adResult = await createAd(accessToken, adAccountId, adSetResult.id, creativeResult.id, {
             name: campaignName
         });
@@ -494,7 +476,7 @@ const createFromPost = async (req, res) => {
             location: location,
             callToAction: callToAction || 'LEARN_MORE',
             menuUrl: menuUrl || null,
-            status: 'ACTIVE', // Definir explicitamente como ACTIVE
+            status: 'ACTIVE',
             postId: postId,
             postUrl: postUrl,
             adSetId: adSetResult.id,
@@ -504,7 +486,7 @@ const createFromPost = async (req, res) => {
             type: 'post'
         };
         
-        // Armazenar a campanha em memória
+        // Armazenar a campanha em memória (backup local)
         if (!campaignsStore[adAccountId]) {
             campaignsStore[adAccountId] = [];
         }
@@ -522,16 +504,16 @@ const createFromPost = async (req, res) => {
             adDetails
         });
     } catch (error) {
-        console.error('Erro ao criar anúncio a partir de publicação:', error);
+        console.error('Erro ao criar anúncio a partir de publicação:', error.response?.data || error.message);
         res.status(500).json({ 
             message: 'Erro ao criar anúncio',
-            error: error.message
+            error: error.response?.data || error.message
         });
     }
 };
 
 /**
- * Obtém as campanhas do usuário
+ * Obtém as campanhas do usuário diretamente da API do Meta
  */
 const getCampaigns = async (req, res) => {
     try {
@@ -541,21 +523,68 @@ const getCampaigns = async (req, res) => {
             return res.status(400).json({ message: 'ID da conta de anúncios é obrigatório' });
         }
         
-        // Adicionar campanhas de exemplo se não houver nenhuma para esta conta
-        if (!campaignsStore[adAccountId]) {
-            addExampleCampaigns(adAccountId);
-        }
+        console.log(`Buscando campanhas reais para conta ${adAccountId}`);
         
-        // Retornar as campanhas armazenadas para esta conta
+        // Obter token de acesso do ambiente
+        const accessToken = getAccessToken();
+        
+        // Buscar campanhas diretamente da API do Meta
+        const response = await axios.get(
+            `${META_API_BASE_URL}/${adAccountId}/campaigns`,
+            {
+                params: {
+                    fields: 'id,name,status,objective,created_time,start_time,stop_time,daily_budget,lifetime_budget',
+                    access_token: accessToken
+                }
+            }
+        );
+        
+        console.log(`Encontradas ${response.data.data.length} campanhas na API do Meta`);
+        
+        // Mapear as campanhas para o formato esperado pelo frontend
+        const campaigns = response.data.data.map(campaign => {
+            return {
+                id: campaign.id,
+                campaignId: campaign.id,
+                name: campaign.name,
+                status: campaign.status,
+                objective: campaign.objective,
+                startDate: campaign.start_time,
+                endDate: campaign.stop_time,
+                dailyBudget: campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : null, // Converter de centavos
+                weeklyBudget: campaign.daily_budget ? (parseFloat(campaign.daily_budget) / 100) * 7 : null,
+                createdAt: campaign.created_time
+            };
+        });
+        
+        // Adicionar campanhas do armazenamento local que ainda não foram sincronizadas
+        const localCampaigns = campaignsStore[adAccountId] || [];
+        const allCampaigns = [...campaigns];
+        
+        // Adicionar campanhas locais que não estão na lista da API
+        localCampaigns.forEach(localCampaign => {
+            if (!allCampaigns.some(c => c.id === localCampaign.id)) {
+                allCampaigns.push(localCampaign);
+            }
+        });
+        
+        // Ordenar por data de criação (mais recentes primeiro)
+        allCampaigns.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        
         res.json({
             success: true,
-            campaigns: campaignsStore[adAccountId] || []
+            campaigns: allCampaigns
         });
     } catch (error) {
-        console.error('Erro ao obter campanhas:', error);
-        res.status(500).json({ 
-            message: 'Erro ao obter campanhas',
-            error: error.message
+        console.error('Erro ao obter campanhas:', error.response?.data || error.message);
+        
+        // Em caso de erro na API, tentar retornar as campanhas armazenadas localmente
+        const localCampaigns = campaignsStore[req.query.adAccountId] || [];
+        
+        res.json({
+            success: true,
+            campaigns: localCampaigns,
+            warning: 'Usando dados locais devido a erro na API do Meta'
         });
     }
 };
