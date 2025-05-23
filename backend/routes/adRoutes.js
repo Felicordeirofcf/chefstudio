@@ -134,8 +134,6 @@ router.get("/location", protect, getLocationSettings);
  *       500:
  *         description: Erro interno do servidor
  */
-// Middleware for image upload
-// Route handler for creating the campaign
 router.post("/create-recommended-traffic-campaign", protect, upload.single("imageFile"), createRecommendedTrafficCampaign);
 
 
