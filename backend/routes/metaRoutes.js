@@ -1,33 +1,27 @@
-// Arquivo de rotas do backend corrigido para garantir consistência de endpoints
 const express = require('express');
 const router = express.Router();
-const metaController = require('../controllers/metaController');
 const { protect } = require('../middleware/authMiddleware');
+const metaController = require('../controllers/metaController');
 
 /**
  * @swagger
  * /api/meta/login:
  *   get:
- *     summary: Iniciar login com Facebook/Meta
+ *     summary: Obter URL de autenticação do Meta
  *     tags: [Meta]
- *     parameters:
- *       - in: query
- *         name: userId
- *         schema:
- *           type: string
- *         required: true
- *         description: ID do usuário que está iniciando o login
  *     responses:
- *       302:
- *         description: Redirecionamento para a página de autorização do Facebook
+ *       200:
+ *         description: URL de autenticação obtida com sucesso
+ *       500:
+ *         description: Erro ao obter URL de autenticação
  */
-router.get("/login", metaController.facebookLogin);
+router.get("/login", metaController.getMetaLoginUrl);
 
 /**
  * @swagger
  * /api/meta/callback:
  *   get:
- *     summary: Callback do Facebook após autorização
+ *     summary: Callback do Meta após autenticação
  *     tags: [Meta]
  *     parameters:
  *       - in: query
@@ -35,42 +29,38 @@ router.get("/login", metaController.facebookLogin);
  *         schema:
  *           type: string
  *         required: true
- *         description: Código de autorização fornecido pelo Facebook
- *       - in: query
- *         name: state
- *         schema:
- *           type: string
- *         required: true
- *         description: Estado passado na requisição inicial (contém userId)
+ *         description: Código de autorização
  *     responses:
- *       302:
- *         description: Redirecionamento para a página de callback no frontend
+ *       200:
+ *         description: Autenticação realizada com sucesso
+ *       400:
+ *         description: Código de autorização não fornecido
+ *       500:
+ *         description: Erro no callback do Meta
  */
 router.get("/callback", metaController.facebookCallback);
 
 /**
  * @swagger
- * /api/meta/connection-status:
+ * /api/meta/status:
  *   get:
- *     summary: Obter status de conexão com Meta
+ *     summary: Verificar status da conexão com o Meta
  *     tags: [Meta]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Status de conexão obtido com sucesso
+ *         description: Status da conexão obtido com sucesso
  *       401:
  *         description: Não autorizado
- *       404:
- *         description: Usuário não encontrado
  */
-router.get("/connection-status", protect, metaController.getConnectionStatus);
+router.get("/status", protect, metaController.getConnectionStatus);
 
 /**
  * @swagger
  * /api/meta/verify-connection:
  *   get:
- *     summary: Verificar e atualizar status de conexão Meta
+ *     summary: Verificar e atualizar status da conexão com o Meta
  *     tags: [Meta]
  *     security:
  *       - bearerAuth: []
