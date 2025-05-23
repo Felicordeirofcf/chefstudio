@@ -15,10 +15,10 @@ const { protect } = require("../middleware/authMiddleware");
 const multer = require("multer");
 const path = require("path"); // Import path module
 
-// Configuração do Multer (sintaxe corrigida na linha 22)
+// Configuração do Multer (sintaxe corrigida)
 const storage = multer.diskStorage({ 
     destination: function (req, file, cb) {
-        cb(null, '/tmp/'); // Diretório temporário - Sintaxe corrigida
+        cb(null, '/tmp/'); // Diretório temporário
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1E9);
@@ -134,13 +134,9 @@ router.get("/location", protect, getLocationSettings);
  *       500:
  *         description: Erro interno do servidor
  */
-// Usar upload.single(
-"imageFile"
-) para lidar com o upload da imagem
-// A função createRecommendedTrafficCampaign é importada do metaController
-router.post("/create-recommended-traffic-campaign", protect, upload.single(
-"imageFile"
-), createRecommendedTrafficCampaign);
+// Middleware for image upload
+// Route handler for creating the campaign
+router.post("/create-recommended-traffic-campaign", protect, upload.single("imageFile"), createRecommendedTrafficCampaign);
 
 
 module.exports = router;
