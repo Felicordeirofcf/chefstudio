@@ -1,135 +1,159 @@
-// Componente para exibir produtos anunciados com tratamento de erros aprimorado
-// Arquivo: frontend/src/components/ProdutosAnunciados.jsx
 import React, { useState, useEffect } from 'react';
-import { api } from '../lib/api';
+import { Card, Button, Container, Row, Col, Badge, Image, Spinner } from 'react-bootstrap';
+import { useAuth } from '../hooks/useAuth';
+import api from '../lib/api-fetch';
 
 const ProdutosAnunciados = () => {
-  const [anuncios, setAnuncios] = useState([]);
+  const [campanhas, setCampanhas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [pausingCampaign, setPausingCampaign] = useState(null);
+  const { token } = useAuth();
 
-  // Carregar anúncios ao inicializar o componente
-  const carregarAnuncios = async () => {
+  const fetchCampanhas = async () => {
     try {
       setLoading(true);
-      setError(null);
-      
-      // Usar o endpoint correto com prefixo /api
-      const response = await api.get('/api/meta/campaigns');
-      
-      // Garantir que o resultado seja um array
-      if (Array.isArray(response.data)) {
-        setAnuncios(response.data);
-      } else if (response.data && Array.isArray(response.data.campaigns)) {
-        // Caso a API retorne um objeto com propriedade campaigns
-        setAnuncios(response.data.campaigns);
-      } else {
-        // Caso a API retorne um formato inesperado, usar array vazio
-        console.warn('Formato de resposta inesperado:', response.data);
-        setAnuncios([]);
-      }
+      const response = await api.get('/api/meta/campaigns', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      setCampanhas(response.data);
     } catch (err) {
-      console.error('Erro ao carregar anúncios:', err);
-      setError('Não foi possível carregar os anúncios. Por favor, tente novamente.');
-      // Garantir que anuncios seja sempre um array mesmo em caso de erro
-      setAnuncios([]);
+      console.error('Erro ao buscar campanhas:', err);
+      setError('Não foi possível carregar as campanhas. Por favor, tente novamente.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Carregar anúncios ao inicializar
   useEffect(() => {
-    carregarAnuncios();
-  }, []);
+    if (token) {
+      fetchCampanhas();
+    }
+  }, [token]);
 
-  // Ouvir evento de criação de anúncio para atualizar a lista
-  useEffect(() => {
-    const handleAnuncioCreated = () => {
-      carregarAnuncios();
-    };
-    
-    window.addEventListener('anuncioCreated', handleAnuncioCreated);
-    
-    return () => {
-      window.removeEventListener('anuncioCreated', handleAnuncioCreated);
-    };
-  }, []);
+  const handlePauseCampaign = async (campaignId) => {
+    try {
+      setPausingCampaign(campaignId);
+      await api.post('/api/meta/pause-campaign', 
+        { campaignId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      
+      // Atualizar a lista de campanhas após pausar
+      fetchCampanhas();
+    } catch (err) {
+      console.error('Erro ao pausar campanha:', err);
+      setError('Não foi possível pausar a campanha. Por favor, tente novamente.');
+    } finally {
+      setPausingCampaign(null);
+    }
+  };
 
-  if (loading && anuncios.length === 0) {
+  if (loading && campanhas.length === 0) {
     return (
-      <div className="flex justify-center p-8">
-        <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-      </div>
+      <Container className="py-4 text-center">
+        <Spinner animation="border" role="status">
+          <span className="visually-hidden">Carregando...</span>
+        </Spinner>
+        <p className="mt-2">Carregando campanhas...</p>
+      </Container>
     );
   }
 
-  if (error && anuncios.length === 0) {
+  if (error) {
     return (
-      <div className="p-4 mt-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
-        {error}
-      </div>
-    );
-  }
-
-  if (!Array.isArray(anuncios) || anuncios.length === 0) {
-    return (
-      <div className="mt-8">
-        <h2 className="text-xl font-semibold mb-2">
-          Produtos Anunciados
-        </h2>
-        <div className="p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-md">
-          Você ainda não tem anúncios criados. Use o formulário acima para criar seu primeiro anúncio.
+      <Container className="py-4">
+        <div className="alert alert-danger" role="alert">
+          {error}
         </div>
-      </div>
+      </Container>
+    );
+  }
+
+  if (campanhas.length === 0) {
+    return (
+      <Container className="py-4">
+        <Card className="text-center">
+          <Card.Body>
+            <Card.Title>Nenhuma campanha encontrada</Card.Title>
+            <Card.Text>
+              Você ainda não criou nenhuma campanha. Faça upload de uma imagem para criar sua primeira campanha.
+            </Card.Text>
+          </Card.Body>
+        </Card>
+      </Container>
     );
   }
 
   return (
-    <div className="mt-8">
-      <h2 className="text-xl font-semibold mb-2">
-        Produtos Anunciados
-      </h2>
-      <p className="text-sm text-gray-500 mb-4">
-        Todos os anúncios que você criou aparecem aqui. Clique em um anúncio para ver mais detalhes.
-      </p>
-      
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {Array.isArray(anuncios) && anuncios.map((anuncio) => (
-          <div key={anuncio?.id || Math.random().toString(36)} className="border rounded-md overflow-hidden flex flex-col h-full bg-white shadow-sm">
-            <img
-              src={anuncio?.imageUrl || 'https://via.placeholder.com/300x140?text=Anúncio'}
-              alt={anuncio?.name || 'Anúncio'}
-              className="h-36 w-full object-cover"
-            />
-            <div className="p-4 flex-grow">
-              <h3 className="font-semibold text-lg mb-1 truncate">
-                {anuncio?.name || 'Anúncio sem nome'}
-              </h3>
-              <p className="text-sm text-gray-600 line-clamp-2 mb-2">
-                {anuncio?.adText || 'Sem descrição'}
-              </p>
-              <div className="flex flex-wrap gap-2 mt-2">
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  R$ {anuncio?.budget || 0}
-                </span>
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  {anuncio?.radius || 0} km
-                </span>
-              </div>
-            </div>
-            <div className="border-t p-3 flex justify-between">
-              <button className="text-sm text-blue-600 hover:text-blue-800">
-                Ver Detalhes
-              </button>
-              <button className="text-sm text-purple-600 hover:text-purple-800">
-                Editar
-              </button>
-            </div>
-          </div>
+    <Container className="py-4">
+      <h2 className="mb-4">Produtos Anunciados</h2>
+      <Row xs={1} md={2} lg={3} className="g-4">
+        {campanhas.map((campanha) => (
+          <Col key={campanha.id}>
+            <Card className="h-100 shadow-sm">
+              {campanha.imageUrl && (
+                <Card.Img 
+                  variant="top" 
+                  src={campanha.imageUrl} 
+                  alt={campanha.name}
+                  style={{ height: '200px', objectFit: 'cover' }}
+                />
+              )}
+              <Card.Body>
+                <Card.Title className="d-flex justify-content-between align-items-center">
+                  {campanha.name}
+                  <Badge bg={campanha.status === 'ACTIVE' ? 'success' : 'secondary'}>
+                    {campanha.status === 'ACTIVE' ? 'Ativo' : 'Pausado'}
+                  </Badge>
+                </Card.Title>
+                <Card.Text>
+                  <strong>Orçamento:</strong> R$ {parseFloat(campanha.dailyBudget).toFixed(2)}/dia<br />
+                  <strong>Início:</strong> {new Date(campanha.startDate).toLocaleDateString('pt-BR')}<br />
+                  {campanha.endDate && (
+                    <><strong>Término:</strong> {new Date(campanha.endDate).toLocaleDateString('pt-BR')}<br /></>
+                  )}
+                </Card.Text>
+                <div className="d-grid gap-2">
+                  {campanha.previewUrl && (
+                    <Button 
+                      variant="outline-primary" 
+                      href={campanha.previewUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      👁️ Visualizar no Facebook
+                    </Button>
+                  )}
+                  {campanha.status === 'ACTIVE' && (
+                    <Button 
+                      variant="outline-secondary" 
+                      onClick={() => handlePauseCampaign(campanha.id)}
+                      disabled={pausingCampaign === campanha.id}
+                    >
+                      {pausingCampaign === campanha.id ? (
+                        <>
+                          <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
+                          {' '}Pausando...
+                        </>
+                      ) : (
+                        <>⏸️ Pausar Campanha</>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
         ))}
-      </div>
-    </div>
+      </Row>
+    </Container>
   );
 };
 
