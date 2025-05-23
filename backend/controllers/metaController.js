@@ -1068,6 +1068,68 @@ const getMetrics = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Pausar uma campanha ativa
+// @route   POST /api/meta/pause-campaign
+// @access  Private
+const pauseCampaign = asyncHandler(async (req, res) => {
+  const { campaignId } = req.body;
+  
+  if (!campaignId) {
+    res.status(400);
+    throw new Error("ID da campanha é obrigatório");
+  }
+  
+  const user = await User.findById(req.user._id);
+  
+  if (!user) {
+    res.status(404);
+    throw new Error("Usuário não encontrado");
+  }
+  
+  // Verificar se o usuário está conectado ao Meta
+  if (user.metaConnectionStatus !== "connected" || !user.metaAccessToken) {
+    res.status(400);
+    throw new Error("Você precisa conectar sua conta ao Meta Ads primeiro");
+  }
+  
+  // Verificar se o token expirou
+  if (user.metaTokenExpires && user.metaTokenExpires < Date.now()) {
+    res.status(401);
+    throw new Error("Seu token do Meta expirou. Por favor, reconecte sua conta.");
+  }
+  
+  try {
+    // Atualizar o status da campanha para PAUSED
+    const updateResponse = await fetch(`https://graph.facebook.com/v18.0/${campaignId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        status: "PAUSED",
+        access_token: user.metaAccessToken,
+      }),
+    });
+    
+    const updateData = await updateResponse.json();
+    
+    if (updateData.error) {
+      throw new Error(`Erro ao pausar campanha: ${updateData.error.message}`);
+    }
+    
+    res.json({
+      success: true,
+      message: "Campanha pausada com sucesso",
+      campaignId
+    });
+    
+  } catch (error) {
+    console.error("Erro ao pausar campanha:", error);
+    res.status(500);
+    throw new Error("Erro ao pausar campanha: " + error.message);
+  }
+});
+
 // Exportar todas as funções do controlador
 module.exports = {
   facebookLogin,
@@ -1077,5 +1139,6 @@ module.exports = {
   createAdFromPost,
   createAdFromImage,
   getCampaigns,
-  getMetrics
+  getMetrics,
+  pauseCampaign
 };
