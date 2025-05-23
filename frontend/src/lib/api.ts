@@ -104,7 +104,8 @@ export const registerUser = async (userData: any) => {
     const { token, _id, name, email, metaUserId, metaConnectionStatus, plan } = response.data || {};
     if (!token || !_id) throw new Error("Registro mal sucedido: token ou dados do usuário ausentes.");
     
-    const userInfo = {
+    // Padronizar o objeto do usuário para salvar
+    const userToStore = {
       token,
       _id,
       name,
@@ -115,29 +116,32 @@ export const registerUser = async (userData: any) => {
       isMetaConnected: metaConnectionStatus === "connected"
     };
     
-    // Armazenar em ambos os locais para garantir compatibilidade
-    localStorage.setItem('userInfo', JSON.stringify(userInfo));
-    localStorage.setItem('token', token);
+    // Salvar APENAS na chave 'user'
+    localStorage.setItem("user", JSON.stringify(userToStore));
+    // Remover salvamentos antigos/redundantes
+    localStorage.removeItem("userInfo");
+    localStorage.removeItem("token");
     
-    return userInfo;
+    return userToStore;
   } catch (error: any) {
-    console.error('Erro no registro:', error);
+    console.error("Erro no registro:", error);
     throw error;
   }
 };
 
 export const loginUser = async (credentials: any) => {
   try {
-    console.log('Tentando login com:', credentials.email);
-    console.log('URL da API:', API_BASE_URL);
+    console.log("Tentando login com:", credentials.email);
+    console.log("URL da API:", API_BASE_URL);
     
     const response = await api.post(`/api/auth/login`, credentials);
-    console.log('Resposta do login:', response.data);
+    console.log("Resposta do login:", response.data);
     
     const { token, _id, name, email, metaUserId, metaConnectionStatus, plan } = response.data || {};
     if (!token || !_id) throw new Error("Login mal sucedido: token ou dados do usuário ausentes.");
     
-    const userInfo = {
+    // Padronizar o objeto do usuário para salvar
+    const userToStore = {
       token,
       _id,
       name,
@@ -148,13 +152,15 @@ export const loginUser = async (credentials: any) => {
       isMetaConnected: metaConnectionStatus === "connected"
     };
     
-    // Armazenar em ambos os locais para garantir compatibilidade
-    localStorage.setItem('userInfo', JSON.stringify(userInfo));
-    localStorage.setItem('token', token);
+    // Salvar APENAS na chave 'user'
+    localStorage.setItem("user", JSON.stringify(userToStore));
+    // Remover salvamentos antigos/redundantes
+    localStorage.removeItem("userInfo");
+    localStorage.removeItem("token");
     
-    return userInfo;
+    return userToStore;
   } catch (error: any) {
-    console.error('Erro detalhado no login:', error);
+    console.error("Erro detalhado no login:", error);
     throw error;
   }
 };
