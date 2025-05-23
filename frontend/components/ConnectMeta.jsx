@@ -6,8 +6,8 @@ import { API_BASE_URL } from '../lib/api-fetch';
 const ConnectMeta = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { user } = useAuth();
-
+  const { user, token } = useAuth();
+  
   const handleConnectMeta = async () => {
     try {
       setLoading(true);
@@ -15,13 +15,17 @@ const ConnectMeta = () => {
       
       // Verificar se o usuário está autenticado
       const userId = user?._id;
-      if (!userId) {
+      if (!userId || !token) {
         throw new Error('Usuário não identificado. Por favor, faça login novamente.');
       }
       
-      // Consumir a URL de autenticação diretamente da API do backend
+      // Consumir a URL de autenticação diretamente da API do backend com header Authorization
       const baseUrl = import.meta.env.VITE_API_URL || API_BASE_URL;
-      const response = await fetch(`${baseUrl}/api/meta/login?userId=${userId}`);
+      const response = await fetch(`${baseUrl}/api/meta/auth-url`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       
       if (!response.ok) {
         throw new Error(`Erro ao obter URL de autenticação: ${response.status}`);
@@ -42,7 +46,7 @@ const ConnectMeta = () => {
       setLoading(false);
     }
   };
-
+  
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <h2 className="text-xl font-bold mb-4">Conectar com Meta Ads</h2>

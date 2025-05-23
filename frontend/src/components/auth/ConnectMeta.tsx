@@ -19,9 +19,13 @@ export default function ConnectMeta() {
         throw new Error("Token ou ID do usuário não encontrado. Faça login novamente.");
       }
 
-      // Consumir a URL de autenticação diretamente da API do backend
+      // Consumir a URL de autenticação diretamente da API do backend com header Authorization
       const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "https://chefstudio-production.up.railway.app";
-      const response = await fetch(`${baseUrl}/api/meta/login?token=${encodeURIComponent(token)}&userId=${encodeURIComponent(userId)}`);
+      const response = await fetch(`${baseUrl}/api/meta/auth-url`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       
       if (!response.ok) {
         throw new Error(`Erro ao obter URL de autenticação: ${response.status}`);
