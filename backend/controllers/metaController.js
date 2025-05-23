@@ -644,18 +644,32 @@ const getCampaigns = asyncHandler(async (req, res) => {
 // @route   POST /api/meta/create-from-image
 // @access  Private
 const createAdFromImage = asyncHandler(async (req, res) => {
-  const { 
-    campaignName, 
-    dailyBudget, 
-    startDate, 
-    endDate, 
-    targetCountry, 
-    adTitle, 
-    adDescription, 
+  console.log("Dados recebidos do frontend para criação com imagem:", req.body);
+  
+  // Mapear campos do frontend (em português) para os campos esperados pelo backend (em inglês)
+  const campaignName = req.body.campaignName || req.body.nome || req.body.name;
+  const dailyBudget = req.body.dailyBudget || req.body.orcamento;
+  const startDate = req.body.startDate || req.body.dataInicio;
+  const endDate = req.body.endDate || req.body.dataTermino || req.body.dataFim;
+  const targetCountry = req.body.targetCountry || req.body.pais || "BR";
+  const adTitle = req.body.adTitle || req.body.titulo;
+  const adDescription = req.body.adDescription || req.body.descricao;
+  const callToAction = req.body.callToAction || req.body.botaoAcao;
+  const menuUrl = req.body.menuUrl || req.body.linkCardapio;
+  const imageUrl = req.body.imageUrl || req.body.urlImagem;
+  
+  console.log("Campos mapeados para criação com imagem:", {
+    campaignName,
+    dailyBudget,
+    startDate,
+    endDate,
+    targetCountry,
+    adTitle,
+    adDescription,
     callToAction,
     menuUrl,
     imageUrl
-  } = req.body;
+  });
   
   // Validações básicas
   if (!campaignName) {
@@ -908,7 +922,8 @@ const createAdFromImage = asyncHandler(async (req, res) => {
         adId: adData.id,
         creativeId: creativeData.id,
         imageId: imageId,
-        status: "PAUSED",
+        imageUrl: imageUrl || `https://graph.facebook.com/v18.0/${adAccountId}/adimages/${imageId}?access_token=${user.metaAccessToken}`,
+        status: "ACTIVE",
         dailyBudget: parseFloat(dailyBudget),
         startDate,
         endDate,
