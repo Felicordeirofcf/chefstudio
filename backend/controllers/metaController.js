@@ -220,3 +220,120 @@ module.exports = {
   disconnectMeta
 };
 
+
+
+// @desc    Obter métricas de anúncios do Meta Ads
+// @route   GET /api/meta/metrics
+// @access  Private
+const getMetaMetrics = asyncHandler(async (req, res) => {
+  const { timeRange = 'last_30_days' } = req.query;
+  const userId = req.user.id;
+
+  try {
+    console.log(`[Meta Metrics] Buscando métricas para ${userId}, timeRange: ${timeRange}`);
+    const user = await User.findById(userId).select('metaAccessToken metaAdAccounts metaPrimaryAdAccountId');
+
+    if (!user) {
+      console.warn(`[Meta Metrics] Usuário não encontrado: ${userId}`);
+      return res.status(404).json({ message: "Usuário não encontrado." });
+    }
+
+    const accessToken = user.metaAccessToken;
+    // Usar a conta primária se definida, senão a primeira da lista
+    const adAccountId = user.metaPrimaryAdAccountId || (user.metaAdAccounts && user.metaAdAccounts.length > 0 ? user.metaAdAccounts[0].id : null);
+
+    if (!accessToken) {
+      console.warn(`[Meta Metrics] Token de acesso Meta ausente para ${userId}`);
+      return res.status(401).json({ message: "Token de acesso Meta não configurado." });
+    }
+    if (!adAccountId) {
+      console.warn(`[Meta Metrics] Conta de anúncios não encontrada para ${userId}`);
+      return res.status(400).json({ message: "Nenhuma conta de anúncios Meta associada ou selecionada." });
+    }
+
+    console.log(`[Meta Metrics] Usando Ad Account ID: ${adAccountId} para ${userId}`);
+
+    // Mapear timeRange para o formato da API do Meta
+    // A API usa presets como 'last_30d', 'today', etc.
+    // Ou um objeto {since: 'YYYY-MM-DD', until: 'YYYY-MM-DD'}
+    // Vamos usar presets por simplicidade, ajustando os nomes se necessário
+    const timePresetMap = {
+      'today': 'today',
+      'yesterday': 'yesterday',
+      'last_7_days': 'last_7d',
+      'last_30_days': 'last_30d',
+      'this_month': 'this_month',
+      'last_month': 'last_month'
+    };
+    const apiTimeRange = timePresetMap[timeRange] || 'last_30d'; // Default para last_30d
+
+    const fields = 'impressions,clicks,spend,ctr';
+    const apiUrl = `https://graph.facebook.com/v18.0/${adAccountId}/insights?level=account&fields=${fields}&time_range={'since':'${apiTimeRange}','until':'${apiTimeRange}'}&access_token=${accessToken}`;
+    // Nota: A API v18 pode preferir time_range como objeto JSON stringificado ou presets como 'last_30d'
+    // Tentativa com time_preset primeiro, que é mais comum
+    const apiUrlPreset = `https://graph.facebook.com/v18.0/${adAccountId}/insights?level=account&fields=${fields}&time_preset=${apiTimeRange}&access_token=${accessToken}`;
+
+    console.log(`[Meta Metrics] Chamando API Insights: ${apiUrlPreset}`);
+    const response = await fetch(apiUrlPreset);
+    const data = await response.json();
+
+    if (data.error) {
+      console.error(`[Meta Metrics] Erro API Insights para ${userId} (${adAccountId}):`, data.error);
+      // Tentar com time_range como objeto se time_preset falhar (exemplo)
+      if (data.error.code === 100 && data.error.error_subcode === 1870078) { // Código comum para parâmetro inválido
+          console.log(`[Meta Metrics] Tentando com time_range como objeto para ${userId}...`);
+          const responseRange = await fetch(apiUrl);
+          const dataRange = await responseRange.json();
+          if (dataRange.error) {
+              console.error(`[Meta Metrics] Erro API Insights (com time_range) para ${userId} (${adAccountId}):`, dataRange.error);
+              throw new Error(`Erro API Meta: ${dataRange.error.message}`);
+          }
+          if (!dataRange.data || dataRange.data.length === 0) {
+              console.warn(`[Meta Metrics] Nenhum dado retornado pela API (com time_range) para ${userId} (${adAccountId}) no período ${apiTimeRange}`);
+              return res.status(200).json({ impressions: 0, clicks: 0, spend: 0, ctr: 0 });
+          }
+          // Processar dados de dataRange.data[0]
+          const metrics = dataRange.data[0];
+          console.log(`[Meta Metrics] Métricas obtidas com sucesso (com time_range) para ${userId}:`, metrics);
+          res.status(200).json({
+            impressions: parseInt(metrics.impressions || 0),
+            clicks: parseInt(metrics.clicks || 0),
+            spend: parseFloat(metrics.spend || 0),
+            ctr: parseFloat(metrics.ctr || 0)
+          });
+          return;
+      }
+      throw new Error(`Erro API Meta: ${data.error.message}`);
+    }
+
+    if (!data.data || data.data.length === 0) {
+      console.warn(`[Meta Metrics] Nenhum dado retornado pela API para ${userId} (${adAccountId}) no período ${apiTimeRange}`);
+      // Retornar zero se não houver dados para o período
+      return res.status(200).json({ impressions: 0, clicks: 0, spend: 0, ctr: 0 });
+    }
+
+    // A API retorna um array, pegamos o primeiro elemento que contém as métricas agregadas da conta
+    const metrics = data.data[0];
+    console.log(`[Meta Metrics] Métricas obtidas com sucesso para ${userId}:`, metrics);
+
+    res.status(200).json({
+      impressions: parseInt(metrics.impressions || 0),
+      clicks: parseInt(metrics.clicks || 0),
+      spend: parseFloat(metrics.spend || 0),
+      ctr: parseFloat(metrics.ctr || 0)
+    });
+
+  } catch (error) {
+    console.error(`[Meta Metrics] ERRO GERAL para ${userId}:`, error);
+    res.status(500).json({ message: `Erro interno ao buscar métricas: ${error.message}` });
+  }
+});
+
+module.exports = {
+  getMetaAuthUrl,
+  facebookCallback,
+  getConnectionStatus,
+  disconnectMeta,
+  getMetaMetrics // Adicionar a nova função aos exports
+};
+

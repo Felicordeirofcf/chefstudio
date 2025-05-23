@@ -139,3 +139,48 @@ router.post("/disconnect", protect, metaController.disconnectMeta); // Rota adic
 
 module.exports = router;
 
+
+
+
+/**
+ * @swagger
+ * /api/meta/metrics:
+ *   get:
+ *     summary: Obtém métricas de anúncios do Meta Ads para a conta principal
+ *     tags: [Meta]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: timeRange
+ *         schema:
+ *           type: string
+ *           enum: [today, yesterday, last_7_days, last_30_days, this_month, last_month]
+ *           default: last_30_days
+ *         description: O período de tempo para buscar as métricas.
+ *     responses:
+ *       200:
+ *         description: Métricas obtidas com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 impressions:
+ *                   type: number
+ *                 clicks:
+ *                   type: number
+ *                 spend:
+ *                   type: number
+ *                 ctr:
+ *                   type: number
+ *       400:
+ *         description: Conta de anúncios principal não definida ou timeRange inválido
+ *       401:
+ *         description: Não autorizado
+ *       404:
+ *         description: Usuário não encontrado
+ *       500:
+ *         description: Erro interno ao buscar métricas
+ */
+router.get("/metrics", protect, metaController.getMetaMetrics); // Rota para buscar métricas
