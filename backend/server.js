@@ -14,7 +14,8 @@ const userRoutes = require('./routes/user');
 const metaRoutes = require('./routes/metaRoutes');
 const menuRoutes = require('./routes/menu');
 const healthRoutes = require('./routes/healthRoutes');
-const profileRoutes = require('./routes/profile');
+const profileRoutes = require("./routes/profile");
+const metaAdsRoutes = require("./routes/metaAdsRoutes"); // Rota adicionada para Meta Ads
 
 // Configurar variáveis de ambiente
 dotenv.config();
@@ -72,7 +73,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/meta', metaRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/health', healthRoutes);
-app.use('/api/profile', profileRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/meta-ads", metaAdsRoutes); // Montando as rotas de Meta Ads
 
 // Rota básica para verificar se o servidor está funcionando
 app.get('/api', (req, res) => {

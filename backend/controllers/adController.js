@@ -202,8 +202,8 @@ exports.getLocationSettings = async (req, res) => {
 
 
 
-// Nova função para criar campanha de Tráfego com configurações recomendadas
-exports.createRecommendedTrafficCampaign = async (req, res) => {
+// Função movida para metaController.js
+// exports.createRecommendedTrafficCampaign = async (req, res) => { ... };
   // Extrair dados do corpo da requisição (frontend)
   const {
     adAccountId, // ID da conta de anúncios selecionada (ex: act_12345)

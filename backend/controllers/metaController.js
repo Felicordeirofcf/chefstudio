@@ -1,6 +1,8 @@
 const asyncHandler = require("express-async-handler");
 const fetch = require("node-fetch");
 const User = require("../models/user"); // Certifique-se que o caminho está correto
+const fs = require('fs');
+const FormData = require('form-data'); // Precisa instalar: npm install form-data
 
 // @desc    Obter URL de autorização do Facebook/Meta
 // @route   GET /api/meta/auth-url
