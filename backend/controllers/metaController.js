@@ -336,6 +336,7 @@ module.exports = {
   facebookCallback,
   getConnectionStatus,
   disconnectMeta,
-  getMetaMetrics // Adicionar a nova função aos exports
+  getMetaMetrics,
+  createRecommendedTrafficCampaign // Adicionando a função exportada
 };
 
