@@ -13,23 +13,22 @@ const {
 const { createRecommendedTrafficCampaign } = require("../controllers/metaController"); 
 const { protect } = require("../middleware/authMiddleware");
 const multer = require("multer");
+const path = require("path"); // Import path module
 
-// Configuração do Multer (igual ao metaAdsRoutes.js para consistência)
+// Configuração do Multer (corrigido)
 const storage = multer.diskStorage({ 
     destination: function (req, file, cb) {
         cb(null, 
 '/tmp/
-') // Diretório temporário
+"); // Diretório temporário - Corrigido
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + 
-'-
-' + Math.round(Math.random() * 1E9)
+"-
+" + Math.round(Math.random() * 1E9);
         cb(null, file.fieldname + 
-'-
-' + uniqueSuffix + require(
-'path
-').extname(file.originalname))
+"-
+" + uniqueSuffix + path.extname(file.originalname)); // Corrigido
     }
 });
 const upload = multer({ storage: storage });
@@ -40,13 +39,6 @@ const upload = multer({ storage: storage });
  *   name: Ads
  *   description: Endpoints para gerenciamento de campanhas e anúncios (geral e Meta Ads)
  */
-
-// Rotas protegidas para campanhas (gerais, se houver)
-// router.get("/campaigns", protect, getAllCampaigns); // Exemplo, se houver campanhas gerais
-// router.post("/campaigns", protect, createCampaign);
-// router.get("/campaigns/:id", protect, getCampaignById);
-// router.put("/campaigns/:id/status", protect, updateCampaignStatus);
-// router.get("/campaigns/:id/metrics", protect, getCampaignMetrics);
 
 // Rotas para configurações de localização
 router.post("/location", protect, saveLocationSettings);
@@ -94,10 +86,10 @@ router.get("/location", protect, getLocationSettings);
  *                 type: string
  *                 enum: [image, post]
  *                 description: Tipo de anúncio (
-'image
-' ou 
-'post
-').
+"image"
+ ou 
+"post"
+).
  *               adTitle:
  *                 type: string
  *                 description: Título do anúncio (opcional).
@@ -108,20 +100,20 @@ router.get("/location", protect, getLocationSettings);
  *                 type: string
  *                 format: binary
  *                 description: Arquivo de imagem (obrigatório se adType=
-'image
-').
+"image"
+).
  *               postUrl:
  *                 type: string
  *                 description: URL da publicação (obrigatório se adType=
-'post
-').
+"post"
+).
  *               callToAction:
  *                 type: string
  *                 description: Tipo de CTA (ex: 
-'LEARN_MORE
-', 
-'SHOP_NOW
-').
+"LEARN_MORE"
+, 
+"SHOP_NOW"
+).
  *               menuUrl:
  *                 type: string
  *                 description: Link de destino (URL do cardápio).
@@ -149,12 +141,12 @@ router.get("/location", protect, getLocationSettings);
  *         description: Erro interno do servidor
  */
 // Usar upload.single(
-'imageFile
-') para lidar com o upload da imagem
+"imageFile"
+) para lidar com o upload da imagem
 // A função createRecommendedTrafficCampaign é importada do metaController
 router.post("/create-recommended-traffic-campaign", protect, upload.single(
-'imageFile
-'), createRecommendedTrafficCampaign);
+"imageFile"
+), createRecommendedTrafficCampaign);
 
 
 module.exports = router;
