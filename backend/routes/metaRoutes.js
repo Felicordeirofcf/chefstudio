@@ -25,7 +25,7 @@ const metaController = require("../controllers/metaController");
  *       401:
  *         description: Não autorizado (token inválido ou ausente)
  *       500:
- *         description: Erro interno do servidor (ex: variáveis de ambiente faltando)
+ *         description: "Erro interno do servidor (ex: variáveis de ambiente faltando)"
  */
 router.get("/auth-url", protect, metaController.getMetaAuthUrl); // Rota adicionada
 
