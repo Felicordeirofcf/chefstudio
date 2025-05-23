@@ -44,3 +44,35 @@ Estas correções garantem que:
 - O backend valide adequadamente a autenticação Meta antes de processar a criação de anúncios
 
 Após aplicar estas correções, o fluxo de criação de anúncios deve funcionar corretamente sem exigir etapas manuais adicionais do usuário.
+
+
+
+
+
+
+Verificar se o usuário completou o fluxo de conexão com o Meta (Facebook/Instagram Ads)
+
+Checar se o banco de dados contém:
+
+metaUserId (ID da conta do Meta vinculada)
+
+metaAccessToken (token de acesso válido)
+
+metaConnectionStatus (deve ser "connected")
+
+2. Fluxo de Conexão com o Meta
+Se o usuário nunca conectou:
+
+Implementar um botão/fluxo para conectar com o Meta (via OAuth)
+
+Armazenar os tokens de acesso no banco de dados após a conexão
+
+3. Tratamento no Frontend
+Antes de fazer requisições a /meta/metrics ou /meta/campaigns, verificar se o usuário está conectado ao Meta
+
+Se não estiver, mostrar um aviso/CTA para conectar
+
+4. Melhorias no Backend
+Retornar um erro mais descritivo (ex: 403 Forbidden)
+
+Incluir no response um link para a conexão com o Meta
