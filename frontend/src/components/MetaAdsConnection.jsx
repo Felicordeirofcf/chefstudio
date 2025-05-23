@@ -1,72 +1,55 @@
-// Componente MetaAdsConnection corrigido para autenticação adequada
-// Arquivo: frontend/src/components/MetaAdsConnection.jsx
 import React, { useState, useEffect } from 'react';
-import { api } from '../lib/api';
+import { useAuth } from '../hooks/useAuth';
+import api from '../lib/api';
 
 const MetaAdsConnection = () => {
   const [connected, setConnected] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [userToken, setUserToken] = useState(null);
-
+  const { userToken } = useAuth();
+  
   // Verificar status da conexão ao carregar o componente
   useEffect(() => {
-    // Verificar token no localStorage (tanto 'token' quanto 'userInfo.token')
-    const checkToken = () => {
-      try {
-        // Primeiro tenta obter o token diretamente
-        let token = localStorage.getItem('token');
-        
-        // Se não encontrar, tenta obter do userInfo
-        if (!token) {
-          const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-          token = userInfo?.token;
-        }
-        
-        return token;
-      } catch (err) {
-        console.error('Erro ao obter token:', err);
-        return null;
-      }
-    };
-
-    const token = checkToken();
-    setUserToken(token);
-    
-    if (token) {
-      checkConnection(token);
-    }
-  }, []);
-
-  // Função para verificar conexão com Meta Ads
-  const checkConnection = async (token) => {
-    if (!token) return;
-    
+    checkConnectionStatus();
+  }, [userToken]);
+  
+  // Função para verificar status da conexão
+  const checkConnectionStatus = async () => {
     try {
       setLoading(true);
       
-      // Verificar status da conexão com Meta Ads usando a instância api centralizada
+      if (!userToken) {
+        setConnected(false);
+        return;
+      }
+      
       try {
-        const response = await api.get('/api/meta/connection-status');
-        setConnected(response.data?.connected || response.data?.status === 'connected' || false);
+        const response = await api.get('/api/meta/status');
+        setConnected(response.data.connected || false);
       } catch (err) {
         // Se o primeiro endpoint falhar, tentar endpoint alternativo
         if (err.response && err.response.status === 404) {
-          const altResponse = await api.get('/api/users/meta-status');
-          setConnected(altResponse.data?.connected || altResponse.data?.status === 'connected' || false);
-        } else {
-          // Se ambos falharem, verificar no localStorage
           try {
-            const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-            setConnected(
-              userInfo?.metaConnectionStatus === 'connected' || 
-              userInfo?.isMetaConnected === true || 
-              false
-            );
-          } catch (localErr) {
-            console.error('Erro ao verificar status no localStorage:', localErr);
+            const altResponse = await api.get('/api/users/meta-status');
+            setConnected(altResponse.data.connected || false);
+          } catch (altErr) {
+            console.error('Erro ao verificar status alternativo:', altErr);
             setConnected(false);
           }
+        } else {
+          console.error('Erro ao verificar status:', err);
+          setConnected(false);
+        }
+        
+        // Verificar também no localStorage como fallback
+        try {
+          const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+          if (userInfo.metaConnectionStatus === 'connected' || userInfo.isMetaConnected === true) {
+            setConnected(true);
+          }
+        } catch (localErr) {
+          console.error('Erro ao verificar status no localStorage:', localErr);
+          setConnected(false);
         }
       }
     } catch (err) {
@@ -96,9 +79,22 @@ const MetaAdsConnection = () => {
         throw new Error('ID do usuário não encontrado. Por favor, faça login novamente.');
       }
       
-      // Redirecionar para a página de login do Meta
+      // Consumir a URL de autenticação diretamente da API do backend
       const apiUrl = import.meta.env.VITE_API_URL || 'https://chefstudio-production.up.railway.app';
-      window.location.href = `${apiUrl}/api/meta/login?userId=${userId}`;
+      const response = await fetch(`${apiUrl}/api/meta/login?userId=${userId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Erro ao obter URL de autenticação: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.authUrl) {
+        throw new Error("URL de autenticação não retornada pelo servidor");
+      }
+      
+      // Redirecionar para a URL fornecida pelo backend
+      window.location.href = data.authUrl;
       
       return;
     } catch (err) {

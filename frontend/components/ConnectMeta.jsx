@@ -13,14 +13,28 @@ const ConnectMeta = () => {
       setLoading(true);
       setError(null);
       
-      // Redirecionar para a URL de login do Meta com userId no state
+      // Verificar se o usuário está autenticado
       const userId = user?._id;
       if (!userId) {
         throw new Error('Usuário não identificado. Por favor, faça login novamente.');
       }
       
-      // Usar a URL correta do backend para iniciar o fluxo de autenticação Meta
-      window.location.href = `${import.meta.env.VITE_API_URL || API_BASE_URL}/api/meta/login?userId=${userId}`;
+      // Consumir a URL de autenticação diretamente da API do backend
+      const baseUrl = import.meta.env.VITE_API_URL || API_BASE_URL;
+      const response = await fetch(`${baseUrl}/api/meta/login?userId=${userId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Erro ao obter URL de autenticação: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.authUrl) {
+        throw new Error("URL de autenticação não retornada pelo servidor");
+      }
+      
+      // Redirecionar para a URL fornecida pelo backend
+      window.location.href = data.authUrl;
     } catch (err) {
       console.error('Erro ao iniciar conexão Meta:', err);
       setError(err.message || 'Erro ao iniciar conexão com Meta');
