@@ -10,20 +10,31 @@ export default function ConnectMeta() {
   const handleConnect = async () => {
     setLoading(true);
     setError(null);
-
     try {
       const rawUserInfo = localStorage.getItem("userInfo");
       if (!rawUserInfo) throw new Error("Usuário não autenticado.");
-
+      
       const { token, _id: userId } = JSON.parse(rawUserInfo);
       if (!token || !userId) {
         throw new Error("Token ou ID do usuário não encontrado. Faça login novamente.");
       }
 
+      // Consumir a URL de autenticação diretamente da API do backend
       const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "https://chefstudio-production.up.railway.app";
-      const redirectUrl = `${baseUrl}/api/meta/login?token=${encodeURIComponent(token)}&userId=${encodeURIComponent(userId)}`;
-
-      window.location.href = redirectUrl;
+      const response = await fetch(`${baseUrl}/api/meta/login?token=${encodeURIComponent(token)}&userId=${encodeURIComponent(userId)}`);
+      
+      if (!response.ok) {
+        throw new Error(`Erro ao obter URL de autenticação: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.authUrl) {
+        throw new Error("URL de autenticação não retornada pelo servidor");
+      }
+      
+      // Redirecionar para a URL fornecida pelo backend
+      window.location.href = data.authUrl;
     } catch (err: any) {
       const message = err?.message || "Erro inesperado ao conectar com Meta.";
       console.error("❌ Erro ao conectar com Meta:", message);
@@ -57,14 +68,11 @@ export default function ConnectMeta() {
             />
           </svg>
         </div>
-
         <h2 className="text-2xl font-bold mb-3 text-gray-800">Quase lá...</h2>
         <p className="text-gray-600 mb-8">
           Para criar campanhas automaticamente, conecte sua conta Meta Ads.
         </p>
-
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-
         <Button
           onClick={handleConnect}
           disabled={loading}
