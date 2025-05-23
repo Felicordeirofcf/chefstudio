@@ -11,15 +11,15 @@ const REDIRECT_URI = process.env.META_REDIRECT_URI || "https://chefstudio-produc
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://chefstudio.vercel.app";
 const SCOPES = "ads_management,ads_read,business_management,public_profile,email";
 
-// Função auxiliar para obter métricas de forma assíncrona
-async function getMetricsAsync(adAccountId, since, until, accessToken) {
+// Função auxiliar para obter métricas de forma assíncrona (usando expressão de função)
+const getMetricsAsync = async (adAccountId, since, until, accessToken) => {
   const metricsResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/insights?fields=impressions,clicks,ctr,spend,reach,frequency&time_range={"since":"${since}","until":"${until}"}&access_token=${accessToken}`, {
     method: "GET",
   });
   
   const metricsData = await metricsResponse.json();
   return metricsData;
-}
+};
 
 // Função para extrair ID da publicação a partir da URL
 const extractPostIdFromUrl = (url) => {
@@ -891,15 +891,8 @@ const createAdFromImage = asyncHandler(async (req, res) => {
         startDate,
         endDate,
         targetCountry: targetCountry || "BR",
-// Função auxiliar para obter métricas de forma assíncrona
-async function getMetricsAsync(adAccountId, since, until, accessToken) {
-  const metricsResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/insights?fields=impressions,clicks,ctr,spend,reach,frequency&time_range={"since":"${since}","until":"${until}"}&access_token=${accessToken}`, {
-    method: "GET",
-  });
-  
-  const metricsData = await metricsResponse.json();
-  return metricsData;
-}
+// Esta função já está definida no topo do arquivo como expressão de função
+// Removida para evitar duplicidade e erro de sintaxe
 
 // @desc    Obter métricas do Meta Ads
 // @route   GET /api/meta/metrics
