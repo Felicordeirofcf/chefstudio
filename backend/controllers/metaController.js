@@ -377,7 +377,7 @@ const createRecommendedTrafficCampaign = asyncHandler(async (req, res) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: campaignName,
-        objective: "TRAFFIC", // Objetivo de Tráfego
+        objective: "OUTCOME_TRAFFIC", // Objetivo de Tráfego (Atualizado)
         status: "ACTIVE",      // Ativa por padrão
         special_ad_categories: [], // Nenhuma categoria especial por padrão
         access_token: accessToken
