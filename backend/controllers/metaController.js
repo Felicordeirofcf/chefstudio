@@ -5,14 +5,14 @@ const User = require('../models/user');
 // @desc    Iniciar login com Facebook
 // @route   GET /api/meta/login
 // @access  Public
-const facebookLogin = asyncHandler(async (req, res) => {
+const getMetaLoginUrl = asyncHandler(async (req, res) => {
   // Usar as variáveis de ambiente com os nomes corretos conforme definido no Railway
-  const redirectUri = process.env.FACEBOOK_REDIRECT_URI || process.env.META_REDIRECT_URI;
-  const clientId = process.env.FACEBOOK_CLIENT_ID || process.env.META_CLIENT_ID;
+  const redirectUri = process.env.FACEBOOK_REDIRECT_URI;
+  const clientId = process.env.FB_APP_ID;
   
   // Verificar se as variáveis de ambiente estão definidas
   if (!clientId) {
-    console.error("ERRO: FACEBOOK_CLIENT_ID não está definido nas variáveis de ambiente");
+    console.error("ERRO: FB_APP_ID não está definido nas variáveis de ambiente");
     return res.status(500).json({ 
       error: "Configuração incompleta", 
       message: "ID do cliente Facebook não está configurado no servidor" 
@@ -43,9 +43,9 @@ const facebookLogin = asyncHandler(async (req, res) => {
 // @access  Public
 const facebookCallback = asyncHandler(async (req, res) => {
   const { code } = req.query;
-  const redirectUri = process.env.FACEBOOK_REDIRECT_URI || process.env.META_REDIRECT_URI;
-  const clientId = process.env.FACEBOOK_CLIENT_ID || process.env.META_CLIENT_ID;
-  const clientSecret = process.env.FACEBOOK_CLIENT_SECRET || process.env.META_CLIENT_SECRET;
+  const redirectUri = process.env.FACEBOOK_REDIRECT_URI;
+  const clientId = process.env.FB_APP_ID;
+  const clientSecret = process.env.FB_APP_SECRET;
   
   if (!code) {
     res.status(400);
@@ -109,9 +109,9 @@ const facebookCallback = asyncHandler(async (req, res) => {
   }
 });
 
-// Exportar as funções
+// Exportar todas as funções do controlador
 module.exports = {
-  facebookLogin,
+  getMetaLoginUrl,
   facebookCallback,
   // Outros exports...
 };
