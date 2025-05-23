@@ -33,7 +33,12 @@ export default function MetaConnect() {
       // Consumir a URL de autenticação diretamente da API do backend
       setDebugInfo(prev => prev + "\nSolicitando URL de autenticação do backend...");
       
-      const response = await fetch(`${baseUrl}/api/meta/facebook/login?token=${encodeURIComponent(token)}`);
+      const response = await fetch(`${baseUrl}/api/meta/facebook/login`, {
+        method: 'GET', // Explicitly set method if needed, GET is default for fetch
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       if (!response.ok) {
         const errorMsg = `Erro ao obter URL de autenticação: ${response.status}`;
