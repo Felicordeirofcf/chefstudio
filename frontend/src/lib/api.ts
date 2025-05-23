@@ -4,27 +4,39 @@ import axios from 'axios';
 // Removendo o '/api' do final para evitar duplicação
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app";
 
-// Função melhorada para obter token, verificando múltiplas fontes
+// Função para obter token JWT do localStorage (chave 'user')
 const getToken = (): string | null => {
   try {
-    // Primeiro tenta obter do localStorage 'userInfo'
-    const userInfo = localStorage.getItem('userInfo');
-    if (userInfo) {
-      const parsedUserInfo = JSON.parse(userInfo);
-      if (parsedUserInfo.token) return parsedUserInfo.token;
+    const userString = localStorage.getItem("user"); // Usar a chave 'user' conforme especificado
+    if (userString) {
+      const parsedUser = JSON.parse(userString);
+      if (parsedUser && parsedUser.token) {
+        return parsedUser.token;
+      }
     }
-    
-    // Se não encontrar, tenta obter diretamente do localStorage 'token'
-    const directToken = localStorage.getItem('token');
-    if (directToken) return directToken;
-    
-    // Se não encontrar em nenhum lugar, retorna null
+    // Tentar também a chave 'userInfo' como fallback temporário, se necessário
+    const userInfoString = localStorage.getItem("userInfo");
+    if (userInfoString) {
+        const parsedUserInfo = JSON.parse(userInfoString);
+        if (parsedUserInfo && parsedUserInfo.token) {
+            console.warn("Token encontrado em 'userInfo', considere padronizar para 'user'.");
+            return parsedUserInfo.token;
+        }
+    }
+    // Tentar também a chave 'token' como fallback
+    const directToken = localStorage.getItem("token");
+    if (directToken) {
+        console.warn("Token encontrado diretamente em 'token', considere padronizar para 'user'.");
+        return directToken;
+    }
+
     return null;
   } catch (error) {
-    console.error('Erro ao obter token:', error);
-    // Em caso de erro, limpa os storages para evitar problemas futuros
-    localStorage.removeItem('userInfo');
-    localStorage.removeItem('token');
+    console.error("Erro ao obter token do localStorage:", error);
+    // Limpar chaves relevantes em caso de erro de parse
+    localStorage.removeItem("user");
+    localStorage.removeItem("userInfo");
+    localStorage.removeItem("token");
     return null;
   }
 };
