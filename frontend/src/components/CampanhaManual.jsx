@@ -443,7 +443,7 @@ const CampanhaManual = () => {
       };
 
       if (tipoAnuncio === 'imagem') {
-        // Usar o novo endpoint para criar anúncio a partir de imagem
+        // Usar o endpoint para criar anúncio a partir de imagem
         endpoint = `${API_BASE_URL}/meta-ads/create-from-image`;
         headers['Content-Type'] = 'multipart/form-data';
         dataToSend = new FormData();
@@ -463,7 +463,7 @@ const CampanhaManual = () => {
         dataToSend.append('image', imagem);
       } else {
         // Usar o endpoint para criar anúncio a partir de post existente
-        endpoint = `${API_BASE_URL}/meta/create-ad-from-post`;
+        endpoint = `${API_BASE_URL}/meta-ads/create-from-post`;
         headers['Content-Type'] = 'application/json';
         dataToSend = JSON.stringify({ 
           ...commonData, 

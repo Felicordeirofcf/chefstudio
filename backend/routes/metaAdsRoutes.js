@@ -280,4 +280,279 @@ router.post("/create-from-image", protect, upload.single('image'), async (req, r
     }
 });
 
+/**
+ * @swagger
+ * /api/meta-ads/create-from-post:
+ *   post:
+ *     summary: Cria um anúncio a partir de uma publicação existente
+ *     tags: [Meta Ads]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - postUrl
+ *             properties:
+ *               adAccountId:
+ *                 type: string
+ *                 description: ID da conta de anúncios
+ *               pageId:
+ *                 type: string
+ *                 description: ID da página do Facebook
+ *               campaignName:
+ *                 type: string
+ *                 description: Nome da campanha
+ *               weeklyBudget:
+ *                 type: number
+ *                 description: Orçamento semanal em R$
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *                 description: Data de início (YYYY-MM-DD)
+ *               endDate:
+ *                 type: string
+ *                 format: date
+ *                 description: Data de término (opcional, YYYY-MM-DD)
+ *               location:
+ *                 type: object
+ *                 properties:
+ *                   latitude:
+ *                     type: number
+ *                   longitude:
+ *                     type: number
+ *                   radius:
+ *                     type: number
+ *               postUrl:
+ *                 type: string
+ *                 description: URL da publicação do Facebook
+ *               callToAction:
+ *                 type: string
+ *                 description: Tipo de CTA (ex: 'LEARN_MORE', 'SHOP_NOW')
+ *               menuUrl:
+ *                 type: string
+ *                 description: Link de destino (URL do cardápio)
+ *     responses:
+ *       201:
+ *         description: Anúncio criado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 campaignId:
+ *                   type: string
+ *                 adSetId:
+ *                   type: string
+ *                 adId:
+ *                   type: string
+ *       400:
+ *         description: Parâmetros inválidos ou ausentes
+ *       401:
+ *         description: Não autorizado
+ *       500:
+ *         description: Erro interno do servidor
+ */
+router.post("/create-from-post", protect, async (req, res) => {
+    try {
+        const { 
+            adAccountId, 
+            pageId, 
+            campaignName, 
+            weeklyBudget, 
+            startDate, 
+            endDate, 
+            postUrl,
+            callToAction, 
+            menuUrl 
+        } = req.body;
+        
+        // Verificar campos obrigatórios
+        if (!postUrl) {
+            return res.status(400).json({ message: 'URL da publicação é obrigatória' });
+        }
+        
+        if (!adAccountId || !pageId || !campaignName || !weeklyBudget || !startDate) {
+            return res.status(400).json({ message: 'Campos obrigatórios não preenchidos' });
+        }
+        
+        // Obter informações de localização
+        let location = { latitude: -23.5505, longitude: -46.6333, radius: 10 }; // Padrão: São Paulo com raio de 10km
+        
+        if (req.body.location) {
+            try {
+                location = req.body.location;
+            } catch (error) {
+                console.error('Erro ao processar localização:', error);
+            }
+        }
+        
+        // Extrair ID da publicação da URL
+        let postId = null;
+        
+        // Tentar extrair o ID da publicação da URL
+        if (postUrl.includes('fbid=')) {
+            const fbidMatch = postUrl.match(/fbid=(\d+)/);
+            if (fbidMatch && fbidMatch[1]) {
+                postId = fbidMatch[1];
+            }
+        } else if (postUrl.includes('/posts/')) {
+            const postsMatch = postUrl.match(/\/posts\/(\d+)/);
+            if (postsMatch && postsMatch[1]) {
+                postId = postsMatch[1];
+            }
+        }
+        
+        if (!postId) {
+            return res.status(400).json({ 
+                message: 'Não foi possível extrair o ID da publicação da URL fornecida',
+                postUrl
+            });
+        }
+        
+        // Em um ambiente real, aqui seria feita a chamada para a API do Facebook
+        // para criar o anúncio a partir da publicação
+        
+        // Simulação de criação de anúncio
+        const adDetails = {
+            name: campaignName,
+            adAccountId: adAccountId,
+            pageId: pageId,
+            weeklyBudget: parseFloat(weeklyBudget),
+            dailyBudget: parseFloat(weeklyBudget) / 7, // Convertendo orçamento semanal para diário
+            startDate: startDate,
+            endDate: endDate || null,
+            location: location,
+            callToAction: callToAction || 'LEARN_MORE',
+            menuUrl: menuUrl || null,
+            status: 'PAUSED',
+            postId: postId,
+            postUrl: postUrl,
+            campaignId: `23848${Math.floor(Math.random() * 10000000)}`,
+            adSetId: `23848${Math.floor(Math.random() * 10000000)}`,
+            adId: `23848${Math.floor(Math.random() * 10000000)}`
+        };
+        
+        // Em um ambiente real, salvaríamos o anúncio no banco de dados
+        
+        res.status(201).json({
+            success: true,
+            message: 'Anúncio criado com sucesso a partir da publicação',
+            campaignId: adDetails.campaignId,
+            adSetId: adDetails.adSetId,
+            adId: adDetails.adId,
+            adDetails
+        });
+    } catch (error) {
+        console.error('Erro ao criar anúncio a partir de publicação:', error);
+        res.status(500).json({ 
+            message: 'Erro ao criar anúncio',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /api/meta-ads/campaigns:
+ *   get:
+ *     summary: Obtém as campanhas do usuário
+ *     tags: [Meta Ads]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: adAccountId
+ *         schema:
+ *           type: string
+ *         description: ID da conta de anúncios para filtrar campanhas
+ *     responses:
+ *       200:
+ *         description: Campanhas obtidas com sucesso
+ *       401:
+ *         description: Não autorizado
+ *       500:
+ *         description: Erro interno do servidor
+ */
+router.get("/campaigns", protect, async (req, res) => {
+    try {
+        const { adAccountId } = req.query;
+        
+        if (!adAccountId) {
+            return res.status(400).json({ message: 'ID da conta de anúncios é obrigatório' });
+        }
+        
+        // Em um ambiente real, aqui seria feita a chamada para a API do Facebook
+        // para obter as campanhas do usuário filtradas pela conta de anúncios
+        
+        // Simulação de campanhas
+        const campaigns = [
+            {
+                id: '23848123456789',
+                campaignId: '23848123456789',
+                name: 'Campanha de Verão',
+                status: 'ACTIVE',
+                weeklyBudget: 350.00,
+                dailyBudget: 50.00,
+                startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+                endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                metrics: {
+                    reach: 1234,
+                    impressions: 5678,
+                    clicks: 89,
+                    spend: 123.45
+                }
+            },
+            {
+                id: '23848987654321',
+                campaignId: '23848987654321',
+                name: 'Promoção de Fim de Semana',
+                status: 'PAUSED',
+                weeklyBudget: 210.00,
+                dailyBudget: 30.00,
+                startDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
+                endDate: null,
+                metrics: {
+                    reach: 567,
+                    impressions: 2345,
+                    clicks: 45,
+                    spend: 67.89
+                }
+            },
+            {
+                id: '23848567891234',
+                campaignId: '23848567891234',
+                name: 'Lançamento Novo Cardápio',
+                status: 'ACTIVE',
+                weeklyBudget: 490.00,
+                dailyBudget: 70.00,
+                startDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+                endDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+                metrics: {
+                    reach: 890,
+                    impressions: 3456,
+                    clicks: 67,
+                    spend: 89.12
+                }
+            }
+        ];
+        
+        res.json({
+            success: true,
+            campaigns
+        });
+    } catch (error) {
+        console.error('Erro ao obter campanhas:', error);
+        res.status(500).json({ 
+            message: 'Erro ao obter campanhas',
+            error: error.message
+        });
+    }
+});
+
 module.exports = router;
