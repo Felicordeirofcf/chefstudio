@@ -49,6 +49,9 @@ const VALID_CTA_TYPES = [
     'SUBSCRIBE'
 ];
 
+// Extensões de imagem válidas
+const VALID_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+
 // Objetivo padrão para campanhas de tráfego
 const DEFAULT_TRAFFIC_OBJECTIVE = 'LINK_CLICKS';
 
@@ -84,17 +87,90 @@ const isValidCTA = (ctaType) => {
 };
 
 /**
- * Valida se uma URL é acessível
+ * Verifica se a URL termina com uma extensão de imagem válida
  * @param {string} url - URL a ser validada
- * @returns {Promise<boolean>} - True se a URL é acessível, false caso contrário
+ * @returns {boolean} - True se a URL tem extensão de imagem válida
  */
-const isUrlAccessible = async (url) => {
+const hasValidImageExtension = (url) => {
+    if (!url) return false;
+    
+    // Remover parâmetros de query da URL
+    const urlWithoutParams = url.split('?')[0].split('#')[0];
+    
+    // Verificar se a URL termina com uma extensão de imagem válida
+    return VALID_IMAGE_EXTENSIONS.some(ext => 
+        urlWithoutParams.toLowerCase().endsWith(ext)
+    );
+};
+
+/**
+ * Valida se uma URL é acessível e é uma imagem válida
+ * @param {string} url - URL a ser validada
+ * @returns {Promise<{isAccessible: boolean, contentType: string|null, error: string|null}>} - Resultado da validação
+ */
+const validateImageUrl = async (url) => {
     try {
-        const response = await axios.head(url, { timeout: 5000 });
-        return response.status >= 200 && response.status < 400;
+        console.log(`Validando URL de imagem: ${url}`);
+        
+        // Verificar se a URL tem formato válido
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            return {
+                isAccessible: false,
+                contentType: null,
+                error: 'URL deve começar com http:// ou https://'
+            };
+        }
+        
+        // Verificar se a URL termina com extensão de imagem válida
+        if (!hasValidImageExtension(url)) {
+            console.warn(`URL não termina com extensão de imagem válida: ${url}`);
+            // Não retornar erro aqui, pois alguns serviços de hospedagem não exigem extensão
+        }
+        
+        // Fazer requisição HEAD para verificar se a URL é acessível
+        const response = await axios.head(url, { 
+            timeout: 5000,
+            validateStatus: status => status < 400 // Aceitar qualquer status < 400
+        });
+        
+        // Verificar o Content-Type da resposta
+        const contentType = response.headers['content-type'];
+        console.log(`Content-Type da URL: ${contentType}`);
+        
+        // Verificar se o Content-Type é de imagem
+        const isImageContentType = contentType && contentType.startsWith('image/');
+        
+        if (!isImageContentType) {
+            console.warn(`URL não tem Content-Type de imagem: ${contentType}`);
+            // Se a URL tem extensão de imagem válida, aceitar mesmo sem Content-Type correto
+            if (hasValidImageExtension(url)) {
+                console.log('URL tem extensão de imagem válida, aceitando mesmo sem Content-Type correto');
+                return {
+                    isAccessible: true,
+                    contentType: contentType,
+                    error: null
+                };
+            }
+            
+            return {
+                isAccessible: false,
+                contentType: contentType,
+                error: `URL não é uma imagem válida (Content-Type: ${contentType})`
+            };
+        }
+        
+        return {
+            isAccessible: true,
+            contentType: contentType,
+            error: null
+        };
     } catch (error) {
-        console.error(`URL não acessível: ${url}`, error.message);
-        return false;
+        console.error(`Erro ao validar URL de imagem: ${url}`, error.message);
+        return {
+            isAccessible: false,
+            contentType: null,
+            error: `Erro ao acessar URL: ${error.message}`
+        };
     }
 };
 
@@ -205,11 +281,16 @@ const uploadImage = async (userAccessToken, adAccountId, file) => {
     try {
         console.log(`Fazendo upload de imagem para conta ${adAccountId}`);
         console.log('Detalhes do arquivo:', {
-            filename: file.originalname,
+            originalname: file.originalname,
             path: file.path,
             mimetype: file.mimetype,
             size: file.size
         });
+        
+        // Verificar se o arquivo é uma imagem válida
+        if (!file.mimetype || !file.mimetype.startsWith('image/')) {
+            throw new Error(`Arquivo não é uma imagem válida (mimetype: ${file.mimetype})`);
+        }
         
         const formData = new FormData();
         formData.append('access_token', userAccessToken); // Usar token do usuário
@@ -226,10 +307,22 @@ const uploadImage = async (userAccessToken, adAccountId, file) => {
             }
         );
         
-        console.log('Resposta do upload de imagem:', uploadResponse.data);
+        console.log('Resposta do upload de imagem:', JSON.stringify(uploadResponse.data, null, 2));
+        
+        // Verificar se a resposta contém imagens
+        if (!uploadResponse.data.images || Object.keys(uploadResponse.data.images).length === 0) {
+            throw new Error('Resposta do upload não contém imagens');
+        }
+        
         const images = uploadResponse.data.images;
         const imageHash = Object.keys(images)[0];
         const imageData = images[imageHash];
+        
+        if (!imageHash) {
+            throw new Error('Não foi possível obter o hash da imagem');
+        }
+        
+        console.log('Hash da imagem obtido:', imageHash);
         
         // Obter URL pública da imagem, se disponível
         let imageUrl = null;
@@ -292,23 +385,80 @@ const uploadImage = async (userAccessToken, adAccountId, file) => {
 const createAdCreative = async (userAccessToken, adAccountId, pageId, creativeData, file = null) => {
     try {
         console.log(`Criando ad creative real no Meta Ads para conta ${adAccountId}`);
-        console.log('Dados do criativo:', creativeData);
+        console.log('Dados do criativo:', JSON.stringify(creativeData, null, 2));
         
         let imageHash = null;
         let imageUrl = null;
         
+        // Processar imagem (upload de arquivo ou URL externa)
         if (file) {
+            console.log('Usando arquivo de imagem enviado');
             // Fazer upload da imagem e obter hash e URL
             const imageData = await uploadImage(userAccessToken, adAccountId, file);
             imageHash = imageData.hash;
             imageUrl = imageData.url;
-        } else if (creativeData.imageUrl) {
-            // Verificar se a URL da imagem é acessível
-            const isAccessible = await isUrlAccessible(creativeData.imageUrl);
-            if (!isAccessible) {
-                throw new Error(`URL da imagem não acessível: ${creativeData.imageUrl}`);
+            
+            if (!imageHash) {
+                throw new Error('Falha ao obter hash da imagem após upload');
             }
-            imageUrl = creativeData.imageUrl;
+            
+            console.log('Hash da imagem obtido após upload:', imageHash);
+        } else if (creativeData.imageUrl) {
+            console.log('Usando URL de imagem externa:', creativeData.imageUrl);
+            
+            // Validar URL da imagem
+            const validationResult = await validateImageUrl(creativeData.imageUrl);
+            
+            if (!validationResult.isAccessible) {
+                throw new Error(`URL da imagem inválida ou inacessível: ${validationResult.error}`);
+            }
+            
+            console.log('URL da imagem validada com sucesso:', creativeData.imageUrl);
+            
+            // Tentar fazer upload da imagem para o Meta Ads a partir da URL
+            try {
+                console.log('Tentando fazer upload da imagem para o Meta Ads a partir da URL');
+                
+                const uploadResponse = await axios.post(
+                    `${META_API_BASE_URL}/${adAccountId}/adimages`,
+                    {
+                        url: creativeData.imageUrl,
+                        access_token: userAccessToken
+                    }
+                );
+                
+                console.log('Resposta do upload de imagem por URL:', JSON.stringify(uploadResponse.data, null, 2));
+                
+                if (uploadResponse.data.images && Object.keys(uploadResponse.data.images).length > 0) {
+                    const images = uploadResponse.data.images;
+                    const uploadedImageHash = Object.keys(images)[0];
+                    const uploadedImageData = images[uploadedImageHash];
+                    
+                    imageHash = uploadedImageHash;
+                    
+                    if (uploadedImageData && uploadedImageData.url) {
+                        imageUrl = uploadedImageData.url;
+                    } else if (uploadedImageData && uploadedImageData.permalink_url) {
+                        imageUrl = uploadedImageData.permalink_url;
+                    } else {
+                        imageUrl = creativeData.imageUrl; // Manter URL original se não conseguir obter do Meta
+                    }
+                    
+                    console.log('Hash da imagem obtido após upload por URL:', imageHash);
+                } else {
+                    throw new Error('Resposta do upload por URL não contém imagens');
+                }
+            } catch (uploadError) {
+                console.error('Erro ao fazer upload da imagem por URL:', uploadError.message);
+                console.error('Detalhes do erro:', uploadError.response?.data || uploadError);
+                
+                // Se falhar o upload por URL, usar a URL diretamente no criativo
+                console.log('Usando URL da imagem diretamente no criativo');
+                imageUrl = creativeData.imageUrl;
+                imageHash = null; // Não temos hash, vamos usar URL diretamente
+            }
+        } else {
+            throw new Error('Nenhuma imagem fornecida (nem arquivo nem URL)');
         }
         
         // Validar message (texto do anúncio)
@@ -326,6 +476,7 @@ const createAdCreative = async (userAccessToken, adAccountId, pageId, creativeDa
             ctaType = DEFAULT_CTA;
         }
         
+        // Construir payload para criação de criativo
         const creativePayload = {
             name: `${creativeData.name} - Creative`,
             object_story_spec: {
@@ -341,8 +492,15 @@ const createAdCreative = async (userAccessToken, adAccountId, pageId, creativeDa
             access_token: userAccessToken // Usar token do usuário
         };
         
+        // Adicionar imagem ao criativo
         if (imageHash) {
+            // Se temos hash, usar image_hash
+            console.log('Usando image_hash no criativo:', imageHash);
             creativePayload.object_story_spec.link_data.image_hash = imageHash;
+        } else if (imageUrl) {
+            // Se não temos hash mas temos URL, usar image_url
+            console.log('Usando image_url no criativo:', imageUrl);
+            creativePayload.object_story_spec.link_data.image_url = imageUrl;
         }
         
         if (creativeData.adTitle) {
@@ -351,9 +509,10 @@ const createAdCreative = async (userAccessToken, adAccountId, pageId, creativeDa
         
         // Se for anúncio de post, adicionar object_story_id
         if (creativeData.postId) {
-             creativePayload.object_story_id = `${pageId}_${creativeData.postId}`;
-             // Remover link_data se object_story_id for usado
-             delete creativePayload.object_story_spec.link_data;
+            console.log('Criando criativo a partir de post ID:', creativeData.postId);
+            creativePayload.object_story_id = `${pageId}_${creativeData.postId}`;
+            // Remover link_data se object_story_id for usado
+            delete creativePayload.object_story_spec.link_data;
         }
 
         console.log('Enviando payload para criação de criativo:', JSON.stringify(creativePayload, null, 2));
@@ -545,15 +704,19 @@ const createFromImage = async (req, res) => {
         // Validar image_url se fornecido
         if (image_url && !req.file) {
             try {
-                const isAccessible = await isUrlAccessible(image_url);
-                if (!isAccessible) {
-                    console.error('❌ Erro: URL da imagem não acessível:', image_url);
+                console.log('Validando URL da imagem:', image_url);
+                const validationResult = await validateImageUrl(image_url);
+                
+                if (!validationResult.isAccessible) {
+                    console.error('❌ Erro: URL da imagem inválida ou inacessível:', validationResult.error);
                     return res.status(400).json({ 
-                        message: `URL da imagem não acessível: ${image_url}`,
+                        message: `URL da imagem inválida ou inacessível: ${validationResult.error}`,
                         camposFaltantes: { image_url: true }
                     });
                 }
+                
                 console.log('✅ URL da imagem validada com sucesso:', image_url);
+                console.log('Content-Type:', validationResult.contentType);
             } catch (error) {
                 console.error('❌ Erro ao validar URL da imagem:', error);
                 return res.status(400).json({ 
