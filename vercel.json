@@ -1,11 +1,5 @@
 {
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/node",
-      "config": {
-        "installCommand": "pnpm install --no-frozen-lockfile"
-      }
-    }
-  ]
+  "rootDirectory": "frontend",
+  "buildCommand": "pnpm install && pnpm build",
+  "outputDirectory": "dist"
 }
