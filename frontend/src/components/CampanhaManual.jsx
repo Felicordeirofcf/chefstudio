@@ -817,16 +817,15 @@ const CampanhaManual = () => {
         </div>
 
         {carregandoCampanhas ? (
-          <div className="p-8 text-center">
-            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-gray-500">Carregando campanhas...</p>
+          <div className="p-4 text-center">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
           </div>
         ) : erroCampanhas ? (
           <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
             {erroCampanhas}
           </div>
         ) : campanhas.length === 0 ? (
-          <div className="p-8 text-center bg-gray-50 rounded-md">
+          <div className="p-4 text-center bg-gray-50 rounded-md">
             <p className="text-gray-500">Nenhuma campanha encontrada para esta conta.</p>
             <p className="text-sm text-gray-400 mt-2">Crie sua primeira campanha usando o formulário acima.</p>
           </div>
