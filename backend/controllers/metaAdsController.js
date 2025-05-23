@@ -529,8 +529,11 @@ const getCampaigns = async (req, res) => {
         // Buscar campanhas da API do Meta
         const response = await axios.get(`${META_API_BASE_URL}/${adAccountId}/campaigns`, {
             params: {
-                fields: 'id,name,status,objective,created_time,start_time,stop_time,daily_budget,lifetime_budget,budget_remaining',
-                access_token: userAccessToken // Usar token do usuário
+                fields: 'id,name,status,objective,created_time,start_time,stop_time,daily_budget,lifetime_budget,budget_remaining'
+                // access_token: userAccessToken // REMOVIDO - Token agora vai no header
+            },
+            headers: {
+                'Authorization': `Bearer ${userAccessToken}` // Adicionar token no header
             }
         });
 
