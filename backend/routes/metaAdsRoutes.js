@@ -84,6 +84,10 @@ const upload = multer({ storage: storage });
  *               menuUrl:
  *                 type: string
  *                 description: Link de destino (URL do cardápio)
+ *               objective:
+ *                 type: string
+ *                 description: Objetivo da campanha (ex LINK_CLICKS, OUTCOME_TRAFFIC)
+ *                 enum: [LINK_CLICKS, OUTCOME_TRAFFIC, POST_ENGAGEMENT, LEAD_GENERATION, CONVERSIONS, OUTCOME_LEADS]
  *     responses:
  *       201:
  *         description: Campanha criada com sucesso
@@ -132,11 +136,15 @@ router.post("/create-recommended-traffic-campaign", protect, upload.single('imag
  *               - weeklyBudget
  *               - startDate
  *               - adDescription
+ *               - objective
  *             properties:
  *               image:
  *                 type: string
  *                 format: binary
  *                 description: Imagem para o anúncio
+ *               image_url:
+ *                 type: string
+ *                 description: URL da imagem (alternativa ao upload de arquivo)
  *               adAccountId:
  *                 type: string
  *                 description: ID da conta de anúncios
@@ -173,15 +181,23 @@ router.post("/create-recommended-traffic-campaign", protect, upload.single('imag
  *               adDescription:
  *                 type: string
  *                 description: Descrição/texto principal do anúncio
+ *               message:
+ *                 type: string
+ *                 description: Texto do anúncio (alternativa a adDescription)
  *               adTitle:
  *                 type: string
  *                 description: Título do anúncio (opcional)
  *               callToAction:
  *                 type: string
  *                 description: Tipo de CTA (ex LEARN_MORE, SHOP_NOW)
+ *                 enum: [LEARN_MORE, SHOP_NOW, BOOK_TRAVEL, CONTACT_US, SIGN_UP, DOWNLOAD, GET_QUOTE, SUBSCRIBE, ORDER_NOW]
  *               menuUrl:
  *                 type: string
  *                 description: Link de destino (URL do cardápio)
+ *               objective:
+ *                 type: string
+ *                 description: Objetivo da campanha
+ *                 enum: [LINK_CLICKS, OUTCOME_TRAFFIC, POST_ENGAGEMENT, LEAD_GENERATION, CONVERSIONS, OUTCOME_LEADS]
  *     responses:
  *       201:
  *         description: Anúncio criado com sucesso
@@ -228,6 +244,7 @@ router.post("/create-from-image", protect, upload.single('image'), metaAdsContro
  *               - campaignName
  *               - weeklyBudget
  *               - startDate
+ *               - objective
  *             properties:
  *               adAccountId:
  *                 type: string
@@ -268,9 +285,14 @@ router.post("/create-from-image", protect, upload.single('image'), metaAdsContro
  *               callToAction:
  *                 type: string
  *                 description: Tipo de CTA (ex LEARN_MORE, SHOP_NOW)
+ *                 enum: [LEARN_MORE, SHOP_NOW, BOOK_TRAVEL, CONTACT_US, SIGN_UP, DOWNLOAD, GET_QUOTE, SUBSCRIBE, ORDER_NOW]
  *               menuUrl:
  *                 type: string
  *                 description: Link de destino (URL do cardápio)
+ *               objective:
+ *                 type: string
+ *                 description: Objetivo da campanha
+ *                 enum: [LINK_CLICKS, OUTCOME_TRAFFIC, POST_ENGAGEMENT, LEAD_GENERATION, CONVERSIONS, OUTCOME_LEADS]
  *     responses:
  *       201:
  *         description: Anúncio criado com sucesso

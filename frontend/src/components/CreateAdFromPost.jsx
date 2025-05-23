@@ -28,7 +28,8 @@ export default function CreateAdFromPost() {
     dailyBudget: "70", // Ajustado para o mínimo de R$70
     startDate: new Date(),
     endDate: null,
-    targetCountry: "BR"
+    targetCountry: "BR",
+    objective: "LINK_CLICKS" // Valor padrão para o objetivo
   });
 
   const countries = [
@@ -41,6 +42,16 @@ export default function CreateAdFromPost() {
     { code: "CO", name: "Colômbia" },
     { code: "CL", name: "Chile" },
     { code: "PE", name: "Peru" },
+  ];
+
+  // Opções para o objetivo da campanha
+  const objectiveOptions = [
+    { value: "LINK_CLICKS", label: "Cliques no link (tráfego)" },
+    { value: "POST_ENGAGEMENT", label: "Engajamento em publicação" },
+    { value: "LEAD_GENERATION", label: "Geração de leads" },
+    { value: "OUTCOME_TRAFFIC", label: "Tráfego (novo)" },
+    { value: "OUTCOME_LEADS", label: "Leads (novo)" },
+    { value: "CONVERSIONS", label: "Conversões" }
   ];
 
   const handleInputChange = (e) => {
@@ -82,6 +93,10 @@ export default function CreateAdFromPost() {
       setError("Data de término deve ser posterior à data de início");
       return false;
     }
+    if (!formData.objective) {
+      setError("Objetivo da campanha é obrigatório");
+      return false;
+    }
     return true;
   };
 
@@ -121,13 +136,14 @@ export default function CreateAdFromPost() {
       });
       
       // Enviar solicitação para criar anúncio
-      const response = await api.post("/meta/create-ad-from-post", {
+      const response = await api.post("/meta-ads/create-from-post", {
         postUrl: formData.postUrl,
         adName: formData.adName,
         dailyBudget: formData.dailyBudget,
         startDate: formData.startDate,
         endDate: formData.endDate,
-        targetCountry: formData.targetCountry
+        targetCountry: formData.targetCountry,
+        objective: formData.objective // Incluir o objetivo no payload
       });
       
       setSuccess(true);
@@ -270,6 +286,26 @@ export default function CreateAdFromPost() {
                   onChange={handleInputChange}
                   required
                 />
+              </div>
+              
+              {/* Novo campo de seleção de objetivo */}
+              <div className="space-y-2">
+                <Label htmlFor="objective">Objetivo da Campanha *</Label>
+                <Select 
+                  value={formData.objective} 
+                  onValueChange={(value) => handleSelectChange("objective", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um objetivo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {objectiveOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="space-y-2">
@@ -424,65 +460,33 @@ export default function CreateAdFromPost() {
                     </div>
                     
                     <div className="space-y-1">
-                      <p className="text-sm font-medium text-gray-500">País Alvo</p>
-                      <p>{countries.find(c => c.code === formData.targetCountry)?.name || formData.targetCountry}</p>
+                      <p className="text-sm font-medium text-gray-500">Objetivo</p>
+                      <p>{adDetails.objective || formData.objective}</p>
                     </div>
                     
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-gray-500">Data de Início</p>
-                      <p>{format(new Date(formData.startDate), "dd/MM/yyyy")}</p>
+                      <p>{format(new Date(adDetails.startDate || formData.startDate), "dd/MM/yyyy")}</p>
                     </div>
                     
-                    {formData.endDate && (
+                    {(adDetails.endDate || formData.endDate) && (
                       <div className="space-y-1">
                         <p className="text-sm font-medium text-gray-500">Data de Término</p>
-                        <p>{format(new Date(formData.endDate), "dd/MM/yyyy")}</p>
+                        <p>{format(new Date(adDetails.endDate || formData.endDate), "dd/MM/yyyy")}</p>
                       </div>
                     )}
                   </div>
                   
-                  <div className="space-y-1 mt-4">
-                    <p className="text-sm font-medium text-gray-500">IDs do Facebook</p>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-                      <div className="p-2 bg-gray-50 rounded">
-                        <span className="font-medium">Campanha:</span> {adDetails.campaignId}
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded">
-                        <span className="font-medium">Conjunto:</span> {adDetails.adSetId}
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded">
-                        <span className="font-medium">Anúncio:</span> {adDetails.adId}
-                      </div>
-                    </div>
+                  <div className="mt-6">
+                    <Button 
+                      onClick={() => window.location.href = '/dashboard/campanhas'}
+                      className="w-full"
+                    >
+                      Ver Todas as Campanhas
+                    </Button>
                   </div>
                 </div>
               )}
-              
-              <div className="flex flex-col sm:flex-row gap-4 mt-6">
-                <Button 
-                  variant="outline" 
-                  className="flex-1"
-                  onClick={() => {
-                    setSuccess(false);
-                    setAdDetails(null);
-                    setFormData({
-                      ...formData,
-                      adName: `Promoção ChefStudio ${new Date().toLocaleDateString('pt-BR')}`,
-                    });
-                  }}
-                >
-                  Criar Novo Anúncio
-                </Button>
-                
-                <Button 
-                  className="flex-1"
-                  onClick={() => {
-                    window.location.href = '/dashboard/campanhas';
-                  }}
-                >
-                  Ver Campanhas
-                </Button>
-              </div>
             </div>
           )}
         </CardContent>
