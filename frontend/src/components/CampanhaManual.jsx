@@ -332,7 +332,7 @@ const CampanhaManual = () => {
           }
         });
         
-        // Adicionar a imagem ao FormData
+        // Adicionar a imagem ao FormData com o nome de campo 'image'
         dataToSend.append('image', imagem);
       } else {
         // Usar o endpoint para criar anúncio a partir de post existente
