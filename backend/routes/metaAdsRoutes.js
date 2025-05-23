@@ -18,6 +18,55 @@ const storage = multer.diskStorage({ // Salvar em disco temporariamente
 });
 const upload = multer({ storage: storage });
 
+// Armazenamento em memória para campanhas criadas (simulação)
+// Em um ambiente de produção, isso seria substituído por um banco de dados
+const campaignsStore = {
+    // Mapeamento de adAccountId para array de campanhas
+    // Exemplo: { 'act_123456789': [campaign1, campaign2, ...] }
+};
+
+// Adicionar algumas campanhas de exemplo para cada conta
+const addExampleCampaigns = (adAccountId) => {
+    if (!campaignsStore[adAccountId]) {
+        campaignsStore[adAccountId] = [
+            {
+                id: '23848123456789',
+                campaignId: '23848123456789',
+                name: 'Campanha de Verão',
+                status: 'ACTIVE',
+                weeklyBudget: 350.00,
+                dailyBudget: 50.00,
+                startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+                endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                adAccountId: adAccountId,
+                metrics: {
+                    reach: 1234,
+                    impressions: 5678,
+                    clicks: 89,
+                    spend: 123.45
+                }
+            },
+            {
+                id: '23848987654321',
+                campaignId: '23848987654321',
+                name: 'Promoção de Fim de Semana',
+                status: 'PAUSED',
+                weeklyBudget: 210.00,
+                dailyBudget: 30.00,
+                startDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
+                endDate: null,
+                adAccountId: adAccountId,
+                metrics: {
+                    reach: 567,
+                    impressions: 2345,
+                    clicks: 45,
+                    spend: 67.89
+                }
+            }
+        ];
+    }
+};
+
 /**
  * @swagger
  * tags:
@@ -240,28 +289,42 @@ router.post("/create-from-image", protect, upload.single('image'), async (req, r
         // Em um ambiente real, aqui seria feita a chamada para a API do Facebook
         // para fazer upload da imagem e criar o anúncio
         
+        // Gerar IDs únicos para a campanha, ad set e ad
+        const campaignId = `23848${Math.floor(Math.random() * 10000000)}`;
+        const adSetId = `23848${Math.floor(Math.random() * 10000000)}`;
+        const adId = `23848${Math.floor(Math.random() * 10000000)}`;
+        
         // Simulação de criação de anúncio
         const adDetails = {
+            id: campaignId, // Usar o mesmo ID para facilitar a listagem
+            campaignId: campaignId,
             name: campaignName,
             adAccountId: adAccountId,
             pageId: pageId,
             weeklyBudget: parseFloat(weeklyBudget),
             dailyBudget: parseFloat(weeklyBudget) / 7, // Convertendo orçamento semanal para diário
-            startDate: startDate,
-            endDate: endDate || null,
+            startDate: new Date(startDate),
+            endDate: endDate ? new Date(endDate) : null,
             location: location,
             adDescription: adDescription,
             adTitle: adTitle || null,
             callToAction: callToAction || 'LEARN_MORE',
             menuUrl: menuUrl || null,
-            status: 'PAUSED',
+            status: 'ACTIVE', // Definir como ACTIVE para aparecer na listagem
             imageUrl: `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`,
-            campaignId: `23848${Math.floor(Math.random() * 10000000)}`,
-            adSetId: `23848${Math.floor(Math.random() * 10000000)}`,
-            adId: `23848${Math.floor(Math.random() * 10000000)}`
+            adSetId: adSetId,
+            adId: adId,
+            createdAt: new Date(),
+            type: 'image'
         };
         
-        // Em um ambiente real, salvaríamos o anúncio no banco de dados
+        // Armazenar a campanha em memória
+        if (!campaignsStore[adAccountId]) {
+            campaignsStore[adAccountId] = [];
+        }
+        
+        // Adicionar a nova campanha no início da lista
+        campaignsStore[adAccountId].unshift(adDetails);
         
         res.status(201).json({
             success: true,
@@ -418,27 +481,41 @@ router.post("/create-from-post", protect, async (req, res) => {
         // Em um ambiente real, aqui seria feita a chamada para a API do Facebook
         // para criar o anúncio a partir da publicação
         
+        // Gerar IDs únicos para a campanha, ad set e ad
+        const campaignId = `23848${Math.floor(Math.random() * 10000000)}`;
+        const adSetId = `23848${Math.floor(Math.random() * 10000000)}`;
+        const adId = `23848${Math.floor(Math.random() * 10000000)}`;
+        
         // Simulação de criação de anúncio
         const adDetails = {
+            id: campaignId, // Usar o mesmo ID para facilitar a listagem
+            campaignId: campaignId,
             name: campaignName,
             adAccountId: adAccountId,
             pageId: pageId,
             weeklyBudget: parseFloat(weeklyBudget),
             dailyBudget: parseFloat(weeklyBudget) / 7, // Convertendo orçamento semanal para diário
-            startDate: startDate,
-            endDate: endDate || null,
+            startDate: new Date(startDate),
+            endDate: endDate ? new Date(endDate) : null,
             location: location,
             callToAction: callToAction || 'LEARN_MORE',
             menuUrl: menuUrl || null,
-            status: 'PAUSED',
+            status: 'ACTIVE', // Definir como ACTIVE para aparecer na listagem
             postId: postId,
             postUrl: postUrl,
-            campaignId: `23848${Math.floor(Math.random() * 10000000)}`,
-            adSetId: `23848${Math.floor(Math.random() * 10000000)}`,
-            adId: `23848${Math.floor(Math.random() * 10000000)}`
+            adSetId: adSetId,
+            adId: adId,
+            createdAt: new Date(),
+            type: 'post'
         };
         
-        // Em um ambiente real, salvaríamos o anúncio no banco de dados
+        // Armazenar a campanha em memória
+        if (!campaignsStore[adAccountId]) {
+            campaignsStore[adAccountId] = [];
+        }
+        
+        // Adicionar a nova campanha no início da lista
+        campaignsStore[adAccountId].unshift(adDetails);
         
         res.status(201).json({
             success: true,
@@ -487,64 +564,15 @@ router.get("/campaigns", protect, async (req, res) => {
             return res.status(400).json({ message: 'ID da conta de anúncios é obrigatório' });
         }
         
-        // Em um ambiente real, aqui seria feita a chamada para a API do Facebook
-        // para obter as campanhas do usuário filtradas pela conta de anúncios
+        // Adicionar campanhas de exemplo se não houver nenhuma para esta conta
+        if (!campaignsStore[adAccountId]) {
+            addExampleCampaigns(adAccountId);
+        }
         
-        // Simulação de campanhas
-        const campaigns = [
-            {
-                id: '23848123456789',
-                campaignId: '23848123456789',
-                name: 'Campanha de Verão',
-                status: 'ACTIVE',
-                weeklyBudget: 350.00,
-                dailyBudget: 50.00,
-                startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-                endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-                metrics: {
-                    reach: 1234,
-                    impressions: 5678,
-                    clicks: 89,
-                    spend: 123.45
-                }
-            },
-            {
-                id: '23848987654321',
-                campaignId: '23848987654321',
-                name: 'Promoção de Fim de Semana',
-                status: 'PAUSED',
-                weeklyBudget: 210.00,
-                dailyBudget: 30.00,
-                startDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-                endDate: null,
-                metrics: {
-                    reach: 567,
-                    impressions: 2345,
-                    clicks: 45,
-                    spend: 67.89
-                }
-            },
-            {
-                id: '23848567891234',
-                campaignId: '23848567891234',
-                name: 'Lançamento Novo Cardápio',
-                status: 'ACTIVE',
-                weeklyBudget: 490.00,
-                dailyBudget: 70.00,
-                startDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-                endDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-                metrics: {
-                    reach: 890,
-                    impressions: 3456,
-                    clicks: 67,
-                    spend: 89.12
-                }
-            }
-        ];
-        
+        // Retornar as campanhas armazenadas para esta conta
         res.json({
             success: true,
-            campaigns
+            campaigns: campaignsStore[adAccountId] || []
         });
     } catch (error) {
         console.error('Erro ao obter campanhas:', error);
