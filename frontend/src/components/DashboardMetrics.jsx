@@ -55,7 +55,7 @@ const DashboardMetrics = () => {
           // Verificar status de conexão Meta antes de buscar métricas
           const connectionResponse = await api.get('/api/meta/connection-status');
           
-          if (!connectionResponse.data.connected) {
+          if (!connectionResponse.data.isConnected) {
             console.warn('Usuário não está conectado ao Meta, usando dados simulados');
             setMetrics(demoMetrics[timeRange] || demoMetrics.last_30_days);
             setLoading(false);
