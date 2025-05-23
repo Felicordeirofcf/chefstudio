@@ -15,20 +15,14 @@ const { protect } = require("../middleware/authMiddleware");
 const multer = require("multer");
 const path = require("path"); // Import path module
 
-// Configuração do Multer (corrigido)
+// Configuração do Multer (sintaxe corrigida na linha 22)
 const storage = multer.diskStorage({ 
     destination: function (req, file, cb) {
-        cb(null, 
-'/tmp/
-"); // Diretório temporário - Corrigido
+        cb(null, '/tmp/'); // Diretório temporário - Sintaxe corrigida
     },
     filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + 
-"-
-" + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + 
-"-
-" + uniqueSuffix + path.extname(file.originalname)); // Corrigido
+        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)); 
     }
 });
 const upload = multer({ storage: storage });
