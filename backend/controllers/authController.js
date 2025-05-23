@@ -232,6 +232,10 @@ exports.facebookCallback = async (req, res) => {
       {
         facebookAccessToken: access_token,
         facebookId: metaUserId,
+        // Adicionar também nos campos padronizados
+        metaAccessToken: access_token,
+        metaUserId: metaUserId,
+        metaConnectionStatus: "connected"
       },
       { new: true }
     );
