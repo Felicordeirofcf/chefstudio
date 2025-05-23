@@ -28,6 +28,7 @@ const getMetaAuthUrl = asyncHandler(async (req, res) => {
     });
   }
 
+  // Adicionando 'pages_show_list' para garantir que podemos listar as páginas
   const scope = [
     "ads_management",
     "ads_read",
@@ -36,6 +37,7 @@ const getMetaAuthUrl = asyncHandler(async (req, res) => {
     "pages_manage_ads",
     "public_profile",
     "email",
+    "pages_show_list" // Permissão para listar páginas
   ].join(",");
 
   // Incluir o userId no parâmetro state
@@ -83,23 +85,39 @@ const facebookCallback = asyncHandler(async (req, res) => {
       return res.redirect(`${dashboardUrl}?meta_connect=error&message=user_not_found`);
     }
 
-    // 3. Trocar o code por um access_token
-    const tokenResponse = await fetch(
+    // 3. Trocar o code por um access_token de longa duração
+    // Primeiro, trocamos o code por um token de curta duração
+    const shortLivedTokenResponse = await fetch(
       `https://graph.facebook.com/v18.0/oauth/access_token?client_id=${clientId}&redirect_uri=${encodeURIComponent(
         redirectUri
       )}&client_secret=${clientSecret}&code=${code}`
     );
-    const tokenData = await tokenResponse.json();
+    const shortLivedTokenData = await shortLivedTokenResponse.json();
 
-    if (tokenData.error || !tokenData.access_token) {
-      console.error("Erro ao obter token de acesso:", tokenData.error || "Token não retornado");
-      throw new Error(`Erro ao obter token: ${tokenData.error?.message || 'Token não retornado'}`);
+    if (shortLivedTokenData.error || !shortLivedTokenData.access_token) {
+      console.error("Erro ao obter token de acesso de curta duração:", shortLivedTokenData.error || "Token não retornado");
+      throw new Error(`Erro ao obter token (curta duração): ${shortLivedTokenData.error?.message || 'Token não retornado'}`);
     }
-    const accessToken = tokenData.access_token;
+    const shortLivedAccessToken = shortLivedTokenData.access_token;
+
+    // Agora, trocamos o token de curta duração por um de longa duração
+    const longLivedTokenResponse = await fetch(
+      `https://graph.facebook.com/v18.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${shortLivedAccessToken}`
+    );
+    const longLivedTokenData = await longLivedTokenResponse.json();
+
+    if (longLivedTokenData.error || !longLivedTokenData.access_token) {
+       // Se a troca falhar (ex: token já é de longa duração ou erro), usamos o de curta duração
+      console.warn("Aviso ao trocar por token de longa duração:", longLivedTokenData.error || "Token não retornado. Usando token de curta duração.");
+      accessToken = shortLivedAccessToken;
+    } else {
+      accessToken = longLivedTokenData.access_token;
+      console.log("Token de longa duração obtido com sucesso.");
+    }
 
     // 4. Buscar o ID do usuário do Facebook (/me)
     const fbUserResponse = await fetch(
-      `https://graph.facebook.com/v18.0/me?fields=id&access_token=${accessToken}` // Apenas o ID é necessário aqui
+      `https://graph.facebook.com/v18.0/me?fields=id&access_token=${accessToken}`
     );
     const fbUserData = await fbUserResponse.json();
 
@@ -111,39 +129,58 @@ const facebookCallback = asyncHandler(async (req, res) => {
 
     // 5. Buscar as contas de anúncio (adAccounts)
     const adAccountsResponse = await fetch(
-      `https://graph.facebook.com/v18.0/me/adaccounts?fields=id,account_id,name&access_token=${accessToken}` // Campos solicitados
+      `https://graph.facebook.com/v18.0/me/adaccounts?fields=id,account_id,name&access_token=${accessToken}`
     );
     const adAccountsData = await adAccountsResponse.json();
 
-    // Não lançar erro se contas não forem encontradas, mas logar
     if (adAccountsData.error) {
       console.warn(
         `Aviso ao obter contas de anúncios para usuário ${userId}: ${adAccountsData.error.message}`
       );
     }
-
-    // Formatar as contas de anúncio conforme solicitado
     const formattedAdAccounts = adAccountsData?.data?.map(acc => ({
-      id: acc.id,           // Ex: act_1234567890
-      account_id: acc.account_id, // Ex: 1234567890
+      id: acc.id,
+      account_id: acc.account_id,
       name: acc.name
     })) || [];
 
-    // 6. Salvar as informações no MongoDB
-    user.metaAccessToken = accessToken;
+    // 6. Buscar as Páginas do Facebook (accounts)
+    const pagesResponse = await fetch(
+      // Usamos o metaUserId aqui para garantir que estamos buscando as páginas do usuário correto
+      `https://graph.facebook.com/v18.0/${metaUserId}/accounts?fields=id,name,access_token&access_token=${accessToken}`
+    );
+    const pagesData = await pagesResponse.json();
+
+    if (pagesData.error) {
+      console.warn(
+        `Aviso ao obter páginas do Facebook para usuário ${userId}: ${pagesData.error.message}`
+      );
+    }
+    // Formatar as páginas - Salvar ID, Nome e o Page Access Token (importante para ações futuras)
+    const formattedPages = pagesData?.data?.map(page => ({
+      id: page.id,
+      name: page.name,
+      access_token: page.access_token // Salvar o Page Access Token
+    })) || [];
+
+    // 7. Salvar as informações no MongoDB
+    user.metaAccessToken = accessToken; // Salvar token de longa duração (ou curta se a troca falhar)
     user.metaUserId = metaUserId;
-    user.adAccounts = formattedAdAccounts; // Salvar array formatado
-    user.isMetaConnected = true; // Marcar como conectado
+    user.adAccounts = formattedAdAccounts;
+    user.metaPages = formattedPages; // Salvar as páginas formatadas
+    user.isMetaConnected = true;
 
     await user.save();
-    console.log(`Dados da Meta salvos com sucesso para o usuário ${userId}`);
+    console.log(`Dados da Meta (incluindo páginas) salvos com sucesso para o usuário ${userId}`);
 
-    // 7. Redirecionar para o dashboard em caso de sucesso
-    res.redirect(dashboardUrl); // Redirecionamento solicitado
+    // 8. Redirecionar para o dashboard em caso de sucesso
+    res.redirect(dashboardUrl);
 
   } catch (error) {
     console.error(`Erro no callback do Facebook para usuário ${userId}:`, error);
-    // Redirecionar para o dashboard com erro
+    // Limpar dados parciais em caso de erro?
+    // Considerar limpar user.metaAccessToken, etc. se o fluxo falhar no meio
+    // await User.findByIdAndUpdate(userId, { $unset: { metaAccessToken: "", metaUserId: "", adAccounts: "", metaPages: "", isMetaConnected: "" } });
     res.redirect(
       `${dashboardUrl}?meta_connect=error&message=${encodeURIComponent(error.message)}`
     );
@@ -151,8 +188,6 @@ const facebookCallback = asyncHandler(async (req, res) => {
 });
 
 // Manter outras funções do controlador se existirem...
-// Exemplo:
-// const getConnectionStatus = asyncHandler(async (req, res) => { ... });
 
 module.exports = {
   getMetaAuthUrl,

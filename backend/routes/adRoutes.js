@@ -23,3 +23,8 @@ router.post("/location", protect, saveLocationSettings);
 router.get("/location", protect, getLocationSettings);
 
 module.exports = router;
+
+
+
+// Nova rota para criar campanha de Tráfego recomendada
+router.post("/create-recommended-traffic-campaign", protect, createRecommendedTrafficCampaign);
