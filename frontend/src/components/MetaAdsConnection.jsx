@@ -71,17 +71,13 @@ const MetaAdsConnection = () => {
         throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
       }
       
-      // Obter ID do usuário do localStorage
-      const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-      const userId = userInfo?._id;
-      
-      if (!userId) {
-        throw new Error('ID do usuário não encontrado. Por favor, faça login novamente.');
-      }
-      
-      // Consumir a URL de autenticação diretamente da API do backend
+      // Consumir a URL de autenticação diretamente da API do backend com header Authorization
       const apiUrl = import.meta.env.VITE_API_URL || 'https://chefstudio-production.up.railway.app';
-      const response = await fetch(`${apiUrl}/api/meta/login?userId=${userId}`);
+      const response = await fetch(`${apiUrl}/api/meta/auth-url`, {
+        headers: {
+          Authorization: `Bearer ${userToken}`
+        }
+      });
       
       if (!response.ok) {
         throw new Error(`Erro ao obter URL de autenticação: ${response.status}`);
