@@ -215,15 +215,6 @@ const disconnectMeta = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = {
-  getMetaAuthUrl,
-  facebookCallback,
-  getConnectionStatus,
-  disconnectMeta
-};
-
-
-
 // @desc    Obter métricas de anúncios do Meta Ads
 // @route   GET /api/meta/metrics
 // @access  Private
@@ -256,9 +247,6 @@ const getMetaMetrics = asyncHandler(async (req, res) => {
     console.log(`[Meta Metrics] Usando Ad Account ID: ${adAccountId} para ${userId}`);
 
     // Mapear timeRange para o formato da API do Meta
-    // A API usa presets como 'last_30d', 'today', etc.
-    // Ou um objeto {since: 'YYYY-MM-DD', until: 'YYYY-MM-DD'}
-    // Vamos usar presets por simplicidade, ajustando os nomes se necessário
     const timePresetMap = {
       'today': 'today',
       'yesterday': 'yesterday',
@@ -271,8 +259,6 @@ const getMetaMetrics = asyncHandler(async (req, res) => {
 
     const fields = 'impressions,clicks,spend,ctr';
     const apiUrl = `https://graph.facebook.com/v18.0/${adAccountId}/insights?level=account&fields=${fields}&time_range={'since':'${apiTimeRange}','until':'${apiTimeRange}'}&access_token=${accessToken}`;
-    // Nota: A API v18 pode preferir time_range como objeto JSON stringificado ou presets como 'last_30d'
-    // Tentativa com time_preset primeiro, que é mais comum
     const apiUrlPreset = `https://graph.facebook.com/v18.0/${adAccountId}/insights?level=account&fields=${fields}&time_preset=${apiTimeRange}&access_token=${accessToken}`;
 
     console.log(`[Meta Metrics] Chamando API Insights: ${apiUrlPreset}`);
@@ -281,8 +267,7 @@ const getMetaMetrics = asyncHandler(async (req, res) => {
 
     if (data.error) {
       console.error(`[Meta Metrics] Erro API Insights para ${userId} (${adAccountId}):`, data.error);
-      // Tentar com time_range como objeto se time_preset falhar (exemplo)
-      if (data.error.code === 100 && data.error.error_subcode === 1870078) { // Código comum para parâmetro inválido
+      if (data.error.code === 100 && data.error.error_subcode === 1870078) { 
           console.log(`[Meta Metrics] Tentando com time_range como objeto para ${userId}...`);
           const responseRange = await fetch(apiUrl);
           const dataRange = await responseRange.json();
@@ -294,7 +279,6 @@ const getMetaMetrics = asyncHandler(async (req, res) => {
               console.warn(`[Meta Metrics] Nenhum dado retornado pela API (com time_range) para ${userId} (${adAccountId}) no período ${apiTimeRange}`);
               return res.status(200).json({ impressions: 0, clicks: 0, spend: 0, ctr: 0 });
           }
-          // Processar dados de dataRange.data[0]
           const metrics = dataRange.data[0];
           console.log(`[Meta Metrics] Métricas obtidas com sucesso (com time_range) para ${userId}:`, metrics);
           res.status(200).json({
@@ -310,11 +294,9 @@ const getMetaMetrics = asyncHandler(async (req, res) => {
 
     if (!data.data || data.data.length === 0) {
       console.warn(`[Meta Metrics] Nenhum dado retornado pela API para ${userId} (${adAccountId}) no período ${apiTimeRange}`);
-      // Retornar zero se não houver dados para o período
       return res.status(200).json({ impressions: 0, clicks: 0, spend: 0, ctr: 0 });
     }
 
-    // A API retorna um array, pegamos o primeiro elemento que contém as métricas agregadas da conta
     const metrics = data.data[0];
     console.log(`[Meta Metrics] Métricas obtidas com sucesso para ${userId}:`, metrics);
 
@@ -330,18 +312,6 @@ const getMetaMetrics = asyncHandler(async (req, res) => {
     res.status(500).json({ message: `Erro interno ao buscar métricas: ${error.message}` });
   }
 });
-
-module.exports = {
-  getMetaAuthUrl,
-  facebookCallback,
-  getConnectionStatus,
-  disconnectMeta,
-  getMetaMetrics,
-  createRecommendedTrafficCampaign // Adicionando a função exportada
-};
-
-
-
 
 // @desc    Criar campanha de Tráfego recomendada no Meta Ads
 // @route   POST /api/meta-ads/create-recommended-traffic-campaign
@@ -501,19 +471,16 @@ const createRecommendedTrafficCampaign = asyncHandler(async (req, res) => {
           else console.log("[Create Campaign] Arquivo temporário removido:", req.file.path);
       });
 
-      if (imageData.error || !imageData.images || !imageData.images[req.file.filename]) {
-        console.error("[Create Campaign] Erro ao fazer upload da imagem:", imageData.error || "Hash da imagem não encontrado");
-        throw new Error(`Erro API (Upload Imagem): ${imageData.error?.message || 'Falha no upload'}`);
-      }
-      // O hash pode estar em imageData.images[Object.keys(imageData.images)[0]].hash se o filename não bater
-      const imageHash = imageData.images[req.file.filename]?.hash || imageData.images[Object.keys(imageData.images)[0]]?.hash;
-      if (!imageHash) {
-          console.error("[Create Campaign] Hash da imagem não encontrado na resposta:", imageData);
-          throw new Error('Erro API (Upload Imagem): Hash da imagem não retornado.');
-      }
-      console.log(`[Create Campaign] Imagem enviada com sucesso. Hash: ${imageHash}`);
+      // Check if the hash exists under a different key (sometimes happens)
+      const imageKeys = Object.keys(imageData.images || {});
+      const imageHash = imageKeys.length > 0 ? imageData.images[imageKeys[0]].hash : null;
 
-      // Atualizar payload do criativo com image_hash
+      if (imageData.error || !imageHash) {
+        console.error("[Create Campaign] Erro ao fazer upload da imagem:", imageData.error || "Hash da imagem não encontrado na resposta");
+        throw new Error(`Erro API (Upload Imagem): ${imageData.error?.message || 'Falha no upload ou hash não encontrado'}`);
+      }
+      
+      console.log(`[Create Campaign] Imagem enviada com sucesso. Hash: ${imageHash}`);
       creativePayload.object_story_spec.link_data.image_hash = imageHash;
       if(adTitle) creativePayload.object_story_spec.link_data.name = adTitle; // Adiciona título se fornecido
 
@@ -527,7 +494,8 @@ const createRecommendedTrafficCampaign = asyncHandler(async (req, res) => {
          console.error("[Create Campaign] Erro ao buscar ID do post:", postLookupData.error || "ID não encontrado");
          // Tentar extração manual como fallback (menos confiável)
          const match = postUrl.match(/(\d+)_(\d+)/) || postUrl.match(/posts\/(\d+)/) || postUrl.match(/fbid=(\d+)/);
-         const extractedPostId = match ? (match.length > 2 ? `${pageId}_${match[2]}` : match[1]) : null;
+         // Ensure pageId is part of the extracted ID if needed
+         const extractedPostId = match ? (match.length > 2 ? `${pageId}_${match[2]}` : (postUrl.includes('fbid=') ? `${pageId}_${match[1]}` : match[1])) : null;
          if (!extractedPostId) {
             throw new Error(`Erro API (Post Lookup): ${postLookupData.error?.message || 'Não foi possível obter o ID do post'}`);
          }
@@ -608,5 +576,5 @@ module.exports = {
   getConnectionStatus,
   disconnectMeta,
   getMetaMetrics,
-  createRecommendedTrafficCampaign // Adicionando a função exportada
+  createRecommendedTrafficCampaign // Exportando a função aqui, após sua declaração
 };
