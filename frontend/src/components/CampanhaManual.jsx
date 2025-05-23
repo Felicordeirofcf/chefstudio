@@ -43,7 +43,7 @@ const CampanhaManual = () => {
   const [callToAction, setCallToAction] = useState('LEARN_MORE');
   const [imagem, setImagem] = useState(null);
   const [imagemPreview, setImagemPreview] = useState('');
-  const [tipoAnuncio, setTipoAnuncio] = useState('post');
+  const [tipoAnuncio, setTipoAnuncio] = useState('imagem'); // Alterado para 'imagem' como padrão
 
   // Estados Meta
   const [adAccountsList, setAdAccountsList] = useState([]);
@@ -258,7 +258,7 @@ const CampanhaManual = () => {
        toast({ title: "Erro", description: "Selecione uma Página do Facebook.", variant: "destructive" });
       return;
     }
-    if (!nomeCampanha || !orcamento || !dataInicio || !descricaoAnuncio || !callToAction || !linkCardapio) {
+    if (!nomeCampanha || !orcamento || !dataInicio || !descricaoAnuncio || !callToAction) {
       setError('Preencha todos os campos obrigatórios (*).');
       toast({ title: "Erro", description: "Preencha todos os campos obrigatórios (*).", variant: "destructive" });
       return;
@@ -288,8 +288,9 @@ const CampanhaManual = () => {
       }
 
       const API_BASE_URL = "https://chefstudio-production.up.railway.app/api";
-      const endpoint = `${API_BASE_URL}/ads/create-recommended-traffic-campaign`;
-
+      
+      // Escolher o endpoint correto com base no tipo de anúncio
+      let endpoint;
       let dataToSend;
       let headers = {
         'Authorization': `Bearer ${token}`,
@@ -308,16 +309,19 @@ const CampanhaManual = () => {
           longitude: currentLocation.lng,
           radius: parseInt(raioAlcance)
         },
-        adType: tipoAnuncio,
-        adTitle: tituloAnuncio || null,
         adDescription: descricaoAnuncio,
         callToAction: callToAction,
-        menuUrl: linkCardapio
+        menuUrl: linkCardapio || null,
+        adTitle: tituloAnuncio || null
       };
 
       if (tipoAnuncio === 'imagem') {
+        // Usar o novo endpoint para criar anúncio a partir de imagem
+        endpoint = `${API_BASE_URL}/meta-ads/create-from-image`;
         headers['Content-Type'] = 'multipart/form-data';
         dataToSend = new FormData();
+        
+        // Adicionar todos os campos comuns ao FormData
         Object.keys(commonData).forEach(key => {
           if (key === 'location') {
             dataToSend.append('location[latitude]', commonData.location.latitude);
@@ -327,10 +331,17 @@ const CampanhaManual = () => {
             dataToSend.append(key, commonData[key]);
           }
         });
-        dataToSend.append('imageFile', imagem);
+        
+        // Adicionar a imagem ao FormData
+        dataToSend.append('image', imagem);
       } else {
+        // Usar o endpoint para criar anúncio a partir de post existente
+        endpoint = `${API_BASE_URL}/meta/create-ad-from-post`;
         headers['Content-Type'] = 'application/json';
-        dataToSend = JSON.stringify({ ...commonData, postUrl: linkPublicacao });
+        dataToSend = JSON.stringify({ 
+          ...commonData, 
+          postUrl: linkPublicacao 
+        });
       }
 
       console.log('Enviando dados para:', endpoint);
@@ -357,8 +368,13 @@ const CampanhaManual = () => {
       setCallToAction('LEARN_MORE');
       handleClearImage();
 
+      // Redirecionar para a tela de listagem de campanhas
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('campanhaCreated', { detail: response.data }));
+        // Redirecionar para a listagem de campanhas após sucesso
+        setTimeout(() => {
+          window.location.href = '/dashboard/campanhas';
+        }, 1500);
       }
 
     } catch (error) {
@@ -387,7 +403,7 @@ const CampanhaManual = () => {
     <div className="w-full bg-white p-6 rounded-lg shadow">
       <form onSubmit={handleSubmit} className="space-y-6">
         <h2 className="text-xl font-semibold">
-          Criar Anúncio Recomendado (Tráfego)
+          Criar Anúncio Manualmente
         </h2>
         <p className="text-sm text-gray-500">
           Configure sua campanha de tráfego com as opções recomendadas pelo Meta Ads.
@@ -453,7 +469,7 @@ const CampanhaManual = () => {
                 id="raioAlcanceSlider"
                 type="range"
                 min="1"
-                max="80"
+                max="50" // Ajustado para máximo de 50km conforme solicitado
                 value={raioAlcance}
                 onChange={(e) => setRaioAlcance(parseInt(e.target.value))}
                 className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
@@ -483,7 +499,7 @@ const CampanhaManual = () => {
                 value={orcamento}
                 onChange={(e) => setOrcamento(parseFloat(e.target.value))}
                 className="w-full p-2 border rounded-md"
-                min="1"
+                min="70" // Orçamento mínimo fixo de R$ 70
                 required
                 disabled={!isMetaConnected}
               />
@@ -523,18 +539,6 @@ const CampanhaManual = () => {
                   <input
                     type="radio"
                     name="tipoAnuncio"
-                    value="post"
-                    checked={tipoAnuncio === 'post'}
-                    onChange={() => { setTipoAnuncio('post'); handleClearImage(); }}
-                    className="mr-2"
-                    disabled={!isMetaConnected}
-                  />
-                  Publicação Existente
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="tipoAnuncio"
                     value="imagem"
                     checked={tipoAnuncio === 'imagem'}
                     onChange={() => { setTipoAnuncio('imagem'); setLinkPublicacao(''); }}
@@ -543,24 +547,21 @@ const CampanhaManual = () => {
                   />
                   Upload de Imagem
                 </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="tipoAnuncio"
+                    value="post"
+                    checked={tipoAnuncio === 'post'}
+                    onChange={() => { setTipoAnuncio('post'); handleClearImage(); }}
+                    className="mr-2"
+                    disabled={!isMetaConnected}
+                  />
+                  Publicação Existente
+                </label>
               </div>
             </div>
 
-            {tipoAnuncio === 'post' && (
-              <div>
-                <label htmlFor="linkPublicacao" className="block text-sm font-medium mb-1">Link da Publicação Existente *</label>
-                <input
-                  type="url"
-                  id="linkPublicacao"
-                  value={linkPublicacao}
-                  onChange={(e) => setLinkPublicacao(e.target.value)}
-                  className="w-full p-2 border rounded-md"
-                  placeholder="https://www.facebook.com/pagina/posts/123..."
-                  required
-                  disabled={!isMetaConnected}
-                />
-              </div>
-            )}
             {tipoAnuncio === 'imagem' && (
               <div>
                 <label htmlFor="imagem" className="block text-sm font-medium mb-1">Imagem para o Anúncio *</label>
@@ -587,6 +588,22 @@ const CampanhaManual = () => {
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+            
+            {tipoAnuncio === 'post' && (
+              <div>
+                <label htmlFor="linkPublicacao" className="block text-sm font-medium mb-1">Link da Publicação Existente *</label>
+                <input
+                  type="url"
+                  id="linkPublicacao"
+                  value={linkPublicacao}
+                  onChange={(e) => setLinkPublicacao(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  placeholder="https://www.facebook.com/pagina/posts/123..."
+                  required
+                  disabled={!isMetaConnected}
+                />
               </div>
             )}
 
@@ -625,7 +642,7 @@ const CampanhaManual = () => {
               disabled={!isMetaConnected}
             />
             <div>
-              <label htmlFor="linkCardapio" className="block text-sm font-medium mb-1">Link do Cardápio/Destino *</label>
+              <label htmlFor="linkCardapio" className="block text-sm font-medium mb-1">Link de Destino (opcional)</label>
               <input
                 type="url"
                 id="linkCardapio"
@@ -633,7 +650,6 @@ const CampanhaManual = () => {
                 onChange={(e) => setLinkCardapio(e.target.value)}
                 className="w-full p-2 border rounded-md"
                 placeholder="https://seurestaurante.com/cardapio"
-                required
                 disabled={!isMetaConnected}
               />
             </div>
@@ -659,4 +675,3 @@ const CampanhaManual = () => {
 };
 
 export default CampanhaManual;
-

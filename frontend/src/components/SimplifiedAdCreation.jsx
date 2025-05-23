@@ -43,9 +43,9 @@ export default function SimplifiedAdCreation() {
         });
         
         // Verificar status de conexão Meta
-        const connectionResponse = await api.get("/api/meta/connection-status");
+        const connectionResponse = await api.get("/meta/connection-status");
         
-        if (!connectionResponse.data.connected) {
+        if (!connectionResponse.data.isConnected) {
           toast({
             title: "Conexão Meta necessária",
             description: "Você precisa conectar sua conta Meta para criar anúncios.",
@@ -55,7 +55,7 @@ export default function SimplifiedAdCreation() {
         }
         
         // Buscar perfil do usuário com informações do restaurante
-        const profileResponse = await api.get("/api/profile");
+        const profileResponse = await api.get("/profile");
         setUserProfile(profileResponse.data);
         
       } catch (err) {
@@ -148,25 +148,25 @@ export default function SimplifiedAdCreation() {
       
       if (activeTab === "link") {
         // Criar anúncio a partir de URL de publicação
-        response = await api.post("/api/meta/create-ad-from-post", {
+        response = await api.post("/meta/create-ad-from-post", {
           postUrl: formData.postUrl,
           // Valores padrão otimizados
           adName: `Anúncio ${userProfile?.restaurantName || 'Restaurante'} ${new Date().toLocaleDateString('pt-BR')}`,
-          dailyBudget: "50",
+          dailyBudget: "70", // Ajustado para o mínimo de R$70
           startDate: new Date(),
           endDate: null,
           targetCountry: "BR"
         });
       } else {
-        // Criar anúncio a partir de imagem
+        // Criar anúncio a partir de imagem usando o novo endpoint
         const formDataObj = new FormData();
         formDataObj.append('image', formData.image);
         formDataObj.append('adName', `Anúncio ${userProfile?.restaurantName || 'Restaurante'} ${new Date().toLocaleDateString('pt-BR')}`);
-        formDataObj.append('dailyBudget', "50");
+        formDataObj.append('dailyBudget', "70"); // Ajustado para o mínimo de R$70
         formDataObj.append('startDate', new Date().toISOString());
         formDataObj.append('targetCountry', "BR");
         
-        response = await api.post("/api/meta/create-ad-from-image", formDataObj, {
+        response = await api.post("/meta-ads/create-from-image", formDataObj, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
@@ -187,6 +187,11 @@ export default function SimplifiedAdCreation() {
         image: null,
         imagePreview: null
       });
+      
+      // Redirecionar para a tela de listagem de campanhas após sucesso
+      setTimeout(() => {
+        window.location.href = '/dashboard/campanhas';
+      }, 1500);
       
     } catch (err) {
       console.error("Erro ao criar anúncio:", err);
@@ -393,10 +398,10 @@ export default function SimplifiedAdCreation() {
                 <Button 
                   className="flex-1"
                   onClick={() => {
-                    window.open("https://business.facebook.com/adsmanager", "_blank");
+                    window.location.href = '/dashboard/campanhas';
                   }}
                 >
-                  Ver no Gerenciador de Anúncios
+                  Ver Campanhas
                 </Button>
               </div>
             </div>

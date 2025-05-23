@@ -25,7 +25,7 @@ export default function CreateAdFromPost() {
   const [formData, setFormData] = useState({
     postUrl: "https://www.facebook.com/photo/?fbid=122102873852863870&set=a.122102873882863870",
     adName: "Promoção ChefStudio",
-    dailyBudget: "10",
+    dailyBudget: "70", // Ajustado para o mínimo de R$70
     startDate: new Date(),
     endDate: null,
     targetCountry: "BR"
@@ -70,8 +70,8 @@ export default function CreateAdFromPost() {
       setError("Nome do anúncio é obrigatório");
       return false;
     }
-    if (!formData.dailyBudget || isNaN(formData.dailyBudget) || parseFloat(formData.dailyBudget) < 1) {
-      setError("Orçamento diário deve ser um número maior que 1");
+    if (!formData.dailyBudget || isNaN(formData.dailyBudget) || parseFloat(formData.dailyBudget) < 70) {
+      setError("Orçamento diário deve ser um número maior ou igual a R$70");
       return false;
     }
     if (!formData.startDate) {
@@ -137,6 +137,11 @@ export default function CreateAdFromPost() {
         title: "Anúncio criado com sucesso!",
         description: "O anúncio foi criado e está pausado para revisão.",
       });
+      
+      // Redirecionar para a tela de listagem de campanhas após sucesso
+      setTimeout(() => {
+        window.location.href = '/dashboard/campanhas';
+      }, 1500);
       
     } catch (err) {
       console.error("Erro ao criar anúncio:", err);
@@ -273,13 +278,16 @@ export default function CreateAdFromPost() {
                   id="dailyBudget"
                   name="dailyBudget"
                   type="number"
-                  min="1"
+                  min="70"
                   step="0.01"
-                  placeholder="10.00"
+                  placeholder="70.00"
                   value={formData.dailyBudget}
                   onChange={handleInputChange}
                   required
                 />
+                <p className="text-sm text-gray-500">
+                  Mínimo recomendado: R$70
+                </p>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -422,13 +430,13 @@ export default function CreateAdFromPost() {
                     
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-gray-500">Data de Início</p>
-                      <p>{format(new Date(adDetails.startDate), "dd/MM/yyyy")}</p>
+                      <p>{format(new Date(formData.startDate), "dd/MM/yyyy")}</p>
                     </div>
                     
-                    {adDetails.endDate && (
+                    {formData.endDate && (
                       <div className="space-y-1">
                         <p className="text-sm font-medium text-gray-500">Data de Término</p>
-                        <p>{format(new Date(adDetails.endDate), "dd/MM/yyyy")}</p>
+                        <p>{format(new Date(formData.endDate), "dd/MM/yyyy")}</p>
                       </div>
                     )}
                   </div>
@@ -458,12 +466,8 @@ export default function CreateAdFromPost() {
                     setSuccess(false);
                     setAdDetails(null);
                     setFormData({
-                      postUrl: "https://www.facebook.com/photo/?fbid=122102873852863870&set=a.122102873882863870",
-                      adName: "Promoção ChefStudio",
-                      dailyBudget: "10",
-                      startDate: new Date(),
-                      endDate: null,
-                      targetCountry: "BR"
+                      ...formData,
+                      adName: `Promoção ChefStudio ${new Date().toLocaleDateString('pt-BR')}`,
                     });
                   }}
                 >
@@ -472,9 +476,11 @@ export default function CreateAdFromPost() {
                 
                 <Button 
                   className="flex-1"
-                  onClick={() => window.location.href = "/dashboard"}
+                  onClick={() => {
+                    window.location.href = '/dashboard/campanhas';
+                  }}
                 >
-                  Voltar para Dashboard
+                  Ver Campanhas
                 </Button>
               </div>
             </div>
