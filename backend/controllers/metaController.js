@@ -1030,3 +1030,15 @@ const getMetrics = asyncHandler(async (req, res) => {
     throw new Error("Erro ao obter métricas: " + error.message);
   }
 });
+
+// Exportar todas as funções do controlador
+module.exports = {
+  facebookLogin,
+  facebookCallback,
+  getConnectionStatus,
+  verifyConnection,
+  createAdFromPost,
+  createAdFromImage,
+  getCampaigns,
+  getMetrics
+};
