@@ -1,16 +1,15 @@
 const asyncHandler = require("express-async-handler");
 const fetch = require("node-fetch");
-const User = require("../models/user");
+const User = require("../models/user"); // Certifique-se que o caminho está correto
 
 // @desc    Obter URL de autorização do Facebook/Meta
 // @route   GET /api/meta/auth-url
 // @access  Private (requer autenticação)
 const getMetaAuthUrl = asyncHandler(async (req, res) => {
-  // Usar as variáveis de ambiente com os nomes corretos conforme definido no Railway
   const redirectUri = process.env.FACEBOOK_REDIRECT_URI;
   const clientId = process.env.FB_APP_ID;
+  const userId = req.user.id; // Obter o ID do usuário logado
 
-  // Verificar se as variáveis de ambiente estão definidas
   if (!clientId) {
     console.error("ERRO: FB_APP_ID não está definido nas variáveis de ambiente");
     return res.status(500).json({
@@ -29,7 +28,6 @@ const getMetaAuthUrl = asyncHandler(async (req, res) => {
     });
   }
 
-  // Construir URL de autorização do Facebook
   const scope = [
     "ads_management",
     "ads_read",
@@ -40,13 +38,15 @@ const getMetaAuthUrl = asyncHandler(async (req, res) => {
     "email",
   ].join(",");
 
+  // Incluir o userId no parâmetro state
+  const state = userId;
+
   const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
     redirectUri
-  )}&scope=${scope}&response_type=code`;
+  )}&scope=${scope}&response_type=code&state=${state}`;
 
-  // Logar para debug
   console.log(
-    `Gerando authUrl para usuário ${req.user.id} com clientId=${clientId} e redirectUri=${redirectUri}`
+    `Gerando authUrl para usuário ${userId} com clientId=${clientId} e redirectUri=${redirectUri}`
   );
 
   res.json({ authUrl });
@@ -56,110 +56,107 @@ const getMetaAuthUrl = asyncHandler(async (req, res) => {
 // @route   GET /api/meta/callback
 // @access  Public
 const facebookCallback = asyncHandler(async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query; // Obter code e state
   const redirectUri = process.env.FACEBOOK_REDIRECT_URI;
   const clientId = process.env.FB_APP_ID;
   const clientSecret = process.env.FB_APP_SECRET;
+  const dashboardUrl = "https://chefstudio.vercel.app/dashboard"; // URL de redirecionamento solicitada
 
+  // 1. Validar code e state
   if (!code) {
-    res.status(400);
-    throw new Error("Código de autorização não fornecido");
+    console.error("Erro no callback: Código de autorização não fornecido.");
+    return res.redirect(`${dashboardUrl}?meta_connect=error&message=auth_code_missing`);
+  }
+  if (!state) {
+    console.error("Erro no callback: Parâmetro state não fornecido.");
+    return res.redirect(`${dashboardUrl}?meta_connect=error&message=state_missing`);
   }
 
+  // O 'state' aqui é o userId que passamos na getMetaAuthUrl
+  const userId = state;
+
   try {
-    // Trocar código por token de acesso
+    // 2. Buscar o usuário no MongoDB usando o userId (state)
+    const user = await User.findById(userId);
+    if (!user) {
+      console.error(`Erro no callback: Usuário não encontrado com ID: ${userId}`);
+      return res.redirect(`${dashboardUrl}?meta_connect=error&message=user_not_found`);
+    }
+
+    // 3. Trocar o code por um access_token
     const tokenResponse = await fetch(
       `https://graph.facebook.com/v18.0/oauth/access_token?client_id=${clientId}&redirect_uri=${encodeURIComponent(
         redirectUri
       )}&client_secret=${clientSecret}&code=${code}`
     );
-
     const tokenData = await tokenResponse.json();
 
-    if (tokenData.error) {
-      throw new Error(`Erro ao obter token: ${tokenData.error.message}`);
+    if (tokenData.error || !tokenData.access_token) {
+      console.error("Erro ao obter token de acesso:", tokenData.error || "Token não retornado");
+      throw new Error(`Erro ao obter token: ${tokenData.error?.message || 'Token não retornado'}`);
     }
-
     const accessToken = tokenData.access_token;
 
-    // Obter informações do usuário do Facebook
+    // 4. Buscar o ID do usuário do Facebook (/me)
     const fbUserResponse = await fetch(
-      `https://graph.facebook.com/v18.0/me?fields=id,name,email&access_token=${accessToken}`
+      `https://graph.facebook.com/v18.0/me?fields=id&access_token=${accessToken}` // Apenas o ID é necessário aqui
     );
     const fbUserData = await fbUserResponse.json();
 
-    if (fbUserData.error) {
-      throw new Error(
-        `Erro ao obter dados do usuário do Facebook: ${fbUserData.error.message}`
-      );
+    if (fbUserData.error || !fbUserData.id) {
+      console.error("Erro ao obter ID do usuário do Facebook:", fbUserData.error || "ID não retornado");
+      throw new Error(`Erro ao obter ID do usuário do Facebook: ${fbUserData.error?.message || 'ID não retornado'}`);
     }
+    const metaUserId = fbUserData.id;
 
-    // Obter contas de anúncios
+    // 5. Buscar as contas de anúncio (adAccounts)
     const adAccountsResponse = await fetch(
-      `https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name,account_status,amount_spent,business_name,currency,account_id&access_token=${accessToken}`
+      `https://graph.facebook.com/v18.0/me/adaccounts?fields=id,account_id,name&access_token=${accessToken}` // Campos solicitados
     );
     const adAccountsData = await adAccountsResponse.json();
 
+    // Não lançar erro se contas não forem encontradas, mas logar
     if (adAccountsData.error) {
       console.warn(
-        `Aviso ao obter contas de anúncios: ${adAccountsData.error.message}`
+        `Aviso ao obter contas de anúncios para usuário ${userId}: ${adAccountsData.error.message}`
       );
-      // Continuar mesmo se houver erro ao buscar contas de anúncios
     }
 
-    // Obter páginas
-    const pagesResponse = await fetch(
-      `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token&access_token=${accessToken}`
-    );
-    const pagesData = await pagesResponse.json();
+    // Formatar as contas de anúncio conforme solicitado
+    const formattedAdAccounts = adAccountsData?.data?.map(acc => ({
+      id: acc.id,           // Ex: act_1234567890
+      account_id: acc.account_id, // Ex: 1234567890
+      name: acc.name
+    })) || [];
 
-    if (pagesData.error) {
-      console.warn(`Aviso ao obter páginas: ${pagesData.error.message}`);
-      // Continuar mesmo se houver erro ao buscar páginas
-    }
+    // 6. Salvar as informações no MongoDB
+    user.metaAccessToken = accessToken;
+    user.metaUserId = metaUserId;
+    user.adAccounts = formattedAdAccounts; // Salvar array formatado
+    user.isMetaConnected = true; // Marcar como conectado
 
-    // Encontrar o usuário no seu banco de dados pelo ID que iniciou o fluxo
-    // (Assumindo que você passou o userId no state ou de alguma forma)
-    // const userId = req.query.state; // Exemplo: se você passou o userId no parâmetro state
-    // Se não passou o state, precisa de outra forma de associar o callback ao usuário
-    // Por enquanto, vamos assumir que o usuário está logado e o ID está em req.user (se aplicável)
-    // const user = await User.findById(userId);
+    await user.save();
+    console.log(`Dados da Meta salvos com sucesso para o usuário ${userId}`);
 
-    // ATENÇÃO: O callback é público, req.user não estará disponível aqui
-    // Você precisa de uma forma de associar este callback ao usuário que iniciou o fluxo.
-    // Uma abordagem comum é usar o parâmetro 'state' na URL de autorização.
-    // Por exemplo, gerar um state único, armazená-lo com o userId e verificá-lo no callback.
+    // 7. Redirecionar para o dashboard em caso de sucesso
+    res.redirect(dashboardUrl); // Redirecionamento solicitado
 
-    // Exemplo simplificado (requer ajuste para associar ao usuário correto):
-    // Atualizar dados do usuário (exemplo, precisa encontrar o usuário correto)
-    // user.metaAccessToken = accessToken;
-    // user.metaUserId = fbUserData.id;
-    // user.metaAdAccounts = adAccountsData?.data || [];
-    // user.metaPages = pagesData?.data || [];
-    // user.isMetaConnected = true;
-    // await user.save();
-
-    // Redirecionar para o frontend com sucesso
-    // Idealmente, passar um token ou indicador de sucesso
-    res.redirect(
-      `${process.env.FRONTEND_URL || "/dashboard"}?meta_connect=success`
-    );
   } catch (error) {
-    console.error("Erro no callback do Facebook:", error);
-    // Redirecionar para o frontend com erro
+    console.error(`Erro no callback do Facebook para usuário ${userId}:`, error);
+    // Redirecionar para o dashboard com erro
     res.redirect(
-      `${process.env.FRONTEND_URL || "/dashboard"}?meta_connect=error&message=${encodeURIComponent(error.message)}`
+      `${dashboardUrl}?meta_connect=error&message=${encodeURIComponent(error.message)}`
     );
   }
 });
 
-// Outras funções do controlador (getConnectionStatus, verifyConnection, etc.)
-// ... (manter as funções existentes)
+// Manter outras funções do controlador se existirem...
+// Exemplo:
+// const getConnectionStatus = asyncHandler(async (req, res) => { ... });
 
-// Exportar todas as funções do controlador, incluindo a nova
 module.exports = {
-  getMetaAuthUrl, // Nova função
+  getMetaAuthUrl,
   facebookCallback,
-  // ... (manter os outros exports existentes)
+  // ... outros exports
 };
 
