@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { useToast } from "./ui/use-toast"; // Importar useToast
+import { useToast } from "../hooks/use-toast"; // Importar useToast
 
 // Componente Select reutilizável
 const SelectInput = ({ id, label, value, onChange, options, placeholder, required, disabled }) => (
