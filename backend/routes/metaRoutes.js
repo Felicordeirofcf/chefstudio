@@ -221,4 +221,38 @@ router.post("/create-from-image", protect, metaController.createAdFromImage);
  */
 router.get("/metrics", protect, metaController.getMetrics);
 
+/**
+ * @swagger
+ * /api/meta/pause-campaign:
+ *   post:
+ *     summary: Pausar uma campanha ativa
+ *     tags: [Meta]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - campaignId
+ *             properties:
+ *               campaignId:
+ *                 type: string
+ *                 description: ID da campanha a ser pausada
+ *     responses:
+ *       200:
+ *         description: Campanha pausada com sucesso
+ *       400:
+ *         description: Dados inválidos ou usuário não conectado ao Meta
+ *       401:
+ *         description: Não autorizado
+ *       404:
+ *         description: Usuário não encontrado
+ *       500:
+ *         description: Erro ao pausar campanha
+ */
+router.post("/pause-campaign", protect, metaController.pauseCampaign);
+
 module.exports = router;
