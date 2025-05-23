@@ -55,62 +55,50 @@ router.get("/location", protect, getLocationSettings);
  *             properties:
  *               adAccountId:
  *                 type: string
- *                 description: ID da conta de anúncios Meta (ex: act_12345).
+ *                 description: ID da conta de anúncios Meta (ex act_12345)
  *               pageId:
  *                 type: string
- *                 description: ID da página do Facebook selecionada.
+ *                 description: ID da página do Facebook selecionada
  *               campaignName:
  *                 type: string
- *                 description: Nome da campanha.
+ *                 description: Nome da campanha
  *               weeklyBudget:
  *                 type: number
- *                 description: Orçamento semanal em R$.
+ *                 description: Orçamento semanal em R$
  *               startDate:
  *                 type: string
  *                 format: date
- *                 description: Data de início (YYYY-MM-DD).
+ *                 description: Data de início (YYYY-MM-DD)
  *               endDate:
  *                 type: string
  *                 format: date
- *                 description: Data de término (opcional, YYYY-MM-DD).
+ *                 description: Data de término (opcional, YYYY-MM-DD)
  *               location:
  *                 type: string
- *                 description: Objeto JSON stringificado { latitude, longitude, radius }.
+ *                 description: Objeto JSON stringificado com latitude, longitude e radius
  *               adType:
  *                 type: string
  *                 enum: [image, post]
- *                 description: Tipo de anúncio (
-"image"
- ou 
-"post"
-).
+ *                 description: Tipo de anúncio (image ou post)
  *               adTitle:
  *                 type: string
- *                 description: Título do anúncio (opcional).
+ *                 description: Título do anúncio (opcional)
  *               adDescription:
  *                 type: string
- *                 description: Descrição/texto principal do anúncio.
+ *                 description: Descrição/texto principal do anúncio
  *               imageFile:
  *                 type: string
  *                 format: binary
- *                 description: Arquivo de imagem (obrigatório se adType=
-"image"
-).
+ *                 description: Arquivo de imagem (obrigatório se adType=image)
  *               postUrl:
  *                 type: string
- *                 description: URL da publicação (obrigatório se adType=
-"post"
-).
+ *                 description: URL da publicação (obrigatório se adType=post)
  *               callToAction:
  *                 type: string
- *                 description: Tipo de CTA (ex: 
-"LEARN_MORE"
-, 
-"SHOP_NOW"
-).
+ *                 description: Tipo de CTA (ex LEARN_MORE, SHOP_NOW)
  *               menuUrl:
  *                 type: string
- *                 description: Link de destino (URL do cardápio).
+ *                 description: Link de destino (URL do cardápio)
  *     responses:
  *       201:
  *         description: Campanha criada com sucesso
@@ -138,4 +126,3 @@ router.post("/create-recommended-traffic-campaign", protect, upload.single("imag
 
 
 module.exports = router;
-
