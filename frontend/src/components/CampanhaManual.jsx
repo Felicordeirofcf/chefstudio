@@ -64,7 +64,6 @@ const CampanhaManual = () => {
   // Estados de controle
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  // const [userInfo, setUserInfo] = useState(null); // Remover userInfo, usar isMetaConnected diretamente
 
   // Definir data de início padrão
   useEffect(() => {
@@ -72,11 +71,11 @@ const CampanhaManual = () => {
     setDataInicio(today);
   }, []);
 
-  // *** NOVO useEffect para buscar status da conexão Meta ***
+  // Buscar status da conexão Meta
   useEffect(() => {
     const fetchMetaStatus = async () => {
       setMetaLoading(true);
-      setError(null); // Limpar erros anteriores
+      setError(null);
       try {
         const token = localStorage.getItem('token');
         if (!token) {
@@ -91,15 +90,16 @@ const CampanhaManual = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
 
+        // *** CORREÇÃO: Usar os nomes corretos retornados pela API ***
         const { isConnected, adAccounts, metaPages } = response.data;
         console.log("Resposta de /api/meta/connection-status:", response.data);
 
-        setIsMetaConnected(isConnected);
+        setIsMetaConnected(isConnected); // isConnected já é boolean
 
         if (isConnected) {
+          // *** CORREÇÃO: Usar 'adAccounts' e 'metaPages' ***
           if (adAccounts && adAccounts.length > 0) {
             setAdAccountsList(adAccounts.map(acc => ({ value: acc.id, label: `${acc.name} (${acc.id})` })));
-            // Selecionar a primeira conta se não houver seleção ou se a seleção atual for inválida
             if (!selectedAdAccount || !adAccounts.some(acc => acc.id === selectedAdAccount)) {
               setSelectedAdAccount(adAccounts[0].id);
             }
@@ -111,7 +111,6 @@ const CampanhaManual = () => {
 
           if (metaPages && metaPages.length > 0) {
             setPagesList(metaPages.map(page => ({ value: page.id, label: `${page.name} (${page.id})` })));
-             // Selecionar a primeira página se não houver seleção ou se a seleção atual for inválida
             if (!selectedPage || !metaPages.some(page => page.id === selectedPage)) {
               setSelectedPage(metaPages[0].id);
             }
@@ -121,7 +120,6 @@ const CampanhaManual = () => {
             console.warn("Nenhuma página do Facebook encontrada via API.");
           }
         } else {
-          // Se não estiver conectado, limpar listas e seleções
           setAdAccountsList([]);
           setPagesList([]);
           setSelectedAdAccount('');
@@ -131,7 +129,7 @@ const CampanhaManual = () => {
       } catch (error) {
         console.error('Erro ao buscar status da conexão Meta:', error.response?.data || error.message);
         setError('Erro ao verificar conexão com Meta Ads. Tente recarregar a página.');
-        setIsMetaConnected(false); // Assume desconectado em caso de erro
+        setIsMetaConnected(false);
         setAdAccountsList([]);
         setPagesList([]);
         setSelectedAdAccount('');
@@ -142,11 +140,10 @@ const CampanhaManual = () => {
     };
 
     fetchMetaStatus();
-  }, []); // Executa na montagem do componente
+  }, []);
 
   // Inicializar o mapa
   useEffect(() => {
-    // ... (código do mapa existente - sem alterações)
     let mapInstance = null;
     let circleInstance = null;
 
@@ -217,7 +214,6 @@ const CampanhaManual = () => {
 
   // Lidar com a seleção de imagem
   const handleImageChange = (e) => {
-    // ... (código existente - sem alterações)
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
@@ -234,7 +230,6 @@ const CampanhaManual = () => {
 
   // Limpar a imagem selecionada
   const handleClearImage = () => {
-    // ... (código existente - sem alterações)
     setImagem(null);
     setImagemPreview('');
     if (fileInputRef.current) {
@@ -247,14 +242,12 @@ const CampanhaManual = () => {
     e.preventDefault();
     setError(null);
 
-    // *** Validação de Conexão Meta ***
     if (!isMetaConnected) {
       setError('Conecte sua conta Meta Ads para criar anúncios.');
       toast({ title: "Erro", description: "Conecte sua conta Meta Ads para criar anúncios.", variant: "destructive" });
       return;
     }
 
-    // --- Validações do Formulário --- 
     if (!selectedAdAccount) {
       setError('Selecione uma Conta de Anúncios.');
       toast({ title: "Erro", description: "Selecione uma Conta de Anúncios.", variant: "destructive" });
@@ -265,7 +258,6 @@ const CampanhaManual = () => {
        toast({ title: "Erro", description: "Selecione uma Página do Facebook.", variant: "destructive" });
       return;
     }
-    // ... (outras validações existentes)
     if (!nomeCampanha || !orcamento || !dataInicio || !descricaoAnuncio || !callToAction || !linkCardapio) {
       setError('Preencha todos os campos obrigatórios (*).');
       toast({ title: "Erro", description: "Preencha todos os campos obrigatórios (*).", variant: "destructive" });
@@ -338,10 +330,10 @@ const CampanhaManual = () => {
         dataToSend.append('imageFile', imagem);
       } else {
         headers['Content-Type'] = 'application/json';
-        dataToSend = JSON.stringify({ ...commonData, postUrl: linkPublicacao }); // Enviar como JSON
+        dataToSend = JSON.stringify({ ...commonData, postUrl: linkPublicacao });
       }
 
-      console.log('Enviando dados para:', endpoint, dataToSend);
+      console.log('Enviando dados para:', endpoint);
 
       const response = await axios({
         method: 'post',
@@ -364,7 +356,6 @@ const CampanhaManual = () => {
       setDescricaoAnuncio('');
       setCallToAction('LEARN_MORE');
       handleClearImage();
-      // Manter seleções de conta e página
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('campanhaCreated', { detail: response.data }));
@@ -380,9 +371,7 @@ const CampanhaManual = () => {
     }
   };
 
-  // Lista de opções para Call to Action
   const ctaOptions = [
-    // ... (opções existentes)
     { value: 'LEARN_MORE', label: 'Saiba Mais' },
     { value: 'BOOK_TRAVEL', label: 'Reservar' },
     { value: 'CONTACT_US', label: 'Entre em Contato' },
@@ -404,7 +393,6 @@ const CampanhaManual = () => {
           Configure sua campanha de tráfego com as opções recomendadas pelo Meta Ads.
         </p>
 
-        {/* Mensagem de carregamento ou erro Meta */}
         {metaLoading && (
           <div className="p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-md">
             Verificando conexão com Meta Ads...
@@ -421,7 +409,6 @@ const CampanhaManual = () => {
            </div>
         )}
 
-        {/* Seletores de Conta e Página */} 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
            <SelectInput
              id="adAccount"
@@ -445,9 +432,7 @@ const CampanhaManual = () => {
            />
         </div>
 
-        {/* Restante do formulário */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Lado esquerdo - Mapa e Raio */}
           <div>
             <div
               id="map-container"
@@ -468,16 +453,15 @@ const CampanhaManual = () => {
                 id="raioAlcanceSlider"
                 type="range"
                 min="1"
-                max="80" // Limite da API Meta
+                max="80"
                 value={raioAlcance}
                 onChange={(e) => setRaioAlcance(parseInt(e.target.value))}
                 className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-                disabled={!isMetaConnected} // Desabilitar se não conectado
+                disabled={!isMetaConnected}
               />
             </div>
           </div>
 
-          {/* Lado direito - Detalhes da Campanha e Anúncio */}
           <div className="space-y-4">
             <div>
               <label htmlFor="nomeCampanha" className="block text-sm font-medium mb-1">Nome da Campanha *</label>
@@ -499,7 +483,7 @@ const CampanhaManual = () => {
                 value={orcamento}
                 onChange={(e) => setOrcamento(parseFloat(e.target.value))}
                 className="w-full p-2 border rounded-md"
-                min="1" // Orçamento mínimo
+                min="1"
                 required
                 disabled={!isMetaConnected}
               />
@@ -526,13 +510,12 @@ const CampanhaManual = () => {
                   value={dataTermino}
                   onChange={(e) => setDataTermino(e.target.value)}
                   className="w-full p-2 border rounded-md"
-                  min={dataInicio} // Data término não pode ser antes do início
+                  min={dataInicio}
                   disabled={!isMetaConnected}
                 />
               </div>
             </div>
 
-            {/* Seleção Tipo Anúncio */}
             <div>
               <span className="block text-sm font-medium mb-1">Tipo de Anúncio *</span>
               <div className="flex items-center space-x-4">
@@ -563,7 +546,6 @@ const CampanhaManual = () => {
               </div>
             </div>
 
-            {/* Campos Condicionais */}
             {tipoAnuncio === 'post' && (
               <div>
                 <label htmlFor="linkPublicacao" className="block text-sm font-medium mb-1">Link da Publicação Existente *</label>
@@ -608,7 +590,6 @@ const CampanhaManual = () => {
               </div>
             )}
 
-            {/* Campos Comuns do Anúncio */}
             <div>
               <label htmlFor="tituloAnuncio" className="block text-sm font-medium mb-1">Título do Anúncio (opcional)</label>
               <input
@@ -659,7 +640,6 @@ const CampanhaManual = () => {
           </div>
         </div>
 
-        {/* Botão de Submissão */}
         <div className="flex justify-end">
           <button
             type="submit"

@@ -1,114 +1,111 @@
-const mongoose = require('mongoose');
-const bcryptjs = require('bcryptjs');
+const mongoose = require("mongoose");
+const bcryptjs = require("bcryptjs");
 
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: true
+    required: true,
   },
   email: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
   },
   password: {
-    type: String
+    type: String,
   },
   role: {
     type: String,
-    enum: ['user', 'admin'],
-    default: 'user'
+    enum: ["user", "admin"],
+    default: "user",
   },
   establishmentName: {
-    type: String
+    type: String,
   },
   businessType: {
-    type: String
+    type: String,
   },
   whatsapp: {
-    type: String
+    type: String,
   },
   menuLink: {
-    type: String
+    type: String,
   },
   address: {
-    type: String
+    type: String,
   },
   cep: {
-    type: String
+    type: String,
   },
   plan: {
     type: String,
-    default: 'free'
+    default: "free",
   },
-  // Campos de integração com Meta/Facebook
-  facebookId: {
-    type: String
-  },
-  facebookAccessToken: {
-    type: String
-  },
-  facebookTokenExpiry: {
-    type: Date
-  },
-  // Campos Meta Ads atualizados
-  metaId: {
-    type: String
-  },
-  metaName: {
-    type: String
-  },
-  metaEmail: {
-    type: String
+  // Campos Meta Ads Padronizados
+  metaUserId: {
+    // ID do usuário no Facebook/Meta
+    type: String,
   },
   metaAccessToken: {
-    type: String
+    // Token de acesso (longa duração preferencialmente)
+    type: String,
   },
   metaTokenExpires: {
-    type: Date
+    // Data de expiração do token (se disponível)
+    type: Date,
   },
   metaConnectionStatus: {
+    // Status da conexão
     type: String,
-    enum: ['connected', 'disconnected'],
-    default: 'disconnected'
+    enum: ["connected", "disconnected"],
+    default: "disconnected",
   },
   metaAdAccounts: {
-    type: Array,
-    default: []
+    // Lista de contas de anúncios
+    type: [
+      {
+        id: String, // act_... ID
+        account_id: String, // ID numérico da conta
+        name: String,
+      },
+    ],
+    default: [],
   },
-  metaPrimaryAdAccountId: {
-    type: String
+  metaPages: {
+    // Lista de páginas do Facebook gerenciadas
+    type: [
+      {
+        id: String, // ID da página
+        name: String,
+        access_token: String, // Page Access Token
+      },
+    ],
+    default: [],
   },
-  metaPrimaryAdAccountName: {
-    type: String
-  },
-  // Campos legados (mantidos para compatibilidade)
-  adsAccountId: {
-    type: String
-  },
-  adsAccountName: {
-    type: String
-  },
-  instagramAccounts: {
-    type: Array,
-    default: []
-  },
+  // Campos legados (remover ou marcar como deprecated se não forem mais usados)
+  facebookId: String,
+  facebookAccessToken: String,
+  facebookTokenExpiry: Date,
+  metaId: String,
+  metaName: String,
+  metaEmail: String,
+  adsAccountId: String,
+  adsAccountName: String,
+  instagramAccounts: Array,
+  metaPrimaryAdAccountId: String,
+  metaPrimaryAdAccountName: String,
+
   createdAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
 // Hash da senha antes de salvar
-userSchema.pre('save', async function(next) {
-  // Só hash a senha se ela foi modificada (ou é nova)
-  if (!this.isModified('password') || !this.password) return next();
-  
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password") || !this.password) return next();
   try {
-    // Gerar salt
     const salt = await bcryptjs.genSalt(10);
-    
-    // Hash da senha com o salt
     this.password = await bcryptjs.hash(this.password, salt);
     next();
   } catch (error) {
@@ -117,7 +114,7 @@ userSchema.pre('save', async function(next) {
 });
 
 // Método para comparar senha
-userSchema.methods.comparePassword = async function(candidatePassword) {
+userSchema.methods.comparePassword = async function (candidatePassword) {
   try {
     return await bcryptjs.compare(candidatePassword, this.password);
   } catch (error) {
@@ -125,6 +122,7 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   }
 };
 
-const User = mongoose.model('User', userSchema);
+const User = mongoose.model("User", userSchema);
 
 module.exports = User;
+
