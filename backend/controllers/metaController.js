@@ -340,3 +340,273 @@ module.exports = {
   createRecommendedTrafficCampaign // Adicionando a função exportada
 };
 
+
+
+
+// @desc    Criar campanha de Tráfego recomendada no Meta Ads
+// @route   POST /api/meta-ads/create-recommended-traffic-campaign
+// @access  Private
+const createRecommendedTrafficCampaign = asyncHandler(async (req, res) => {
+  // Extrair dados do corpo da requisição (frontend)
+  const {
+    adAccountId, // ID da conta de anúncios selecionada (ex: act_12345)
+    pageId,      // ID da página do Facebook selecionada
+    campaignName,
+    weeklyBudget, // Orçamento SEMANAL em R$
+    startDate,   // Formato YYYY-MM-DD
+    endDate,     // Formato YYYY-MM-DD (opcional)
+    location,    // { latitude, longitude, radius } (radius em KM)
+    adType,      // 'image' ou 'post'
+    adTitle,     // Título do anúncio (opcional)
+    adDescription, // Descrição/texto principal do anúncio
+    // imageFile,   // Objeto do arquivo de imagem (se adType === 'image') - Tratado pelo multer
+    postUrl,     // URL da publicação (se adType === 'post')
+    callToAction, // Tipo de CTA (ex: 'LEARN_MORE')
+    menuUrl      // Link de destino (URL do cardápio)
+  } = req.body;
+
+  // Obter token de acesso do usuário logado
+  const user = req.user;
+  const accessToken = user.metaAccessToken;
+
+  // --- Validações Iniciais --- 
+  if (!adAccountId || !pageId || !campaignName || !weeklyBudget || !startDate || !location || !adType || !adDescription || !callToAction || !menuUrl) {
+    return res.status(400).json({ message: "Parâmetros obrigatórios ausentes para criar a campanha recomendada." });
+  }
+  // A validação de req.file é feita aqui porque multer já processou
+  if (adType === 'image' && !req.file) { 
+     console.error("[Create Campaign] Erro: adType é 'image' mas req.file está ausente.");
+     return res.status(400).json({ message: "Arquivo de imagem é obrigatório para anúncios de imagem." });
+  }
+  if (adType === 'post' && !postUrl) {
+     return res.status(400).json({ message: "URL da publicação é obrigatória para anúncios de post existente." });
+  }
+  if (!accessToken) {
+    return res.status(401).json({ message: "Token de acesso do Meta não encontrado para o usuário." });
+  }
+
+  // Encontrar o Page Access Token específico para a página selecionada
+  const selectedPage = user.metaPages.find(p => p.id === pageId);
+  if (!selectedPage || !selectedPage.access_token) {
+    return res.status(400).json({ message: `Token de acesso não encontrado para a página selecionada (ID: ${pageId}). Tente reconectar a conta Meta.` });
+  }
+  const pageAccessToken = selectedPage.access_token;
+
+  // --- Constantes e Configurações --- 
+  const API_VERSION = "v18.0"; // Usar a versão consistente
+  const GRAPH_URL = `https://graph.facebook.com/${API_VERSION}`;
+  const dailyBudgetInCents = Math.round((parseFloat(weeklyBudget) / 7) * 100); // Converter para orçamento diário em centavos
+
+  try {
+    console.log(`[Create Campaign] Iniciando criação de campanha de Tráfego para Ad Account: ${adAccountId}`);
+
+    // --- Passo 1: Criar Campanha --- 
+    console.log("[Create Campaign] Passo 1: Criando Campanha...");
+    const campaignResponse = await fetch(`${GRAPH_URL}/${adAccountId}/campaigns`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: campaignName,
+        objective: "TRAFFIC", // Objetivo de Tráfego
+        status: "ACTIVE",      // Ativa por padrão
+        special_ad_categories: [], // Nenhuma categoria especial por padrão
+        access_token: accessToken
+      })
+    });
+    const campaignData = await campaignResponse.json();
+    if (campaignData.error) {
+      console.error("[Create Campaign] Erro ao criar campanha:", campaignData.error);
+      throw new Error(`Erro API (Campanha): ${campaignData.error.message}`);
+    }
+    const campaignId = campaignData.id;
+    console.log(`[Create Campaign] Campanha criada com sucesso: ${campaignId}`);
+
+    // --- Passo 2: Criar Conjunto de Anúncios (Ad Set) --- 
+    console.log("[Create Campaign] Passo 2: Criando Conjunto de Anúncios...");
+    const adSetPayload = {
+      name: `${campaignName} - Ad Set`, 
+      campaign_id: campaignId,
+      status: "ACTIVE",
+      bid_strategy: "LOWEST_COST_WITHOUT_CAP", // Estratégia de lance recomendada (sem limite explícito)
+      daily_budget: dailyBudgetInCents,
+      billing_event: "IMPRESSIONS", // Cobrança por impressões
+      optimization_goal: "LINK_CLICKS", // Otimização para cliques no link
+      targeting: {
+        geo_locations: {
+          custom_locations: [{
+            latitude: location.latitude,
+            longitude: location.longitude,
+            radius: location.radius, // Raio em KM
+            distance_unit: 'kilometer'
+          }]
+        },
+        publisher_platforms: ["facebook", "instagram", "messenger", "audience_network"],
+        facebook_positions: ["feed"], 
+        instagram_positions: ["stream"], 
+        device_platforms: ["mobile", "desktop"],
+      },
+      start_time: new Date(startDate).toISOString(), // Data de início
+      access_token: accessToken
+    };
+    if (endDate) {
+      adSetPayload.end_time = new Date(endDate).toISOString(); // Data de término opcional
+    }
+
+    const adSetResponse = await fetch(`${GRAPH_URL}/${adAccountId}/adsets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(adSetPayload)
+    });
+    const adSetData = await adSetResponse.json();
+    if (adSetData.error) {
+      console.error("[Create Campaign] Erro ao criar Ad Set:", adSetData.error);
+      throw new Error(`Erro API (Ad Set): ${adSetData.error.message}`);
+    }
+    const adSetId = adSetData.id;
+    console.log(`[Create Campaign] Conjunto de Anúncios criado com sucesso: ${adSetId}`);
+
+    // --- Passo 3: Preparar Criativo (Ad Creative) --- 
+    console.log("[Create Campaign] Passo 3: Preparando Criativo...");
+    let creativePayload = {
+      name: `${campaignName} - Creative`,
+      object_story_spec: {
+        page_id: pageId,
+        link_data: {
+          message: adDescription,
+          link: menuUrl,
+          call_to_action: { type: callToAction.toUpperCase() }, // CTA em maiúsculas
+        }
+      },
+      access_token: pageAccessToken // Usar Page Access Token para criar o criativo
+    };
+
+    if (adType === 'image') {
+      // 3.1: Upload da Imagem
+      console.log("[Create Campaign] Fazendo upload da imagem...");
+      const imageForm = new FormData();
+      // req.file.path contém o caminho do arquivo salvo temporariamente pelo multer
+      imageForm.append('source', fs.createReadStream(req.file.path)); 
+      imageForm.append('access_token', accessToken);
+
+      const imageUploadResponse = await fetch(`${GRAPH_URL}/${adAccountId}/adimages`, {
+        method: "POST",
+        body: imageForm, 
+        headers: imageForm.getHeaders() // Necessário para form-data
+      });
+      const imageData = await imageUploadResponse.json();
+      
+      // Remover arquivo temporário após upload
+      fs.unlink(req.file.path, (err) => {
+          if (err) console.error("[Create Campaign] Erro ao remover arquivo temporário:", req.file.path, err);
+          else console.log("[Create Campaign] Arquivo temporário removido:", req.file.path);
+      });
+
+      if (imageData.error || !imageData.images || !imageData.images[req.file.filename]) {
+        console.error("[Create Campaign] Erro ao fazer upload da imagem:", imageData.error || "Hash da imagem não encontrado");
+        throw new Error(`Erro API (Upload Imagem): ${imageData.error?.message || 'Falha no upload'}`);
+      }
+      // O hash pode estar em imageData.images[Object.keys(imageData.images)[0]].hash se o filename não bater
+      const imageHash = imageData.images[req.file.filename]?.hash || imageData.images[Object.keys(imageData.images)[0]]?.hash;
+      if (!imageHash) {
+          console.error("[Create Campaign] Hash da imagem não encontrado na resposta:", imageData);
+          throw new Error('Erro API (Upload Imagem): Hash da imagem não retornado.');
+      }
+      console.log(`[Create Campaign] Imagem enviada com sucesso. Hash: ${imageHash}`);
+
+      // Atualizar payload do criativo com image_hash
+      creativePayload.object_story_spec.link_data.image_hash = imageHash;
+      if(adTitle) creativePayload.object_story_spec.link_data.name = adTitle; // Adiciona título se fornecido
+
+    } else { // adType === 'post'
+      // 3.2: Obter ID do Post existente
+      console.log(`[Create Campaign] Buscando ID do post para URL: ${postUrl}`);
+      const postLookupResponse = await fetch(`${GRAPH_URL}/oembed_post?url=${encodeURIComponent(postUrl)}&access_token=${accessToken}`);
+      const postLookupData = await postLookupResponse.json();
+      
+      if (postLookupData.error || !postLookupData.post_id) {
+         console.error("[Create Campaign] Erro ao buscar ID do post:", postLookupData.error || "ID não encontrado");
+         // Tentar extração manual como fallback (menos confiável)
+         const match = postUrl.match(/(\d+)_(\d+)/) || postUrl.match(/posts\/(\d+)/) || postUrl.match(/fbid=(\d+)/);
+         const extractedPostId = match ? (match.length > 2 ? `${pageId}_${match[2]}` : match[1]) : null;
+         if (!extractedPostId) {
+            throw new Error(`Erro API (Post Lookup): ${postLookupData.error?.message || 'Não foi possível obter o ID do post'}`);
+         }
+         console.warn(`[Create Campaign] Usando ID extraído manualmente: ${extractedPostId}`);
+         creativePayload.object_story_id = extractedPostId; // Usar page_id_post_id
+      } else {
+         creativePayload.object_story_id = postLookupData.post_id; // Usar page_id_post_id
+         console.log(`[Create Campaign] ID do post obtido: ${postLookupData.post_id}`);
+      }
+      // Remover link_data quando usamos object_story_id
+      delete creativePayload.object_story_spec.link_data;
+      creativePayload.object_story_spec = undefined; // API espera object_story_id OU object_story_spec
+    }
+
+    // 3.3: Criar o Ad Creative
+    console.log("[Create Campaign] Criando Ad Creative...");
+    const creativeResponse = await fetch(`${GRAPH_URL}/${adAccountId}/adcreatives`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(creativePayload)
+    });
+    const creativeData = await creativeResponse.json();
+    if (creativeData.error) {
+      console.error("[Create Campaign] Erro ao criar Ad Creative:", creativeData.error);
+      throw new Error(`Erro API (Ad Creative): ${creativeData.error.message}`);
+    }
+    const creativeId = creativeData.id;
+    console.log(`[Create Campaign] Ad Creative criado com sucesso: ${creativeId}`);
+
+    // --- Passo 4: Criar Anúncio (Ad) --- 
+    console.log("[Create Campaign] Passo 4: Criando Anúncio...");
+    const adResponse = await fetch(`${GRAPH_URL}/${adAccountId}/ads`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: `${campaignName} - Ad`,
+        adset_id: adSetId,
+        creative: { creative_id: creativeId },
+        status: "ACTIVE",
+        access_token: accessToken
+      })
+    });
+    const adData = await adResponse.json();
+    if (adData.error) {
+      console.error("[Create Campaign] Erro ao criar Ad:", adData.error);
+      throw new Error(`Erro API (Ad): ${adData.error.message}`);
+    }
+    const adId = adData.id;
+    console.log(`[Create Campaign] Anúncio criado com sucesso: ${adId}`);
+
+    // --- Sucesso --- 
+    res.status(201).json({
+      message: "Campanha de Tráfego recomendada criada com sucesso!",
+      campaignId: campaignId,
+      adSetId: adSetId,
+      adId: adId
+    });
+
+  } catch (error) {
+    console.error("❌ [Create Campaign] Erro geral ao criar campanha de Tráfego recomendada:", error);
+    // Limpar arquivo temporário em caso de erro também
+    if (req.file && req.file.path) {
+        fs.unlink(req.file.path, (err) => {
+            if (err) console.error("[Create Campaign] Erro ao remover arquivo temporário (em erro):", req.file.path, err);
+        });
+    }
+    res.status(500).json({ 
+      message: "Erro interno ao criar campanha de Tráfego", 
+      error: error.message 
+    });
+  }
+});
+
+
+module.exports = {
+  getMetaAuthUrl,
+  facebookCallback,
+  getConnectionStatus,
+  disconnectMeta,
+  getMetaMetrics,
+  createRecommendedTrafficCampaign // Adicionando a função exportada
+};
