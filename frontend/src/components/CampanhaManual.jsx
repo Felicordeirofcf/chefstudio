@@ -27,6 +27,67 @@ const SelectInput = ({ id, label, value, onChange, options, placeholder, require
   </div>
 );
 
+// Componente para exibir uma campanha
+const CampanhaItem = ({ campanha, onVerAds }) => {
+  // Formatar data para exibição
+  const formatarData = (dataString) => {
+    try {
+      const data = new Date(dataString);
+      return data.toLocaleDateString('pt-BR');
+    } catch (e) {
+      return 'Data inválida';
+    }
+  };
+
+  // Determinar a cor do status
+  const getStatusColor = (status) => {
+    switch (status?.toUpperCase()) {
+      case 'ACTIVE':
+        return 'bg-green-100 text-green-800';
+      case 'PAUSED':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'DELETED':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  return (
+    <div className="border rounded-md p-4 mb-3 bg-white shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex justify-between items-start">
+        <div>
+          <h3 className="font-medium text-lg">{campanha.name}</h3>
+          <div className="text-sm text-gray-500 mt-1">
+            Criada em: {formatarData(campanha.startDate)}
+          </div>
+        </div>
+        <div className="flex items-center">
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(campanha.status)}`}>
+            {campanha.status === 'ACTIVE' ? 'Ativo' : 
+             campanha.status === 'PAUSED' ? 'Pausado' : 
+             campanha.status === 'DELETED' ? 'Excluído' : campanha.status}
+          </span>
+        </div>
+      </div>
+      
+      <div className="mt-3 flex justify-between items-center">
+        <div className="text-sm">
+          <span className="font-medium">Orçamento:</span> R$ {campanha.weeklyBudget?.toFixed(2) || campanha.dailyBudget?.toFixed(2) || '0.00'} 
+          {campanha.weeklyBudget ? '/semana' : '/dia'}
+        </div>
+        
+        <button 
+          onClick={() => onVerAds(campanha)}
+          className="text-sm px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
+        >
+          Ver no Ads
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const CampanhaManual = () => {
   const { toast } = useToast();
 
@@ -52,6 +113,11 @@ const CampanhaManual = () => {
   const [selectedPage, setSelectedPage] = useState('');
   const [isMetaConnected, setIsMetaConnected] = useState(false); // Estado para controlar a conexão
   const [metaLoading, setMetaLoading] = useState(true); // Estado para carregamento dos dados Meta
+
+  // Estados para listagem de campanhas
+  const [campanhas, setCampanhas] = useState([]);
+  const [carregandoCampanhas, setCarregandoCampanhas] = useState(false);
+  const [erroCampanhas, setErroCampanhas] = useState(null);
 
   const fileInputRef = useRef(null);
 
@@ -141,6 +207,46 @@ const CampanhaManual = () => {
 
     fetchMetaStatus();
   }, []);
+
+  // Buscar campanhas quando a conta de anúncios for selecionada
+  useEffect(() => {
+    if (selectedAdAccount && isMetaConnected) {
+      buscarCampanhas();
+    }
+  }, [selectedAdAccount, isMetaConnected]);
+
+  // Função para buscar campanhas
+  const buscarCampanhas = async () => {
+    if (!selectedAdAccount || !isMetaConnected) return;
+    
+    setCarregandoCampanhas(true);
+    setErroCampanhas(null);
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Usuário não autenticado.');
+      }
+      
+      const API_BASE_URL = "https://chefstudio-production.up.railway.app/api";
+      const response = await axios.get(`${API_BASE_URL}/meta-ads/campaigns`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { adAccountId: selectedAdAccount }
+      });
+      
+      if (response.data && response.data.campaigns) {
+        setCampanhas(response.data.campaigns);
+      } else {
+        setCampanhas([]);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar campanhas:', error.response?.data || error.message);
+      setErroCampanhas('Não foi possível carregar as campanhas. Tente novamente mais tarde.');
+      setCampanhas([]);
+    } finally {
+      setCarregandoCampanhas(false);
+    }
+  };
 
   // Inicializar o mapa
   useEffect(() => {
@@ -235,6 +341,27 @@ const CampanhaManual = () => {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  // Função para abrir o anúncio no Ads Manager
+  const handleVerAds = (campanha) => {
+    // URL do Ads Manager com o ID da campanha
+    const adsManagerUrl = `https://business.facebook.com/adsmanager/manage/campaigns?act=${selectedAdAccount}&selected_campaign_ids=${campanha.campaignId}`;
+    window.open(adsManagerUrl, '_blank');
+  };
+
+  // Função para limpar o formulário
+  const limparFormulario = () => {
+    setNomeCampanha('');
+    setOrcamento(70);
+    setLinkCardapio('');
+    setLinkPublicacao('');
+    setDataInicio(new Date().toISOString().split('T')[0]);
+    setDataTermino('');
+    setTituloAnuncio('');
+    setDescricaoAnuncio('');
+    setCallToAction('LEARN_MORE');
+    handleClearImage();
   };
 
   // Função para criar a campanha
@@ -357,24 +484,14 @@ const CampanhaManual = () => {
       toast({ title: "Sucesso!", description: response.data.message || "Campanha criada com sucesso!" });
 
       // Limpar formulário
-      setNomeCampanha('');
-      setOrcamento(70);
-      setLinkCardapio('');
-      setLinkPublicacao('');
-      setDataInicio(new Date().toISOString().split('T')[0]);
-      setDataTermino('');
-      setTituloAnuncio('');
-      setDescricaoAnuncio('');
-      setCallToAction('LEARN_MORE');
-      handleClearImage();
+      limparFormulario();
 
-      // Redirecionar para a tela de listagem de campanhas
+      // Atualizar a lista de campanhas
+      buscarCampanhas();
+
+      // Disparar evento de criação (para outros componentes que possam estar ouvindo)
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('campanhaCreated', { detail: response.data }));
-        // Redirecionar para a listagem de campanhas após sucesso
-        setTimeout(() => {
-          window.location.href = '/dashboard/campanhas';
-        }, 1500);
       }
 
     } catch (error) {
@@ -400,276 +517,331 @@ const CampanhaManual = () => {
   ];
 
   return (
-    <div className="w-full bg-white p-6 rounded-lg shadow">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <h2 className="text-xl font-semibold">
-          Criar Anúncio Manualmente
-        </h2>
-        <p className="text-sm text-gray-500">
-          Configure sua campanha de tráfego com as opções recomendadas pelo Meta Ads.
-        </p>
+    <div className="w-full space-y-8">
+      {/* Formulário de criação de anúncio */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <h2 className="text-xl font-semibold">
+            Criar Anúncio Manualmente
+          </h2>
+          <p className="text-sm text-gray-500">
+            Configure sua campanha de tráfego com as opções recomendadas pelo Meta Ads.
+          </p>
 
-        {metaLoading && (
-          <div className="p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-md">
-            Verificando conexão com Meta Ads...
-          </div>
-        )}
-        {!metaLoading && !isMetaConnected && (
-           <div className="p-4 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-md">
-             Conecte sua conta Meta Ads no seu perfil para criar anúncios.
-           </div>
-        )}
-        {error && (
-           <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
-             {error}
-           </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-           <SelectInput
-             id="adAccount"
-             label="Conta de Anúncios Meta"
-             value={selectedAdAccount}
-             onChange={(e) => setSelectedAdAccount(e.target.value)}
-             options={adAccountsList}
-             placeholder={metaLoading ? "Carregando..." : "Selecione a Conta"}
-             required
-             disabled={metaLoading || !isMetaConnected || adAccountsList.length === 0}
-           />
-           <SelectInput
-             id="facebookPage"
-             label="Página do Facebook"
-             value={selectedPage}
-             onChange={(e) => setSelectedPage(e.target.value)}
-             options={pagesList}
-             placeholder={metaLoading ? "Carregando..." : "Selecione a Página"}
-             required
-             disabled={metaLoading || !isMetaConnected || pagesList.length === 0}
-           />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <div
-              id="map-container"
-              className="relative h-[300px] bg-gray-100 rounded-md overflow-hidden border"
-              style={{ width: '100%', height: '300px' }}
-            >
-              {!mapLoaded && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-                </div>
-              )}
+          {metaLoading && (
+            <div className="p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-md">
+              Verificando conexão com Meta Ads...
             </div>
-            <div className="mt-4">
-              <label htmlFor="raioAlcanceSlider" className="block mb-2 text-sm font-medium">
-                Raio de Alcance ({raioAlcance} Km)
-              </label>
-              <input
-                id="raioAlcanceSlider"
-                type="range"
-                min="1"
-                max="50" // Ajustado para máximo de 50km conforme solicitado
-                value={raioAlcance}
-                onChange={(e) => setRaioAlcance(parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-                disabled={!isMetaConnected}
-              />
-            </div>
+          )}
+          {!metaLoading && !isMetaConnected && (
+             <div className="p-4 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-md">
+               Conecte sua conta Meta Ads no seu perfil para criar anúncios.
+             </div>
+          )}
+          {error && (
+             <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+               {error}
+             </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <SelectInput
+               id="adAccount"
+               label="Conta de Anúncios Meta"
+               value={selectedAdAccount}
+               onChange={(e) => setSelectedAdAccount(e.target.value)}
+               options={adAccountsList}
+               placeholder={metaLoading ? "Carregando..." : "Selecione a Conta"}
+               required
+               disabled={metaLoading || !isMetaConnected || adAccountsList.length === 0}
+             />
+             <SelectInput
+               id="facebookPage"
+               label="Página do Facebook"
+               value={selectedPage}
+               onChange={(e) => setSelectedPage(e.target.value)}
+               options={pagesList}
+               placeholder={metaLoading ? "Carregando..." : "Selecione a Página"}
+               required
+               disabled={metaLoading || !isMetaConnected || pagesList.length === 0}
+             />
           </div>
 
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label htmlFor="nomeCampanha" className="block text-sm font-medium mb-1">Nome da Campanha *</label>
-              <input
-                type="text"
-                id="nomeCampanha"
-                value={nomeCampanha}
-                onChange={(e) => setNomeCampanha(e.target.value)}
-                className="w-full p-2 border rounded-md"
-                required
-                disabled={!isMetaConnected}
-              />
-            </div>
-            <div>
-              <label htmlFor="orcamento" className="block text-sm font-medium mb-1">Orçamento Semanal (R$) *</label>
-              <input
-                type="number"
-                id="orcamento"
-                value={orcamento}
-                onChange={(e) => setOrcamento(parseFloat(e.target.value))}
-                className="w-full p-2 border rounded-md"
-                min="70" // Orçamento mínimo fixo de R$ 70
-                required
-                disabled={!isMetaConnected}
-              />
-              <p className="text-xs text-gray-500 mt-1">Mínimo recomendado: R$70.</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="dataInicio" className="block text-sm font-medium mb-1">Data de Início *</label>
-                <input
-                  type="date"
-                  id="dataInicio"
-                  value={dataInicio}
-                  onChange={(e) => setDataInicio(e.target.value)}
-                  className="w-full p-2 border rounded-md"
-                  required
-                  disabled={!isMetaConnected}
-                />
-              </div>
-              <div>
-                <label htmlFor="dataTermino" className="block text-sm font-medium mb-1">Data de Término (opcional)</label>
-                <input
-                  type="date"
-                  id="dataTermino"
-                  value={dataTermino}
-                  onChange={(e) => setDataTermino(e.target.value)}
-                  className="w-full p-2 border rounded-md"
-                  min={dataInicio}
-                  disabled={!isMetaConnected}
-                />
-              </div>
-            </div>
-
-            <div>
-              <span className="block text-sm font-medium mb-1">Tipo de Anúncio *</span>
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="tipoAnuncio"
-                    value="imagem"
-                    checked={tipoAnuncio === 'imagem'}
-                    onChange={() => { setTipoAnuncio('imagem'); setLinkPublicacao(''); }}
-                    className="mr-2"
-                    disabled={!isMetaConnected}
-                  />
-                  Upload de Imagem
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="tipoAnuncio"
-                    value="post"
-                    checked={tipoAnuncio === 'post'}
-                    onChange={() => { setTipoAnuncio('post'); handleClearImage(); }}
-                    className="mr-2"
-                    disabled={!isMetaConnected}
-                  />
-                  Publicação Existente
-                </label>
-              </div>
-            </div>
-
-            {tipoAnuncio === 'imagem' && (
-              <div>
-                <label htmlFor="imagem" className="block text-sm font-medium mb-1">Imagem para o Anúncio *</label>
-                <input
-                  type="file"
-                  id="imagem"
-                  ref={fileInputRef}
-                  onChange={handleImageChange}
-                  accept="image/png, image/jpeg, image/gif"
-                  className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  required
-                  disabled={!isMetaConnected}
-                />
-                {imagemPreview && (
-                  <div className="mt-2 relative w-32 h-32 border rounded overflow-hidden">
-                    <img src={imagemPreview} alt="Preview" className="object-cover w-full h-full" />
-                    <button
-                      type="button"
-                      onClick={handleClearImage}
-                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 text-xs"
-                      aria-label="Remover imagem"
-                    >
-                      X
-                    </button>
+              <div
+                id="map-container"
+                className="relative h-[300px] bg-gray-100 rounded-md overflow-hidden border"
+                style={{ width: '100%', height: '300px' }}
+              >
+                {!mapLoaded && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
                   </div>
                 )}
               </div>
-            )}
-            
-            {tipoAnuncio === 'post' && (
-              <div>
-                <label htmlFor="linkPublicacao" className="block text-sm font-medium mb-1">Link da Publicação Existente *</label>
+              <div className="mt-4">
+                <label htmlFor="raioAlcanceSlider" className="block mb-2 text-sm font-medium">
+                  Raio de Alcance ({raioAlcance} Km)
+                </label>
                 <input
-                  type="url"
-                  id="linkPublicacao"
-                  value={linkPublicacao}
-                  onChange={(e) => setLinkPublicacao(e.target.value)}
+                  id="raioAlcanceSlider"
+                  type="range"
+                  min="1"
+                  max="50" // Ajustado para máximo de 50km conforme solicitado
+                  value={raioAlcance}
+                  onChange={(e) => setRaioAlcance(parseInt(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                  disabled={!isMetaConnected}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="nomeCampanha" className="block text-sm font-medium mb-1">Nome da Campanha *</label>
+                <input
+                  type="text"
+                  id="nomeCampanha"
+                  value={nomeCampanha}
+                  onChange={(e) => setNomeCampanha(e.target.value)}
                   className="w-full p-2 border rounded-md"
-                  placeholder="https://www.facebook.com/pagina/posts/123..."
                   required
                   disabled={!isMetaConnected}
                 />
               </div>
-            )}
+              <div>
+                <label htmlFor="orcamento" className="block text-sm font-medium mb-1">Orçamento Semanal (R$) *</label>
+                <input
+                  type="number"
+                  id="orcamento"
+                  value={orcamento}
+                  onChange={(e) => setOrcamento(parseFloat(e.target.value))}
+                  className="w-full p-2 border rounded-md"
+                  min="70" // Orçamento mínimo fixo de R$ 70
+                  required
+                  disabled={!isMetaConnected}
+                />
+                <p className="text-xs text-gray-500 mt-1">Mínimo recomendado: R$70.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="dataInicio" className="block text-sm font-medium mb-1">Data de Início *</label>
+                  <input
+                    type="date"
+                    id="dataInicio"
+                    value={dataInicio}
+                    onChange={(e) => setDataInicio(e.target.value)}
+                    className="w-full p-2 border rounded-md"
+                    required
+                    disabled={!isMetaConnected}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="dataTermino" className="block text-sm font-medium mb-1">Data de Término (opcional)</label>
+                  <input
+                    type="date"
+                    id="dataTermino"
+                    value={dataTermino}
+                    onChange={(e) => setDataTermino(e.target.value)}
+                    className="w-full p-2 border rounded-md"
+                    min={dataInicio}
+                    disabled={!isMetaConnected}
+                  />
+                </div>
+              </div>
 
-            <div>
-              <label htmlFor="tituloAnuncio" className="block text-sm font-medium mb-1">Título do Anúncio (opcional)</label>
-              <input
-                type="text"
-                id="tituloAnuncio"
-                value={tituloAnuncio}
-                onChange={(e) => setTituloAnuncio(e.target.value)}
-                className="w-full p-2 border rounded-md"
-                disabled={!isMetaConnected}
-              />
-            </div>
-            <div>
-              <label htmlFor="descricaoAnuncio" className="block text-sm font-medium mb-1">Descrição do Anúncio *</label>
-              <textarea
-                id="descricaoAnuncio"
-                value={descricaoAnuncio}
-                onChange={(e) => setDescricaoAnuncio(e.target.value)}
-                className="w-full p-2 border rounded-md"
-                rows="3"
-                placeholder="Ex: Venha experimentar nossos pratos especiais com 20% de desconto!"
+              <div>
+                <span className="block text-sm font-medium mb-1">Tipo de Anúncio *</span>
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="tipoAnuncio"
+                      value="imagem"
+                      checked={tipoAnuncio === 'imagem'}
+                      onChange={() => { setTipoAnuncio('imagem'); setLinkPublicacao(''); }}
+                      className="mr-2"
+                      disabled={!isMetaConnected}
+                    />
+                    Upload de Imagem
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="tipoAnuncio"
+                      value="post"
+                      checked={tipoAnuncio === 'post'}
+                      onChange={() => { setTipoAnuncio('post'); handleClearImage(); }}
+                      className="mr-2"
+                      disabled={!isMetaConnected}
+                    />
+                    Publicação Existente
+                  </label>
+                </div>
+              </div>
+
+              {tipoAnuncio === 'imagem' && (
+                <div>
+                  <label htmlFor="imagem" className="block text-sm font-medium mb-1">Imagem para o Anúncio *</label>
+                  <input
+                    type="file"
+                    id="imagem"
+                    ref={fileInputRef}
+                    onChange={handleImageChange}
+                    accept="image/png, image/jpeg, image/gif"
+                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    required
+                    disabled={!isMetaConnected}
+                  />
+                  {imagemPreview && (
+                    <div className="mt-2 relative w-32 h-32 border rounded overflow-hidden">
+                      <img src={imagemPreview} alt="Preview" className="object-cover w-full h-full" />
+                      <button
+                        type="button"
+                        onClick={handleClearImage}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 text-xs"
+                        aria-label="Remover imagem"
+                      >
+                        X
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {tipoAnuncio === 'post' && (
+                <div>
+                  <label htmlFor="linkPublicacao" className="block text-sm font-medium mb-1">Link da Publicação Existente *</label>
+                  <input
+                    type="url"
+                    id="linkPublicacao"
+                    value={linkPublicacao}
+                    onChange={(e) => setLinkPublicacao(e.target.value)}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="https://www.facebook.com/pagina/posts/123..."
+                    required
+                    disabled={!isMetaConnected}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="tituloAnuncio" className="block text-sm font-medium mb-1">Título do Anúncio (opcional)</label>
+                <input
+                  type="text"
+                  id="tituloAnuncio"
+                  value={tituloAnuncio}
+                  onChange={(e) => setTituloAnuncio(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  disabled={!isMetaConnected}
+                />
+              </div>
+              <div>
+                <label htmlFor="descricaoAnuncio" className="block text-sm font-medium mb-1">Descrição do Anúncio *</label>
+                <textarea
+                  id="descricaoAnuncio"
+                  value={descricaoAnuncio}
+                  onChange={(e) => setDescricaoAnuncio(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  rows="3"
+                  placeholder="Ex: Venha experimentar nossos pratos especiais com 20% de desconto!"
+                  required
+                  disabled={!isMetaConnected}
+                ></textarea>
+              </div>
+              <SelectInput
+                id="callToAction"
+                label="Botão de Ação (Call to Action) *"
+                value={callToAction}
+                onChange={(e) => setCallToAction(e.target.value)}
+                options={ctaOptions}
+                placeholder="Selecione o CTA"
                 required
                 disabled={!isMetaConnected}
-              ></textarea>
-            </div>
-            <SelectInput
-              id="callToAction"
-              label="Botão de Ação (Call to Action) *"
-              value={callToAction}
-              onChange={(e) => setCallToAction(e.target.value)}
-              options={ctaOptions}
-              placeholder="Selecione o CTA"
-              required
-              disabled={!isMetaConnected}
-            />
-            <div>
-              <label htmlFor="linkCardapio" className="block text-sm font-medium mb-1">Link de Destino (opcional)</label>
-              <input
-                type="url"
-                id="linkCardapio"
-                value={linkCardapio}
-                onChange={(e) => setLinkCardapio(e.target.value)}
-                className="w-full p-2 border rounded-md"
-                placeholder="https://seurestaurante.com/cardapio"
-                disabled={!isMetaConnected}
               />
+              <div>
+                <label htmlFor="linkCardapio" className="block text-sm font-medium mb-1">Link de Destino (opcional)</label>
+                <input
+                  type="url"
+                  id="linkCardapio"
+                  value={linkCardapio}
+                  onChange={(e) => setLinkCardapio(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  placeholder="https://seurestaurante.com/cardapio"
+                  disabled={!isMetaConnected}
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={loading || metaLoading || !isMetaConnected}
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading || metaLoading || !isMetaConnected}
+            >
+              {loading ? (
+                <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mx-auto"></div>
+              ) : (
+                'Criar Anúncio no Meta Ads'
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Seção de campanhas criadas */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Campanhas Criadas</h2>
+          <button 
+            onClick={buscarCampanhas}
+            className="text-sm px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors flex items-center"
+            disabled={carregandoCampanhas || !isMetaConnected || !selectedAdAccount}
           >
-            {loading ? (
-              <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mx-auto"></div>
+            {carregandoCampanhas ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-2 border-gray-500 border-t-transparent rounded-full mr-2"></div>
+                Atualizando...
+              </>
             ) : (
-              'Criar Anúncio no Meta Ads'
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Atualizar
+              </>
             )}
           </button>
         </div>
-      </form>
+
+        {carregandoCampanhas ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-500">Carregando campanhas...</p>
+          </div>
+        ) : erroCampanhas ? (
+          <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+            {erroCampanhas}
+          </div>
+        ) : campanhas.length === 0 ? (
+          <div className="p-8 text-center bg-gray-50 rounded-md">
+            <p className="text-gray-500">Nenhuma campanha encontrada para esta conta.</p>
+            <p className="text-sm text-gray-400 mt-2">Crie sua primeira campanha usando o formulário acima.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {campanhas.map((campanha) => (
+              <CampanhaItem 
+                key={campanha.id || campanha.campaignId} 
+                campanha={campanha} 
+                onVerAds={handleVerAds} 
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
