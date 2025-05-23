@@ -348,7 +348,29 @@ const verifyConnection = asyncHandler(async (req, res) => {
 // @route   POST /api/meta/create-ad-from-post
 // @access  Private
 const createAdFromPost = asyncHandler(async (req, res) => {
-  const { postUrl, campaignName, dailyBudget, startDate, endDate, targetCountry, adTitle, adDescription, callToAction } = req.body;
+  console.log("Dados recebidos do frontend:", req.body);
+  
+  // Mapear campos do frontend (em português) para os campos esperados pelo backend (em inglês)
+  const postUrl = req.body.postUrl || req.body.linkPublicacao || req.body.linkPost;
+  const campaignName = req.body.campaignName || req.body.nome;
+  const dailyBudget = req.body.dailyBudget || req.body.orcamento;
+  const startDate = req.body.startDate || req.body.dataInicio;
+  const endDate = req.body.endDate || req.body.dataTermino || req.body.dataFim;
+  const targetCountry = req.body.targetCountry || req.body.pais || "BR";
+  const adTitle = req.body.adTitle || req.body.titulo;
+  const adDescription = req.body.adDescription || req.body.descricao;
+  const callToAction = req.body.callToAction || req.body.botaoAcao;
+  const radius = req.body.radius || req.body.raio;
+  
+  console.log("Campos mapeados:", {
+    postUrl,
+    campaignName,
+    dailyBudget,
+    startDate,
+    endDate,
+    targetCountry,
+    radius
+  });
   
   if (!postUrl) {
     res.status(400);
