@@ -193,4 +193,32 @@ router.get("/campaigns", protect, metaController.getCampaigns);
  */
 router.post("/create-from-image", protect, metaController.createAdFromImage);
 
+/**
+ * @swagger
+ * /api/meta/metrics:
+ *   get:
+ *     summary: Obter métricas do Meta Ads
+ *     tags: [Meta]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: timeRange
+ *         schema:
+ *           type: string
+ *           enum: [today, yesterday, last_7_days, this_month, last_month, last_30_days]
+ *         required: false
+ *         description: Intervalo de tempo para as métricas (padrão é last_30_days)
+ *     responses:
+ *       200:
+ *         description: Métricas obtidas com sucesso
+ *       400:
+ *         description: Usuário não conectado ao Meta
+ *       401:
+ *         description: Não autorizado
+ *       404:
+ *         description: Usuário não encontrado
+ */
+router.get("/metrics", protect, metaController.getMetrics);
+
 module.exports = router;
