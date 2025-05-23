@@ -1,15 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useToast } from "./ui/use-toast"; // Importar useToast
+
+// Componente Select reutilizável
+const SelectInput = ({ id, label, value, onChange, options, placeholder, required, disabled }) => (
+  <div>
+    <label htmlFor={id} className="block text-sm font-medium mb-1">
+      {label} {required && '*'}
+    </label>
+    <select
+      id={id}
+      value={value}
+      onChange={onChange}
+      className="w-full p-2 border rounded-md bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+      required={required}
+      disabled={disabled || options.length === 0}
+    >
+      <option value="" disabled>{placeholder}</option>
+      {options.map(option => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+    {options.length === 0 && !disabled && <p className="text-xs text-red-500 mt-1">Nenhuma opção disponível.</p>}
+  </div>
+);
 
 const CampanhaManual = () => {
+  const { toast } = useToast(); // Hook para exibir toasts
+
   // Estados para os campos do formulário
   const [nomeCampanha, setNomeCampanha] = useState('');
   const [orcamento, setOrcamento] = useState(70);
   const [raioAlcance, setRaioAlcance] = useState(5);
   const [linkCardapio, setLinkCardapio] = useState('');
   const [linkPublicacao, setLinkPublicacao] = useState('');
-  
-  // Novos campos adicionados
   const [dataInicio, setDataInicio] = useState('');
   const [dataTermino, setDataTermino] = useState('');
   const [tituloAnuncio, setTituloAnuncio] = useState('');
@@ -18,19 +44,25 @@ const CampanhaManual = () => {
   const [imagem, setImagem] = useState(null);
   const [imagemPreview, setImagemPreview] = useState('');
   const [tipoAnuncio, setTipoAnuncio] = useState('post'); // 'post' ou 'imagem'
-  
+
+  // Estados para seleção de Conta e Página
+  const [adAccountsList, setAdAccountsList] = useState([]);
+  const [pagesList, setPagesList] = useState([]);
+  const [selectedAdAccount, setSelectedAdAccount] = useState('');
+  const [selectedPage, setSelectedPage] = useState('');
+
   // Referência para o input de arquivo
   const fileInputRef = useRef(null);
-  
+
   // Estados para o mapa
   const [mapLoaded, setMapLoaded] = useState(false);
   const [map, setMap] = useState(null);
   const [circle, setCircle] = useState(null);
+  const [currentLocation, setCurrentLocation] = useState({ lat: -23.5505, lng: -46.6333 }); // Padrão SP
 
   // Estados para controle de carregamento e erros
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
 
   // Definir data de início padrão como hoje
@@ -39,93 +71,130 @@ const CampanhaManual = () => {
     setDataInicio(today);
   }, []);
 
-  // Buscar informações do usuário ao carregar o componente
+  // Buscar informações do usuário e carregar contas/páginas
   useEffect(() => {
     try {
       const storedUserInfo = localStorage.getItem('userInfo');
       if (storedUserInfo) {
-        setUserInfo(JSON.parse(storedUserInfo));
+        const parsedInfo = JSON.parse(storedUserInfo);
+        setUserInfo(parsedInfo);
+
+        // Popular listas de Ad Accounts e Pages
+        if (parsedInfo.adAccounts && parsedInfo.adAccounts.length > 0) {
+          setAdAccountsList(parsedInfo.adAccounts.map(acc => ({ value: acc.id, label: `${acc.name} (${acc.id})` })));
+          // Selecionar a primeira conta por padrão, se houver apenas uma
+          if (parsedInfo.adAccounts.length === 1) {
+             setSelectedAdAccount(parsedInfo.adAccounts[0].id);
+          }
+        } else {
+          console.warn("Nenhuma conta de anúncios encontrada para o usuário.");
+        }
+
+        if (parsedInfo.metaPages && parsedInfo.metaPages.length > 0) {
+          setPagesList(parsedInfo.metaPages.map(page => ({ value: page.id, label: `${page.name} (${page.id})` })));
+           // Selecionar a primeira página por padrão, se houver apenas uma
+          if (parsedInfo.metaPages.length === 1) {
+             setSelectedPage(parsedInfo.metaPages[0].id);
+          }
+        } else {
+          console.warn("Nenhuma página do Facebook encontrada para o usuário.");
+        }
+      } else {
+         console.error("Informações do usuário não encontradas no localStorage.");
+         setError("Erro ao carregar dados do usuário. Faça login novamente.");
       }
     } catch (error) {
       console.error('Erro ao carregar informações do usuário:', error);
+      setError("Erro ao processar dados do usuário.");
     }
   }, []);
 
   // Inicializar o mapa quando o componente montar
-  useEffect(() => {
-    // Verificar se o Leaflet está disponível globalmente
-    if (window.L && !mapLoaded) {
-      // Criar script para carregar o CSS do Leaflet
-      const linkElement = document.createElement('link');
-      linkElement.rel = 'stylesheet';
-      linkElement.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(linkElement);
+   useEffect(() => {
+    let mapInstance = null;
+    let circleInstance = null;
 
-      // Inicializar o mapa após um pequeno delay para garantir que o CSS foi carregado
-      setTimeout(() => {
-        const mapContainer = document.getElementById('map-container');
-        if (mapContainer) {
-          // Inicializar o mapa
-          const mapInstance = window.L.map('map-container').setView([-23.5505, -46.6333], 12);
-          
-          // Adicionar camada de tiles
-          window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          }).addTo(mapInstance);
-          
-          // Adicionar círculo para representar o raio
-          const circleInstance = window.L.circle([-23.5505, -46.6333], {
-            color: 'blue',
-            fillColor: '#30f',
-            fillOpacity: 0.2,
-            radius: raioAlcance * 1000 // Converter para metros
-          }).addTo(mapInstance);
-          
-          // Salvar referências
-          setMap(mapInstance);
-          setCircle(circleInstance);
-          setMapLoaded(true);
+    const initMap = (lat, lng) => {
+      const mapContainer = document.getElementById('map-container');
+      if (mapContainer && window.L && !map) {
+        mapInstance = window.L.map(mapContainer).setView([lat, lng], 12);
+        window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(mapInstance);
+
+        circleInstance = window.L.circle([lat, lng], {
+          color: 'blue',
+          fillColor: '#30f',
+          fillOpacity: 0.2,
+          radius: raioAlcance * 1000
+        }).addTo(mapInstance);
+
+        setMap(mapInstance);
+        setCircle(circleInstance);
+        setCurrentLocation({ lat, lng });
+        setMapLoaded(true);
+      }
+    };
+
+    // Tentar obter localização do usuário
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          initMap(latitude, longitude);
+        },
+        (error) => {
+          console.warn("Erro ao obter geolocalização, usando padrão SP:", error);
+          initMap(-23.5505, -46.6333); // Fallback para SP
         }
-      }, 500);
-    } else if (!window.L) {
-      // Se o Leaflet não estiver disponível, carregá-lo dinamicamente
+      );
+    } else {
+      console.warn("Geolocalização não suportada, usando padrão SP.");
+      initMap(-23.5505, -46.6333); // Fallback para SP
+    }
+
+    // Carregar Leaflet se não estiver presente
+    if (!window.L) {
       const script = document.createElement('script');
       script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
       script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
       script.crossOrigin = '';
-      script.onload = () => {
-        setMapLoaded(true);
-      };
       document.head.appendChild(script);
+
+      const linkElement = document.createElement('link');
+      linkElement.rel = 'stylesheet';
+      linkElement.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(linkElement);
     }
 
-    // Limpeza ao desmontar
+    // Limpeza
     return () => {
-      if (map) {
-        map.remove();
+      if (mapInstance) {
+        mapInstance.remove();
       }
     };
-  }, []);
+  }, []); // Executa apenas uma vez na montagem
 
-  // Atualizar o raio do círculo quando o valor do slider mudar
+  // Atualizar o raio do círculo
   useEffect(() => {
-    if (circle && map) {
+    if (circle) {
       circle.setRadius(raioAlcance * 1000);
     }
-  }, [raioAlcance, circle, map]);
+  }, [raioAlcance, circle]);
 
   // Lidar com a seleção de imagem
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Validar tamanho (ex: 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: "Erro", description: "A imagem excede o limite de 5MB.", variant: "destructive" });
+        return;
+      }
       setImagem(file);
       setTipoAnuncio('imagem');
-      
-      // Criar preview da imagem
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagemPreview(reader.result);
-      };
+      reader.onloadend = () => setImagemPreview(reader.result);
       reader.readAsDataURL(file);
     }
   };
@@ -142,131 +211,115 @@ const CampanhaManual = () => {
   // Função para criar a campanha
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!nomeCampanha || !orcamento) {
-      setError('Por favor, preencha o nome da campanha e o orçamento.');
+    setError(null);
+
+    // --- Validações do Formulário --- 
+    if (!selectedAdAccount) {
+      setError('Selecione uma Conta de Anúncios.');
+      toast({ title: "Erro", description: "Selecione uma Conta de Anúncios.", variant: "destructive" });
       return;
     }
-
-    if (!dataInicio) {
-      setError('Por favor, selecione uma data de início para a campanha.');
+    if (!selectedPage) {
+      setError('Selecione uma Página do Facebook.');
+       toast({ title: "Erro", description: "Selecione uma Página do Facebook.", variant: "destructive" });
       return;
     }
-
+    if (!nomeCampanha || !orcamento || !dataInicio || !descricaoAnuncio || !callToAction || !linkCardapio) {
+      setError('Preencha todos os campos obrigatórios (*).');
+      toast({ title: "Erro", description: "Preencha todos os campos obrigatórios (*).", variant: "destructive" });
+      return;
+    }
     if (tipoAnuncio === 'post' && !linkPublicacao) {
-      setError('Por favor, forneça o link da publicação ou selecione uma imagem para o anúncio.');
+      setError('Forneça o link da publicação existente.');
+      toast({ title: "Erro", description: "Forneça o link da publicação existente.", variant: "destructive" });
       return;
     }
-
     if (tipoAnuncio === 'imagem' && !imagem) {
-      setError('Por favor, selecione uma imagem para o anúncio ou forneça o link de uma publicação.');
+      setError('Selecione uma imagem para o anúncio.');
+      toast({ title: "Erro", description: "Selecione uma imagem para o anúncio.", variant: "destructive" });
       return;
     }
-
     if (dataTermino && new Date(dataTermino) <= new Date(dataInicio)) {
       setError('A data de término deve ser posterior à data de início.');
+      toast({ title: "Erro", description: "A data de término deve ser posterior à data de início.", variant: "destructive" });
       return;
     }
 
-    try {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
 
-      // Verificar se o usuário está autenticado
+    try {
       const token = localStorage.getItem('token') || (userInfo && userInfo.token);
       if (!token) {
-        throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
+        throw new Error('Usuário não autenticado.');
       }
 
-      // Verificar se o usuário está conectado ao Meta Ads
-      const userMetaStatus = userInfo?.metaConnectionStatus || 'disconnected';
-      if (userMetaStatus !== 'connected') {
-        throw new Error('Você precisa conectar sua conta ao Meta Ads antes de criar campanhas. Vá para seu perfil e conecte-se.');
-      }
-
-      // URL base correta para o backend
+      // URL do novo endpoint
       const API_BASE_URL = "https://chefstudio-production.up.railway.app/api";
+      const endpoint = `${API_BASE_URL}/ads/create-recommended-traffic-campaign`;
 
-      // Preparar dados para envio - formato corrigido conforme esperado pelo backend
-      const campaignData = new FormData();
-      
-      // Campos obrigatórios
-      campaignData.append('campaignName', nomeCampanha);
-      campaignData.append('dailyBudget', parseFloat(orcamento) / 7); // Converter orçamento semanal para diário
-      campaignData.append('radius', raioAlcance);
-      campaignData.append('startDate', dataInicio);
-      
-      // Campos opcionais
-      if (dataTermino) campaignData.append('endDate', dataTermino);
-      if (tituloAnuncio) campaignData.append('adTitle', tituloAnuncio);
-      if (descricaoAnuncio) campaignData.append('adDescription', descricaoAnuncio);
-      if (callToAction) campaignData.append('callToAction', callToAction);
-      if (linkCardapio) campaignData.append('menuUrl', linkCardapio);
-      
-      // Campos específicos por tipo de anúncio
-      if (tipoAnuncio === 'post' && linkPublicacao) {
-        campaignData.append('postUrl', linkPublicacao);
-      }
-      
-      if (tipoAnuncio === 'imagem' && imagem) {
-        campaignData.append('image', imagem);
-      }
-      
-      // Campos adicionais que podem ser necessários
-      campaignData.append('location[latitude]', -23.5505);
-      campaignData.append('location[longitude]', -46.6333);
+      // Preparar dados (FormData para imagem, JSON para post)
+      let dataToSend;
+      let headers = {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      };
 
-      console.log('Enviando dados para criação de campanha:', {
-        tipo: tipoAnuncio,
-        nome: nomeCampanha,
-        orcamento: parseFloat(orcamento) / 7,
-        raio: raioAlcance,
-        dataInicio,
-        dataTermino,
-        titulo: tituloAnuncio,
-        descricao: descricaoAnuncio,
-        cta: callToAction,
-        temImagem: !!imagem
-      });
+      const commonData = {
+        adAccountId: selectedAdAccount,
+        pageId: selectedPage,
+        campaignName: nomeCampanha,
+        weeklyBudget: parseFloat(orcamento),
+        startDate: dataInicio,
+        endDate: dataTermino || null,
+        location: {
+          latitude: currentLocation.lat,
+          longitude: currentLocation.lng,
+          radius: parseInt(raioAlcance)
+        },
+        adType: tipoAnuncio,
+        adTitle: tituloAnuncio || null,
+        adDescription: descricaoAnuncio,
+        callToAction: callToAction,
+        menuUrl: linkCardapio
+      };
 
-      // Determinar qual endpoint usar com base no tipo de anúncio
-      let endpoint = `${API_BASE_URL}/meta/create-ad-from-post`;
-      
       if (tipoAnuncio === 'imagem') {
-        endpoint = `${API_BASE_URL}/meta/create-from-image`;
+        headers['Content-Type'] = 'multipart/form-data';
+        dataToSend = new FormData();
+        // Anexar todos os campos comuns
+        Object.keys(commonData).forEach(key => {
+          if (key === 'location') {
+            dataToSend.append('location[latitude]', commonData.location.latitude);
+            dataToSend.append('location[longitude]', commonData.location.longitude);
+            dataToSend.append('location[radius]', commonData.location.radius);
+          } else if (commonData[key] !== null && commonData[key] !== undefined) {
+            dataToSend.append(key, commonData[key]);
+          }
+        });
+        dataToSend.append('imageFile', imagem); // Anexar o arquivo de imagem
+      } else { // tipoAnuncio === 'post'
+        headers['Content-Type'] = 'application/json';
+        dataToSend = { ...commonData, postUrl: linkPublicacao };
       }
 
-      // Enviar dados da campanha para a API
+      console.log('Enviando dados para:', endpoint, dataToSend);
+
+      // Enviar requisição
       const response = await axios({
         method: 'post',
         url: endpoint,
-        data: tipoAnuncio === 'imagem' ? campaignData : {
-          campaignName: nomeCampanha,
-          dailyBudget: parseFloat(orcamento) / 7,
-          radius: raioAlcance,
-          startDate: dataInicio,
-          endDate: dataTermino || null,
-          adTitle: tituloAnuncio || null,
-          adDescription: descricaoAnuncio || null,
-          callToAction: callToAction || null,
-          menuUrl: linkCardapio || null,
-          postUrl: linkPublicacao || null,
-          location: {
-            latitude: -23.5505,
-            longitude: -46.6333
-          }
-        },
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': tipoAnuncio === 'imagem' ? 'multipart/form-data' : 'application/json',
-          'Accept': 'application/json'
-        }
+        data: dataToSend,
+        headers: headers
       });
 
-      // Limpar formulário após sucesso
+      console.log('Resposta da API:', response.data);
+      toast({ title: "Sucesso!", description: response.data.message || "Campanha criada com sucesso!" });
+
+      // Limpar formulário
+      // (Opcional: manter alguns campos como conta e página selecionados?)
       setNomeCampanha('');
       setOrcamento(70);
-      setRaioAlcance(5);
+      // setRaioAlcance(5); // Manter raio?
       setLinkCardapio('');
       setLinkPublicacao('');
       setDataInicio(new Date().toISOString().split('T')[0]);
@@ -274,41 +327,23 @@ const CampanhaManual = () => {
       setTituloAnuncio('');
       setDescricaoAnuncio('');
       setCallToAction('LEARN_MORE');
-      setImagem(null);
-      setImagemPreview('');
-      setTipoAnuncio('post');
-      
-      // Exibir mensagem de sucesso
-      setSuccess(true);
-      
-      // Atualizar a lista de produtos anunciados
+      handleClearImage();
+      // setSelectedAdAccount(''); // Manter selecionado?
+      // setSelectedPage(''); // Manter selecionado?
+
+      // Atualizar UI (se necessário, ex: lista de campanhas)
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('anuncioCreated', { detail: response.data }));
+        window.dispatchEvent(new CustomEvent('campanhaCreated', { detail: response.data }));
       }
-      
+
     } catch (error) {
-      console.error('Erro ao criar campanha:', error);
-      
-      // Tratamento específico para erro 400 Bad Request
-      if (error.response && error.response.status === 400) {
-        setError(`Erro no formato dos dados: ${error.response.data?.message || 'Verifique os campos e tente novamente.'}`);
-      } else if (error.response && error.response.status === 401) {
-        setError('Sessão expirada ou usuário não autenticado. Por favor, faça login novamente.');
-        // Redirecionar para login após um breve delay
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
-      } else {
-        setError(error.message || error.response?.data?.message || 'Erro ao criar campanha. Por favor, tente novamente.');
-      }
+      console.error('Erro ao criar campanha:', error.response?.data || error.message);
+      const errorMsg = error.response?.data?.message || error.message || 'Erro desconhecido ao criar campanha.';
+      setError(errorMsg);
+      toast({ title: "Erro ao criar campanha", description: errorMsg, variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  };
-
-  // Fechar alerta de sucesso
-  const handleCloseSuccess = () => {
-    setSuccess(false);
   };
 
   // Lista de opções para Call to Action
@@ -322,24 +357,58 @@ const CampanhaManual = () => {
     { value: 'SUBSCRIBE', label: 'Inscrever-se' },
     { value: 'SHOP_NOW', label: 'Comprar Agora' },
     { value: 'ORDER_NOW', label: 'Pedir Agora' }
+    // Adicionar mais CTAs relevantes se necessário
   ];
 
+  // Verifica se o usuário está conectado ao Meta
+  const isMetaConnected = userInfo?.isMetaConnected === true;
+
   return (
-    <div className="w-full">
+    <div className="w-full bg-white p-6 rounded-lg shadow">
       <form onSubmit={handleSubmit} className="space-y-6">
         <h2 className="text-xl font-semibold">
-          Configurações da Campanha Manual
+          Criar Anúncio Recomendado (Tráfego)
         </h2>
         <p className="text-sm text-gray-500">
-          Defina os parâmetros para sua campanha de anúncios no Meta Ads.
+          Configure sua campanha de tráfego com as opções recomendadas pelo Meta Ads.
         </p>
+
+        {!isMetaConnected && (
+           <div className="p-4 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-md">
+             Conecte sua conta Meta Ads no seu perfil para criar anúncios.
+           </div>
+        )}
+
+        {/* Seletores de Conta e Página */} 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+           <SelectInput
+             id="adAccount"
+             label="Conta de Anúncios Meta"
+             value={selectedAdAccount}
+             onChange={(e) => setSelectedAdAccount(e.target.value)}
+             options={adAccountsList}
+             placeholder="Selecione a Conta de Anúncios"
+             required
+             disabled={!isMetaConnected || adAccountsList.length === 0}
+           />
+           <SelectInput
+             id="facebookPage"
+             label="Página do Facebook"
+             value={selectedPage}
+             onChange={(e) => setSelectedPage(e.target.value)}
+             options={pagesList}
+             placeholder="Selecione a Página"
+             required
+             disabled={!isMetaConnected || pagesList.length === 0}
+           />
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Lado esquerdo - Mapa e Raio */}
           <div>
-            <div 
+            <div
               id="map-container"
-              className="relative h-[300px] bg-gray-100 rounded-md overflow-hidden"
+              className="relative h-[300px] bg-gray-100 rounded-md overflow-hidden border"
               style={{ width: '100%', height: '300px' }}
             >
               {!mapLoaded && (
@@ -349,26 +418,28 @@ const CampanhaManual = () => {
               )}
             </div>
             <div className="mt-4">
-              <label className="block mb-2">
+              <label htmlFor="raioAlcanceSlider" className="block mb-2 text-sm font-medium">
                 Raio de Alcance ({raioAlcance} Km)
               </label>
               <input
+                id="raioAlcanceSlider"
                 type="range"
                 value={raioAlcance}
                 onChange={(e) => setRaioAlcance(parseInt(e.target.value))}
                 min="1"
-                max="50"
-                className="w-full"
+                max="80" // Limite máximo do raio
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                disabled={!isMetaConnected}
               />
             </div>
 
             {/* Tipo de Anúncio */}
             <div className="mt-6">
               <label className="block text-sm font-medium mb-2">
-                Tipo de Anúncio
+                Tipo de Criativo *
               </label>
               <div className="flex space-x-4">
-                <label className="flex items-center">
+                <label className="flex items-center cursor-pointer">
                   <input
                     type="radio"
                     name="tipoAnuncio"
@@ -376,10 +447,11 @@ const CampanhaManual = () => {
                     checked={tipoAnuncio === 'post'}
                     onChange={() => setTipoAnuncio('post')}
                     className="mr-2"
+                    disabled={!isMetaConnected}
                   />
-                  Publicação Existente
+                  Usar Publicação Existente
                 </label>
-                <label className="flex items-center">
+                <label className="flex items-center cursor-pointer">
                   <input
                     type="radio"
                     name="tipoAnuncio"
@@ -387,36 +459,38 @@ const CampanhaManual = () => {
                     checked={tipoAnuncio === 'imagem'}
                     onChange={() => setTipoAnuncio('imagem')}
                     className="mr-2"
+                    disabled={!isMetaConnected}
                   />
-                  Upload de Imagem
+                  Fazer Upload de Imagem
                 </label>
               </div>
             </div>
 
-            {/* Upload de Imagem (visível apenas quando tipoAnuncio === 'imagem') */}
+            {/* Upload de Imagem */} 
             {tipoAnuncio === 'imagem' && (
               <div className="mt-4">
                 <label className="block text-sm font-medium mb-1">
-                  Imagem para o Anúncio
+                  Imagem para o Anúncio *
                 </label>
                 <div className="flex flex-col space-y-2">
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg, image/png, image/gif"
                     onChange={handleImageChange}
                     className="hidden"
                     id="image-upload"
+                    disabled={!isMetaConnected}
                   />
                   <label
                     htmlFor="image-upload"
-                    className="cursor-pointer py-2 px-4 border border-blue-500 text-blue-500 rounded-md text-center hover:bg-blue-50"
+                    className={`cursor-pointer py-2 px-4 border rounded-md text-center ${isMetaConnected ? 'border-blue-500 text-blue-500 hover:bg-blue-50' : 'border-gray-300 text-gray-400 cursor-not-allowed'}`}
                   >
-                    Selecionar Imagem
+                    Selecionar Imagem (JPG, PNG, GIF - Máx 5MB)
                   </label>
-                  
+
                   {imagemPreview && (
-                    <div className="relative mt-2">
+                    <div className="relative mt-2 border rounded-md p-1 inline-block">
                       <img
                         src={imagemPreview}
                         alt="Preview"
@@ -425,7 +499,9 @@ const CampanhaManual = () => {
                       <button
                         type="button"
                         onClick={handleClearImage}
-                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1"
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 leading-none"
+                        aria-label="Remover imagem"
+                        disabled={!isMetaConnected}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -434,6 +510,24 @@ const CampanhaManual = () => {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+             {/* Link da Publicação */} 
+            {tipoAnuncio === 'post' && (
+              <div className="mt-4">
+                <label htmlFor="linkPublicacao" className="block text-sm font-medium mb-1">
+                  Link da Publicação Existente *
+                </label>
+                <input
+                  id="linkPublicacao"
+                  type="url" // Usar type url para validação básica
+                  value={linkPublicacao}
+                  onChange={(e) => setLinkPublicacao(e.target.value)}
+                  placeholder="https://facebook.com/suapagina/posts/123..."
+                  className="w-full p-2 border rounded-md"
+                  required={tipoAnuncio === 'post'}
+                  disabled={!isMetaConnected}
+                />
               </div>
             )}
           </div>
@@ -449,101 +543,112 @@ const CampanhaManual = () => {
                 type="text"
                 value={nomeCampanha}
                 onChange={(e) => setNomeCampanha(e.target.value)}
-                placeholder="Ex: Campanha de Verão"
+                placeholder="Ex: Campanha de Tráfego - Verão"
                 className="w-full p-2 border rounded-md"
                 required
+                disabled={!isMetaConnected}
               />
             </div>
-            
+
             <div>
               <label htmlFor="orcamento" className="block text-sm font-medium mb-1">
-                Orçamento semanal (R$) *
+                Orçamento Semanal (R$) *
               </label>
               <input
                 id="orcamento"
                 type="number"
                 value={orcamento}
                 onChange={(e) => setOrcamento(e.target.value)}
-                min="10"
+                min="70" // Mínimo recomendado
+                step="1"
                 className="w-full p-2 border rounded-md"
                 required
+                disabled={!isMetaConnected}
               />
               <p className="text-xs text-gray-500 mt-1">
-                Para melhores resultados recomendamos um orçamento mínimo semanal de R$70.
+                Recomendamos um mínimo de R$70 por semana (R$10/dia).
               </p>
             </div>
 
-            {/* Data de Início */}
-            <div>
-              <label htmlFor="dataInicio" className="block text-sm font-medium mb-1">
-                Data de Início *
-              </label>
-              <input
-                id="dataInicio"
-                type="date"
-                value={dataInicio}
-                onChange={(e) => setDataInicio(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                className="w-full p-2 border rounded-md"
-                required
-              />
+            {/* Datas */} 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="dataInicio" className="block text-sm font-medium mb-1">
+                  Data de Início *
+                </label>
+                <input
+                  id="dataInicio"
+                  type="date"
+                  value={dataInicio}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full p-2 border rounded-md"
+                  required
+                  disabled={!isMetaConnected}
+                />
+              </div>
+              <div>
+                <label htmlFor="dataTermino" className="block text-sm font-medium mb-1">
+                  Data de Término (opcional)
+                </label>
+                <input
+                  id="dataTermino"
+                  type="date"
+                  value={dataTermino}
+                  onChange={(e) => setDataTermino(e.target.value)}
+                  min={dataInicio || new Date().toISOString().split('T')[0]}
+                  className="w-full p-2 border rounded-md"
+                  disabled={!isMetaConnected}
+                />
+              </div>
             </div>
 
-            {/* Data de Término */}
-            <div>
-              <label htmlFor="dataTermino" className="block text-sm font-medium mb-1">
-                Data de Término (opcional)
-              </label>
-              <input
-                id="dataTermino"
-                type="date"
-                value={dataTermino}
-                onChange={(e) => setDataTermino(e.target.value)}
-                min={dataInicio || new Date().toISOString().split('T')[0]}
-                className="w-full p-2 border rounded-md"
-              />
-            </div>
-
-            {/* Título do Anúncio */}
+            {/* Título do Anúncio (Opcional) */} 
             <div>
               <label htmlFor="tituloAnuncio" className="block text-sm font-medium mb-1">
-                Título do Anúncio
+                Título do Anúncio (opcional)
               </label>
               <input
                 id="tituloAnuncio"
                 type="text"
                 value={tituloAnuncio}
                 onChange={(e) => setTituloAnuncio(e.target.value)}
-                placeholder="Ex: Promoção Especial de Verão"
+                placeholder="Ex: Peça já nosso Combo Especial!"
                 className="w-full p-2 border rounded-md"
+                maxLength={255} // Limite comum
+                disabled={!isMetaConnected}
               />
             </div>
 
-            {/* Descrição do Anúncio */}
+            {/* Descrição do Anúncio */} 
             <div>
               <label htmlFor="descricaoAnuncio" className="block text-sm font-medium mb-1">
-                Descrição do Anúncio
+                Texto Principal do Anúncio *
               </label>
               <textarea
                 id="descricaoAnuncio"
                 value={descricaoAnuncio}
                 onChange={(e) => setDescricaoAnuncio(e.target.value)}
-                placeholder="Ex: Venha experimentar nossos pratos especiais com 20% de desconto!"
+                placeholder="Descreva sua oferta ou restaurante aqui..."
                 className="w-full p-2 border rounded-md"
-                rows="3"
+                rows="4"
+                required
+                disabled={!isMetaConnected}
               />
             </div>
 
-            {/* Call to Action */}
+            {/* Call to Action */} 
             <div>
               <label htmlFor="callToAction" className="block text-sm font-medium mb-1">
-                Botão de Ação (Call to Action)
+                Botão de Ação (Call to Action) *
               </label>
               <select
                 id="callToAction"
                 value={callToAction}
                 onChange={(e) => setCallToAction(e.target.value)}
-                className="w-full p-2 border rounded-md"
+                className="w-full p-2 border rounded-md bg-white"
+                required
+                disabled={!isMetaConnected}
               >
                 {ctaOptions.map(option => (
                   <option key={option.value} value={option.value}>
@@ -552,72 +657,52 @@ const CampanhaManual = () => {
                 ))}
               </select>
             </div>
-            
-            {/* Link do Cardápio */}
+
+            {/* Link de Destino */} 
             <div>
               <label htmlFor="linkCardapio" className="block text-sm font-medium mb-1">
-                Link do Cardápio
+                Link de Destino (Ex: Cardápio, Site) *
               </label>
               <input
                 id="linkCardapio"
-                type="text"
+                type="url"
                 value={linkCardapio}
                 onChange={(e) => setLinkCardapio(e.target.value)}
                 placeholder="https://seurestaurante.com/cardapio"
                 className="w-full p-2 border rounded-md"
+                required
+                disabled={!isMetaConnected}
               />
             </div>
-            
-            {/* Link da Publicação (visível apenas quando tipoAnuncio === 'post') */}
-            {tipoAnuncio === 'post' && (
-              <div>
-                <label htmlFor="linkPublicacao" className="block text-sm font-medium mb-1">
-                  Link da Publicação
-                </label>
-                <input
-                  id="linkPublicacao"
-                  type="text"
-                  value={linkPublicacao}
-                  onChange={(e) => setLinkPublicacao(e.target.value)}
-                  placeholder="https://facebook.com/suapagina/posts/123..."
-                  className="w-full p-2 border rounded-md"
-                />
-              </div>
-            )}
+
           </div>
         </div>
 
-        {/* Mensagem de erro */}
+        {/* Mensagem de erro */} 
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+          <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
             {error}
           </div>
         )}
 
-        {/* Botão de Envio */}
-        <button 
-          type="submit" 
-          className="w-full py-3 bg-blue-600 text-white rounded-md font-medium"
-          disabled={loading}
+        {/* Botão de Envio */} 
+        <button
+          type="submit"
+          className={`w-full py-3 text-white rounded-md font-medium ${isMetaConnected && !loading ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'}`}
+          disabled={!isMetaConnected || loading}
         >
-          {loading ? 'Processando...' : 'Criar Anúncio no Meta Ads'}
+          {loading ? (
+             <div className="flex items-center justify-center">
+               <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+               Processando...
+             </div>
+          ) : 'Criar Campanha de Tráfego'}
         </button>
 
-        {/* Mensagem de sucesso */}
-        {success && (
-          <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-md">
-            Anúncio criado com sucesso! Verifique a seção de produtos anunciados abaixo.
-            <button 
-              onClick={handleCloseSuccess}
-              className="ml-2 text-sm underline"
-            >
-              Fechar
-            </button>
-          </div>
-        )}
       </form>
     </div>
   );
 };
 
 export default CampanhaManual;
+
