@@ -102,6 +102,7 @@ const CampanhaManual = () => {
   const [tituloAnuncio, setTituloAnuncio] = useState('');
   const [descricaoAnuncio, setDescricaoAnuncio] = useState('');
   const [callToAction, setCallToAction] = useState('LEARN_MORE');
+  const [objective, setObjective] = useState('LINK_CLICKS'); // Novo estado para o objetivo da campanha
   const [imagem, setImagem] = useState(null);
   const [imagemPreview, setImagemPreview] = useState('');
   const [tipoAnuncio, setTipoAnuncio] = useState('imagem'); // Alterado para 'imagem' como padrão
@@ -361,6 +362,7 @@ const CampanhaManual = () => {
     setTituloAnuncio('');
     setDescricaoAnuncio('');
     setCallToAction('LEARN_MORE');
+    setObjective('LINK_CLICKS'); // Limpar o objetivo para o valor padrão
     handleClearImage();
   };
 
@@ -385,7 +387,7 @@ const CampanhaManual = () => {
        toast({ title: "Erro", description: "Selecione uma Página do Facebook.", variant: "destructive" });
       return;
     }
-    if (!nomeCampanha || !orcamento || !dataInicio || !descricaoAnuncio || !callToAction) {
+    if (!nomeCampanha || !orcamento || !dataInicio || !descricaoAnuncio || !callToAction || !objective) {
       setError('Preencha todos os campos obrigatórios (*).');
       toast({ title: "Erro", description: "Preencha todos os campos obrigatórios (*).", variant: "destructive" });
       return;
@@ -439,7 +441,8 @@ const CampanhaManual = () => {
         adDescription: descricaoAnuncio,
         callToAction: callToAction,
         menuUrl: linkCardapio || null,
-        adTitle: tituloAnuncio || null
+        adTitle: tituloAnuncio || null,
+        objective: objective // Adicionar o objetivo ao payload
       };
 
       if (tipoAnuncio === 'imagem') {
@@ -451,52 +454,58 @@ const CampanhaManual = () => {
         // Adicionar todos os campos comuns ao FormData
         Object.keys(commonData).forEach(key => {
           if (key === 'location') {
-            dataToSend.append('location[latitude]', commonData.location.latitude);
-            dataToSend.append('location[longitude]', commonData.location.longitude);
-            dataToSend.append('location[radius]', commonData.location.radius);
+            dataToSend.append(key, JSON.stringify(commonData[key]));
           } else if (commonData[key] !== null && commonData[key] !== undefined) {
             dataToSend.append(key, commonData[key]);
           }
         });
         
-        // Adicionar a imagem ao FormData com o nome de campo 'image'
+        // Adicionar a imagem ao FormData
         dataToSend.append('image', imagem);
-      } else {
+        
+      } else if (tipoAnuncio === 'post') {
         // Usar o endpoint para criar anúncio a partir de post existente
         endpoint = `${API_BASE_URL}/meta-ads/create-from-post`;
         headers['Content-Type'] = 'application/json';
-        dataToSend = JSON.stringify({ 
-          ...commonData, 
-          postUrl: linkPublicacao 
-        });
+        dataToSend = {
+          ...commonData,
+          postUrl: linkPublicacao
+        };
       }
 
-      console.log('Enviando dados para:', endpoint);
-
-      const response = await axios({
-        method: 'post',
-        url: endpoint,
-        data: dataToSend,
-        headers: headers
+      console.log('Enviando dados para criação de anúncio:', tipoAnuncio === 'imagem' ? 'FormData com imagem' : dataToSend);
+      
+      const response = await axios.post(endpoint, dataToSend, { headers });
+      
+      console.log('Resposta da criação de anúncio:', response.data);
+      
+      toast({ 
+        title: "Sucesso", 
+        description: "Anúncio criado com sucesso no Meta Ads!", 
+        variant: "default" 
       });
-
-      console.log('Resposta da API:', response.data);
-      toast({ title: "Sucesso!", description: response.data.message || "Campanha criada com sucesso!" });
-
-      // Limpar formulário
+      
+      // Limpar o formulário após o sucesso
       limparFormulario();
-
+      
       // Atualizar a lista de campanhas
       buscarCampanhas();
-
-      // Disparar evento de criação (para outros componentes que possam estar ouvindo)
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('campanhaCreated', { detail: response.data }));
-      }
-
+      
     } catch (error) {
-      console.error('Erro ao criar campanha:', error.response?.data || error.message);
-      const errorMsg = error.response?.data?.message || error.message || 'Erro desconhecido ao criar campanha.';
+      console.error('Erro ao criar anúncio:', error.response?.data || error.message);
+      
+      let errorMsg = 'Erro ao criar anúncio. Tente novamente mais tarde.';
+      
+      if (error.response?.data?.message) {
+        errorMsg = error.response.data.message;
+      } else if (error.response?.data?.error) {
+        errorMsg = typeof error.response.data.error === 'string' 
+          ? error.response.data.error 
+          : JSON.stringify(error.response.data.error);
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      
       setError(errorMsg);
       toast({ title: "Erro ao criar campanha", description: errorMsg, variant: "destructive" });
     } finally {
@@ -514,6 +523,16 @@ const CampanhaManual = () => {
     { value: 'SUBSCRIBE', label: 'Inscrever-se' },
     { value: 'SHOP_NOW', label: 'Comprar Agora' },
     { value: 'ORDER_NOW', label: 'Pedir Agora' }
+  ];
+
+  // Opções para o objetivo da campanha
+  const objectiveOptions = [
+    { value: 'LINK_CLICKS', label: 'Cliques no link (tráfego)' },
+    { value: 'POST_ENGAGEMENT', label: 'Engajamento em publicação' },
+    { value: 'LEAD_GENERATION', label: 'Geração de leads' },
+    { value: 'OUTCOME_TRAFFIC', label: 'Tráfego (novo)' },
+    { value: 'OUTCOME_LEADS', label: 'Leads (novo)' },
+    { value: 'CONVERSIONS', label: 'Conversões' }
   ];
 
   return (
@@ -750,6 +769,19 @@ const CampanhaManual = () => {
                   disabled={!isMetaConnected}
                 ></textarea>
               </div>
+              
+              {/* Novo campo de seleção de objetivo */}
+              <SelectInput
+                id="objective"
+                label="Objetivo da Campanha"
+                value={objective}
+                onChange={(e) => setObjective(e.target.value)}
+                options={objectiveOptions}
+                placeholder="Selecione o objetivo"
+                required
+                disabled={!isMetaConnected}
+              />
+              
               <SelectInput
                 id="callToAction"
                 label="Botão de Ação (Call to Action) *"
@@ -801,43 +833,35 @@ const CampanhaManual = () => {
             disabled={carregandoCampanhas || !isMetaConnected || !selectedAdAccount}
           >
             {carregandoCampanhas ? (
-              <>
-                <div className="animate-spin h-4 w-4 border-2 border-gray-500 border-t-transparent rounded-full mr-2"></div>
-                Atualizando...
-              </>
+              <div className="animate-spin h-4 w-4 border-2 border-gray-500 border-t-transparent rounded-full mr-2"></div>
             ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Atualizar
-              </>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
             )}
+            Atualizar
           </button>
         </div>
-
-        {carregandoCampanhas ? (
-          <div className="p-4 text-center">
-            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
-          </div>
-        ) : erroCampanhas ? (
-          <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+        
+        {erroCampanhas && (
+          <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-md mb-4">
             {erroCampanhas}
           </div>
-        ) : campanhas.length === 0 ? (
-          <div className="p-4 text-center bg-gray-50 rounded-md">
-            <p className="text-gray-500">Nenhuma campanha encontrada para esta conta.</p>
-            <p className="text-sm text-gray-400 mt-2">Crie sua primeira campanha usando o formulário acima.</p>
+        )}
+        
+        {carregandoCampanhas ? (
+          <div className="flex justify-center items-center p-8">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          </div>
+        ) : campanhas.length > 0 ? (
+          <div className="space-y-2">
+            {campanhas.map((campanha, index) => (
+              <CampanhaItem key={campanha.id || index} campanha={campanha} onVerAds={handleVerAds} />
+            ))}
           </div>
         ) : (
-          <div className="space-y-2">
-            {campanhas.map((campanha) => (
-              <CampanhaItem 
-                key={campanha.id || campanha.campaignId} 
-                campanha={campanha} 
-                onVerAds={handleVerAds} 
-              />
-            ))}
+          <div className="text-center p-8 bg-gray-50 rounded-md">
+            <p className="text-gray-500">Nenhuma campanha encontrada para esta conta.</p>
           </div>
         )}
       </div>
