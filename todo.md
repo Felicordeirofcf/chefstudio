@@ -1,34 +1,21 @@
-# Tarefas para Implementação
+# ChefStudio - Correção do Fluxo de Anúncios Meta
 
-## Fluxo de Autenticação e Integração Meta Ads
-- [x] Analisar código existente e estrutura do projeto
-- [x] Identificar rotas de autenticação no backend
-- [x] Identificar componentes de autenticação no frontend
-- [x] Modificar componente de login para redirecionar para Meta Ads após autenticação
-- [x] Garantir que o token JWT seja corretamente armazenado e utilizado
+## Tarefas
 
-## Ajustes no Dashboard
-- [x] Remover menu lateral "Planos"
-- [x] Manter navegação responsiva e funcional
-- [x] Garantir que a remoção não afete outros elementos do layout
+### Backend
+- [x] Corrigir extração do post_id a partir de diferentes formatos de URL do Facebook
+- [x] Implementar validação da existência e visibilidade da publicação
+- [x] Garantir uso correto do object_story_id no payload enviado ao Meta Ads
+- [x] Corrigir validação do campo objective para aceitar valores válidos
+- [x] Melhorar tratamento de erros e logs para diagnóstico
 
-## Simplificação da Criação Manual de Anúncios
-- [x] Simplificar formulário mantendo apenas campos essenciais
-- [x] Manter campo de link do cardápio
-- [x] Manter campo de link da publicação
-- [x] Manter mapa funcional
-- [x] Manter campo de orçamento
-- [x] Remover campos desnecessários
-- [x] Garantir que o formulário continue responsivo
+### Frontend
+- [x] Remover completamente a opção de upload de imagem do formulário
+- [x] Ajustar formulário para aceitar apenas anúncios com publicação existente
+- [x] Organizar campos conforme solicitado (obrigatórios e opcionais)
+- [x] Pré-definir objetivo da campanha como POST_ENGAGEMENT ou LINK_CLICKS
+- [x] Testar fluxo com vários formatos de URL do Facebook e Instagram
 
-## Validação e Testes
-- [ ] Testar fluxo completo de login
-- [ ] Testar redirecionamento para conexão Meta Ads
-- [ ] Testar navegação no dashboard sem o menu de planos
-- [ ] Testar criação de anúncios com o formulário simplificado
-- [ ] Verificar responsividade em diferentes tamanhos de tela
-
-## Entrega
-- [ ] Preparar arquivos para entrega
-- [ ] Documentar alterações realizadas
-- [ ] Criar instruções de uso para o cliente
+### Entrega
+- [ ] Compactar arquivos modificados mantendo estrutura de pastas
+- [ ] Enviar arquivos ao usuário
