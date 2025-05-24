@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useToast } from "../hooks/use-toast"; // Importar useToast
+import { useToast } from "../hooks/use-toast";
 
 // Componente Select reutilizável
 const SelectInput = ({ id, label, value, onChange, options, placeholder, required, disabled }) => (
@@ -94,23 +94,18 @@ const CampanhaManual = () => {
   // Estados do formulário
   const [nomeCampanha, setNomeCampanha] = useState('');
   const [orcamento, setOrcamento] = useState(70);
-  const [raioAlcance, setRaioAlcance] = useState(5);
-  const [linkCardapio, setLinkCardapio] = useState('');
   const [linkPublicacao, setLinkPublicacao] = useState('');
   const [dataInicio, setDataInicio] = useState('');
   const [dataTermino, setDataTermino] = useState('');
-  const [tituloAnuncio, setTituloAnuncio] = useState('');
-  const [descricaoAnuncio, setDescricaoAnuncio] = useState('');
   const [callToAction, setCallToAction] = useState('LEARN_MORE');
-  const [objective, setObjective] = useState('POST_ENGAGEMENT'); // Valor padrão alterado para POST_ENGAGEMENT
 
   // Estados Meta
   const [adAccountsList, setAdAccountsList] = useState([]);
   const [pagesList, setPagesList] = useState([]);
   const [selectedAdAccount, setSelectedAdAccount] = useState('');
   const [selectedPage, setSelectedPage] = useState('');
-  const [isMetaConnected, setIsMetaConnected] = useState(false); // Estado para controlar a conexão
-  const [metaLoading, setMetaLoading] = useState(true); // Estado para carregamento dos dados Meta
+  const [isMetaConnected, setIsMetaConnected] = useState(false);
+  const [metaLoading, setMetaLoading] = useState(true);
 
   // Estados para listagem de campanhas
   const [campanhas, setCampanhas] = useState([]);
@@ -126,9 +121,6 @@ const CampanhaManual = () => {
   // Estados de controle
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
-  // Estado para controle de campos avançados
-  const [mostrarCamposAvancados, setMostrarCamposAvancados] = useState(false);
 
   // Definir data de início padrão
   useEffect(() => {
@@ -155,14 +147,12 @@ const CampanhaManual = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        // *** CORREÇÃO: Usar os nomes corretos retornados pela API ***
         const { isConnected, adAccounts, metaPages } = response.data;
         console.log("Resposta de /api/meta/connection-status:", response.data);
 
-        setIsMetaConnected(isConnected); // isConnected já é boolean
+        setIsMetaConnected(isConnected);
 
         if (isConnected) {
-          // *** CORREÇÃO: Usar 'adAccounts' e 'metaPages' ***
           if (adAccounts && adAccounts.length > 0) {
             setAdAccountsList(adAccounts.map(acc => ({ value: acc.id, label: `${acc.name} (${acc.id})` })));
             if (!selectedAdAccount || !adAccounts.some(acc => acc.id === selectedAdAccount)) {
@@ -264,7 +254,7 @@ const CampanhaManual = () => {
           color: 'blue',
           fillColor: '#30f',
           fillOpacity: 0.2,
-          radius: raioAlcance * 1000
+          radius: 10 * 1000 // Raio fixo de 10km
         }).addTo(mapInstance);
 
         setMap(mapInstance);
@@ -310,13 +300,6 @@ const CampanhaManual = () => {
     };
   }, []);
 
-  // Atualizar o raio do círculo
-  useEffect(() => {
-    if (circle) {
-      circle.setRadius(raioAlcance * 1000);
-    }
-  }, [raioAlcance, circle]);
-
   // Função para abrir o anúncio no Ads Manager
   const handleVerAds = (campanha) => {
     // URL do Ads Manager com o ID da campanha
@@ -328,14 +311,10 @@ const CampanhaManual = () => {
   const limparFormulario = () => {
     setNomeCampanha('');
     setOrcamento(70);
-    setLinkCardapio('');
     setLinkPublicacao('');
     setDataInicio(new Date().toISOString().split('T')[0]);
     setDataTermino('');
-    setTituloAnuncio('');
-    setDescricaoAnuncio('');
     setCallToAction('LEARN_MORE');
-    setObjective('POST_ENGAGEMENT'); // Limpar o objetivo para o valor padrão
   };
 
   // Função para criar a campanha
@@ -359,7 +338,7 @@ const CampanhaManual = () => {
        toast({ title: "Erro", description: "Selecione uma Página do Facebook.", variant: "destructive" });
       return;
     }
-    if (!nomeCampanha || !orcamento || !dataInicio || !linkPublicacao || !callToAction) {
+    if (!nomeCampanha || !orcamento || !linkPublicacao || !callToAction) {
       setError('Preencha todos os campos obrigatórios (*).');
       toast({ title: "Erro", description: "Preencha todos os campos obrigatórios (*).", variant: "destructive" });
       return;
@@ -397,14 +376,11 @@ const CampanhaManual = () => {
         location: {
           latitude: currentLocation.lat,
           longitude: currentLocation.lng,
-          radius: parseInt(raioAlcance)
+          radius: 10 // Raio fixo de 10km
         },
         postUrl: linkPublicacao,
-        callToAction: callToAction,
-        menuUrl: linkCardapio || null,
-        adTitle: tituloAnuncio || null,
-        adDescription: descricaoAnuncio || null,
-        objective: objective
+        callToAction: callToAction
+        // Não enviamos objective, será definido no backend
       };
 
       console.log('Enviando dados para criação de anúncio:', dataToSend);
@@ -449,24 +425,12 @@ const CampanhaManual = () => {
 
   const ctaOptions = [
     { value: 'LEARN_MORE', label: 'Saiba Mais' },
+    { value: 'MESSAGE_PAGE', label: 'Enviar Mensagem' },
+    { value: 'SHOP_NOW', label: 'Comprar Agora' },
     { value: 'BOOK_TRAVEL', label: 'Reservar' },
     { value: 'CONTACT_US', label: 'Entre em Contato' },
-    { value: 'DOWNLOAD', label: 'Baixar' },
-    { value: 'GET_QUOTE', label: 'Pedir Orçamento' },
     { value: 'SIGN_UP', label: 'Cadastre-se' },
-    { value: 'SUBSCRIBE', label: 'Inscrever-se' },
-    { value: 'SHOP_NOW', label: 'Comprar Agora' },
-    { value: 'ORDER_NOW', label: 'Pedir Agora' }
-  ];
-
-  // Opções para o objetivo da campanha
-  const objectiveOptions = [
-    { value: 'POST_ENGAGEMENT', label: 'Engajamento em publicação' },
-    { value: 'LINK_CLICKS', label: 'Cliques no link (tráfego)' },
-    { value: 'LEAD_GENERATION', label: 'Geração de leads' },
-    { value: 'OUTCOME_TRAFFIC', label: 'Tráfego (novo)' },
-    { value: 'OUTCOME_LEADS', label: 'Leads (novo)' },
-    { value: 'CONVERSIONS', label: 'Conversões' }
+    { value: 'GET_OFFER', label: 'Ver Oferta' }
   ];
 
   return (
@@ -475,10 +439,10 @@ const CampanhaManual = () => {
       <div className="bg-white p-6 rounded-lg shadow">
         <form onSubmit={handleSubmit} className="space-y-6">
           <h2 className="text-xl font-semibold">
-            Criar Anúncio Manualmente
+            Criar Anúncio
           </h2>
           <p className="text-sm text-gray-500">
-            Configure sua campanha de tráfego com as opções recomendadas pelo Meta Ads.
+            Impulsione uma publicação existente do Facebook ou Instagram.
           </p>
 
           {metaLoading && (
@@ -497,31 +461,45 @@ const CampanhaManual = () => {
              </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             <SelectInput
-               id="adAccount"
-               label="Conta de Anúncios Meta"
-               value={selectedAdAccount}
-               onChange={(e) => setSelectedAdAccount(e.target.value)}
-               options={adAccountsList}
-               placeholder={metaLoading ? "Carregando..." : "Selecione a Conta"}
-               required
-               disabled={metaLoading || !isMetaConnected || adAccountsList.length === 0}
-             />
-             <SelectInput
-               id="facebookPage"
-               label="Página do Facebook"
-               value={selectedPage}
-               onChange={(e) => setSelectedPage(e.target.value)}
-               options={pagesList}
-               placeholder={metaLoading ? "Carregando..." : "Selecione a Página"}
-               required
-               disabled={metaLoading || !isMetaConnected || pagesList.length === 0}
-             />
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
+              <div
+                id="map-container"
+                className="relative h-[300px] bg-gray-100 rounded-md overflow-hidden border"
+                style={{ width: '100%', height: '300px' }}
+              >
+                {!mapLoaded && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <SelectInput
+                  id="adAccount"
+                  label="Conta de Anúncios Meta"
+                  value={selectedAdAccount}
+                  onChange={(e) => setSelectedAdAccount(e.target.value)}
+                  options={adAccountsList}
+                  placeholder={metaLoading ? "Carregando..." : "Selecione a Conta"}
+                  required
+                  disabled={metaLoading || !isMetaConnected || adAccountsList.length === 0}
+                />
+                <SelectInput
+                  id="facebookPage"
+                  label="Página do Facebook"
+                  value={selectedPage}
+                  onChange={(e) => setSelectedPage(e.target.value)}
+                  options={pagesList}
+                  placeholder={metaLoading ? "Carregando..." : "Selecione a Página"}
+                  required
+                  disabled={metaLoading || !isMetaConnected || pagesList.length === 0}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
               <div>
                 <label htmlFor="nomeCampanha" className="block text-sm font-medium mb-1">Nome da Campanha *</label>
                 <input
@@ -535,8 +513,8 @@ const CampanhaManual = () => {
                 />
               </div>
               
-              <div className="mt-4">
-                <label htmlFor="orcamento" className="block text-sm font-medium mb-1">Orçamento Semanal (R$) *</label>
+              <div>
+                <label htmlFor="orcamento" className="block text-sm font-medium mb-1">Valor a Investir (R$) *</label>
                 <input
                   type="number"
                   id="orcamento"
@@ -547,23 +525,10 @@ const CampanhaManual = () => {
                   required
                   disabled={!isMetaConnected}
                 />
-                <p className="text-xs text-gray-500 mt-1">Mínimo recomendado: R$70.</p>
+                <p className="text-xs text-gray-500 mt-1">Mínimo recomendado: R$70 por semana.</p>
               </div>
               
-              <div className="mt-4">
-                <label htmlFor="dataInicio" className="block text-sm font-medium mb-1">Data de Início *</label>
-                <input
-                  type="date"
-                  id="dataInicio"
-                  value={dataInicio}
-                  onChange={(e) => setDataInicio(e.target.value)}
-                  className="w-full p-2 border rounded-md"
-                  required
-                  disabled={!isMetaConnected}
-                />
-              </div>
-              
-              <div className="mt-4">
+              <div>
                 <label htmlFor="linkPublicacao" className="block text-sm font-medium mb-1">Link da Publicação Existente *</label>
                 <input
                   type="url"
@@ -577,140 +542,44 @@ const CampanhaManual = () => {
                 />
               </div>
               
-              <div className="mt-4">
-                <SelectInput
-                  id="callToAction"
-                  label="Botão de Ação (Call to Action) *"
-                  value={callToAction}
-                  onChange={(e) => setCallToAction(e.target.value)}
-                  options={ctaOptions}
-                  placeholder="Selecione o CTA"
-                  required
+              <SelectInput
+                id="callToAction"
+                label="Botão de Ação *"
+                value={callToAction}
+                onChange={(e) => setCallToAction(e.target.value)}
+                options={ctaOptions}
+                placeholder="Selecione o botão"
+                required
+                disabled={!isMetaConnected}
+              />
+              
+              <div>
+                <label htmlFor="dataTermino" className="block text-sm font-medium mb-1">Data de Término (opcional)</label>
+                <input
+                  type="date"
+                  id="dataTermino"
+                  value={dataTermino}
+                  onChange={(e) => setDataTermino(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  min={dataInicio}
                   disabled={!isMetaConnected}
                 />
               </div>
-            </div>
-
-            <div className="space-y-4">
-              <div
-                id="map-container"
-                className="relative h-[300px] bg-gray-100 rounded-md overflow-hidden border"
-                style={{ width: '100%', height: '300px' }}
-              >
-                {!mapLoaded && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-                  </div>
-                )}
+              
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  className="w-full px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading || metaLoading || !isMetaConnected}
+                >
+                  {loading ? (
+                    <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mx-auto"></div>
+                  ) : (
+                    'Criar Anúncio'
+                  )}
+                </button>
               </div>
-              
-              <button 
-                type="button" 
-                onClick={() => setMostrarCamposAvancados(!mostrarCamposAvancados)}
-                className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
-              >
-                {mostrarCamposAvancados ? 'Ocultar configurações avançadas' : 'Mostrar configurações avançadas'}
-                <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ml-1 transition-transform ${mostrarCamposAvancados ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              
-              {mostrarCamposAvancados && (
-                <div className="space-y-4 border-t pt-4 mt-2">
-                  <div>
-                    <label htmlFor="dataTermino" className="block text-sm font-medium mb-1">Data de Término (opcional)</label>
-                    <input
-                      type="date"
-                      id="dataTermino"
-                      value={dataTermino}
-                      onChange={(e) => setDataTermino(e.target.value)}
-                      className="w-full p-2 border rounded-md"
-                      min={dataInicio}
-                      disabled={!isMetaConnected}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="tituloAnuncio" className="block text-sm font-medium mb-1">Título do Anúncio (opcional)</label>
-                    <input
-                      type="text"
-                      id="tituloAnuncio"
-                      value={tituloAnuncio}
-                      onChange={(e) => setTituloAnuncio(e.target.value)}
-                      className="w-full p-2 border rounded-md"
-                      disabled={!isMetaConnected}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="descricaoAnuncio" className="block text-sm font-medium mb-1">Descrição do Anúncio (opcional)</label>
-                    <textarea
-                      id="descricaoAnuncio"
-                      value={descricaoAnuncio}
-                      onChange={(e) => setDescricaoAnuncio(e.target.value)}
-                      className="w-full p-2 border rounded-md"
-                      rows="3"
-                      placeholder="Ex: Venha experimentar nossos pratos especiais com 20% de desconto!"
-                      disabled={!isMetaConnected}
-                    ></textarea>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="raioAlcanceSlider" className="block mb-2 text-sm font-medium">
-                      Raio de Alcance ({raioAlcance} Km)
-                    </label>
-                    <input
-                      id="raioAlcanceSlider"
-                      type="range"
-                      min="1"
-                      max="50"
-                      value={raioAlcance}
-                      onChange={(e) => setRaioAlcance(parseInt(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-                      disabled={!isMetaConnected}
-                    />
-                  </div>
-                  
-                  <SelectInput
-                    id="objective"
-                    label="Objetivo da Campanha"
-                    value={objective}
-                    onChange={(e) => setObjective(e.target.value)}
-                    options={objectiveOptions}
-                    placeholder="Selecione o objetivo"
-                    required
-                    disabled={!isMetaConnected}
-                  />
-                  
-                  <div>
-                    <label htmlFor="linkCardapio" className="block text-sm font-medium mb-1">Link de Destino (opcional)</label>
-                    <input
-                      type="url"
-                      id="linkCardapio"
-                      value={linkCardapio}
-                      onChange={(e) => setLinkCardapio(e.target.value)}
-                      className="w-full p-2 border rounded-md"
-                      placeholder="https://seurestaurante.com/cardapio"
-                      disabled={!isMetaConnected}
-                    />
-                  </div>
-                </div>
-              )}
             </div>
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading || metaLoading || !isMetaConnected}
-            >
-              {loading ? (
-                <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mx-auto"></div>
-              ) : (
-                'Criar Anúncio no Meta Ads'
-              )}
-            </button>
           </div>
         </form>
       </div>

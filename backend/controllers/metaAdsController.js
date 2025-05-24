@@ -49,8 +49,8 @@ const VALID_CTA_TYPES = [
     'SUBSCRIBE'
 ];
 
-// Objetivo padrão para campanhas de tráfego
-const DEFAULT_TRAFFIC_OBJECTIVE = 'LINK_CLICKS';
+// Objetivo padrão para campanhas de tráfego - FIXADO para OUTCOME_TRAFFIC
+const DEFAULT_TRAFFIC_OBJECTIVE = 'OUTCOME_TRAFFIC';
 
 // CTA padrão
 const DEFAULT_CTA = 'LEARN_MORE';
@@ -109,14 +109,9 @@ const createCampaign = async (userAccessToken, adAccountId, campaignData) => {
     try {
         console.log(`Criando campanha real no Meta Ads para conta ${adAccountId}`);
         
-        // Validar o objetivo da campanha
-        let objective = campaignData.objective || DEFAULT_TRAFFIC_OBJECTIVE;
-        if (!isValidObjective(objective)) {
-            console.error(`Objetivo inválido: ${objective}. Usando objetivo padrão: ${DEFAULT_TRAFFIC_OBJECTIVE}`);
-            objective = DEFAULT_TRAFFIC_OBJECTIVE;
-        }
-        
-        console.log(`Usando objetivo: ${objective}`);
+        // Sempre usar o objetivo fixo OUTCOME_TRAFFIC, ignorando qualquer valor recebido
+        const objective = DEFAULT_TRAFFIC_OBJECTIVE;
+        console.log(`Usando objetivo fixo: ${objective}`);
         
         const response = await axios.post(
             `${META_API_BASE_URL}/${adAccountId}/campaigns`,
@@ -308,7 +303,8 @@ const createAdCreative = async (userAccessToken, adAccountId, pageId, creativeDa
         
         // Validar message (texto do anúncio)
         if (!creativeData.adDescription && !creativeData.message) {
-            throw new Error('Texto do anúncio (message/adDescription) é obrigatório');
+            // Não exigir texto do anúncio, usar o texto da publicação existente
+            console.log('Nenhum texto de anúncio fornecido, usando texto da publicação existente.');
         }
         
         // Usar message ou adDescription, priorizando message se ambos estiverem presentes
@@ -431,9 +427,9 @@ const createFromImage = async (req, res) => {
         console.log('Corpo da requisição (req.body):', req.body);
         console.log('Arquivo recebido (req.file):', req.file ? {
             originalname: req.file.originalname,
+            path: req.file.path,
             mimetype: req.file.mimetype,
-            size: req.file.size,
-            path: req.file.path
+            size: req.file.size
         } : 'Nenhum arquivo recebido');
 
         // Verificar se o usuário está autenticado
@@ -459,13 +455,13 @@ const createFromImage = async (req, res) => {
             weeklyBudget,
             startDate,
             endDate,
+            adTitle,
             adDescription,
             message,
-            adTitle,
             callToAction,
             menuUrl,
-            objective,
-            image_url
+            image_url,
+            objective // Ignorado, será usado o valor fixo
         } = req.body;
 
         // Log detalhado dos campos recebidos
@@ -476,24 +472,22 @@ const createFromImage = async (req, res) => {
             weeklyBudget,
             startDate,
             endDate,
-            adDescription: adDescription ? `${adDescription.substring(0, 20)}...` : null,
-            message: message ? `${message.substring(0, 20)}...` : null,
             adTitle,
+            adDescription,
+            message,
             callToAction,
             menuUrl,
-            objective,
-            image_url
+            image_url,
+            objective
         });
 
         // Verificar campos obrigatórios
         const camposObrigatorios = {
-            imagem: !!req.file || !!image_url,
             adAccountId: !!adAccountId,
             pageId: !!pageId,
             campaignName: !!campaignName,
             weeklyBudget: !!weeklyBudget,
-            startDate: !!startDate,
-            message: !!(message || adDescription)
+            startDate: !!startDate
         };
         
         console.log('Validação de campos obrigatórios:', camposObrigatorios);
@@ -515,15 +509,6 @@ const createFromImage = async (req, res) => {
             return res.status(400).json({ 
                 message: 'Campos obrigatórios não preenchidos', 
                 camposFaltantes 
-            });
-        }
-        
-        // Validar objetivo da campanha se fornecido
-        if (objective && !isValidObjective(objective)) {
-            console.error('❌ Erro: Objetivo inválido:', objective);
-            return res.status(400).json({ 
-                message: `Objetivo inválido: ${objective}. Valores válidos: ${VALID_OBJECTIVES.join(', ')}`,
-                objetivosValidos: VALID_OBJECTIVES
             });
         }
         
@@ -581,8 +566,8 @@ const createFromImage = async (req, res) => {
         // Criar campanha, ad set, criativo e anúncio em sequência usando o token do usuário
         console.log('Iniciando criação de campanha...');
         const campaignResult = await createCampaign(userAccessToken, adAccountId, {
-            name: campaignName,
-            objective: objective || DEFAULT_TRAFFIC_OBJECTIVE
+            name: campaignName
+            // Não passamos objective, será usado o valor fixo DEFAULT_TRAFFIC_OBJECTIVE
         });
 
         console.log('Iniciando criação de ad set...');
@@ -633,7 +618,7 @@ const createFromImage = async (req, res) => {
             creativeId: creativeResult.id,
             createdAt: new Date(),
             type: 'image',
-            objective: objective || DEFAULT_TRAFFIC_OBJECTIVE
+            objective: DEFAULT_TRAFFIC_OBJECTIVE // Usar o objetivo fixo
         };
 
         // Armazenar a campanha em memória (backup local)
@@ -716,8 +701,7 @@ const createFromPost = async (req, res) => {
             endDate,
             postUrl,
             callToAction,
-            menuUrl,
-            objective
+            objective // Ignorado, será usado o valor fixo
         } = req.body;
 
         // Log detalhado dos campos recebidos
@@ -730,7 +714,6 @@ const createFromPost = async (req, res) => {
             endDate,
             postUrl,
             callToAction,
-            menuUrl,
             objective
         });
 
@@ -760,15 +743,6 @@ const createFromPost = async (req, res) => {
             return res.status(400).json({ 
                 message: 'Campos obrigatórios não preenchidos', 
                 camposFaltantes 
-            });
-        }
-        
-        // Validar objetivo da campanha se fornecido
-        if (objective && !isValidObjective(objective)) {
-            console.error('❌ Erro: Objetivo inválido:', objective);
-            return res.status(400).json({ 
-                message: `Objetivo inválido: ${objective}. Valores válidos: ${VALID_OBJECTIVES.join(', ')}`,
-                objetivosValidos: VALID_OBJECTIVES
             });
         }
         
@@ -836,6 +810,16 @@ const createFromPost = async (req, res) => {
                 // Formato: /username/photos/postid
                 postId = pathname.split('/photos/')[1].split('/')[0];
                 console.log('ID extraído do formato /photos/:', postId);
+            } else if (pathname.includes('/pfbid')) {
+                // Formato: /pagename/posts/pfbid...
+                const parts = pathname.split('/');
+                for (const part of parts) {
+                    if (part.startsWith('pfbid')) {
+                        postId = part;
+                        console.log('ID extraído do formato pfbid:', postId);
+                        break;
+                    }
+                }
             } else {
                 // Tentar extrair de outros formatos
                 const matches = postUrl.match(/\/(\d+)(?:\/|$)/g);
@@ -865,20 +849,18 @@ const createFromPost = async (req, res) => {
             
             console.log('ID da publicação extraído com sucesso:', postId);
         } catch (error) {
-            console.error('❌ Erro ao extrair ID da publicação:', error);
-            console.error('URL problemática:', postUrl);
+            console.error('❌ Erro ao extrair ID da publicação:', error.message);
             return res.status(400).json({ 
-                message: 'URL da publicação inválida ou não suportada',
-                error: error.message,
-                url: postUrl
+                message: 'URL da publicação inválida ou não suportada. Não foi possível extrair o ID da publicação.',
+                error: error.message
             });
         }
 
-        // Criar campanha, ad set, criativo e anúncio em sequência
+        // Criar campanha, ad set, criativo e anúncio em sequência usando o token do usuário
         console.log('Iniciando criação de campanha...');
         const campaignResult = await createCampaign(userAccessToken, adAccountId, {
-            name: campaignName,
-            objective: objective || DEFAULT_TRAFFIC_OBJECTIVE
+            name: campaignName
+            // Não passamos objective, será usado o valor fixo DEFAULT_TRAFFIC_OBJECTIVE
         });
 
         console.log('Iniciando criação de ad set...');
@@ -890,14 +872,11 @@ const createFromPost = async (req, res) => {
             location: location
         });
 
-        // Criar criativo usando object_story_id
-        console.log('Iniciando criação de criativo com postId:', postId);
+        console.log('Iniciando criação de criativo...');
         const creativeResult = await createAdCreative(userAccessToken, adAccountId, pageId, {
             name: campaignName,
-            postId: postId, // Passar o ID do post para usar object_story_id
-            callToAction: callToAction || DEFAULT_CTA,
-            menuUrl: menuUrl || null
-            // Não passar adDescription, adTitle aqui, pois vêm do post
+            postId: postId,
+            callToAction: callToAction || DEFAULT_CTA
         });
 
         console.log('Iniciando criação de anúncio...');
@@ -920,14 +899,13 @@ const createFromPost = async (req, res) => {
             postUrl: postUrl,
             postId: postId,
             callToAction: callToAction || DEFAULT_CTA,
-            menuUrl: menuUrl || null,
             status: 'ACTIVE',
             adSetId: adSetResult.id,
             adId: adResult.id,
             creativeId: creativeResult.id,
             createdAt: new Date(),
             type: 'post',
-            objective: objective || DEFAULT_TRAFFIC_OBJECTIVE
+            objective: DEFAULT_TRAFFIC_OBJECTIVE // Usar o objetivo fixo
         };
 
         // Armazenar a campanha em memória (backup local)
@@ -936,10 +914,10 @@ const createFromPost = async (req, res) => {
         }
         campaignsStore[adAccountId].unshift(adDetails);
 
-        console.log('✅ Anúncio criado com sucesso a partir da publicação!');
+        console.log('✅ Anúncio criado com sucesso!');
         res.status(201).json({
             success: true,
-            message: 'Anúncio criado com sucesso a partir da publicação e publicado como ACTIVE',
+            message: 'Anúncio criado com sucesso e publicado como ACTIVE',
             campaignId: adDetails.campaignId,
             adSetId: adDetails.adSetId,
             adId: adDetails.adId,
@@ -947,7 +925,7 @@ const createFromPost = async (req, res) => {
             adDetails
         });
     } catch (error) {
-        console.error('❌ Erro ao criar anúncio a partir de post:', error.response?.data || error.message);
+        console.error('❌ Erro ao criar anúncio a partir de publicação:', error.response?.data || error.message);
         if (error.response?.data) {
             console.error('Detalhes do erro:', JSON.stringify(error.response.data));
         }
@@ -963,7 +941,7 @@ const createFromPost = async (req, res) => {
         }
         
         res.status(500).json({
-            message: 'Erro ao criar anúncio a partir da publicação',
+            message: 'Erro ao criar anúncio',
             error: error.response?.data || error.message,
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
@@ -971,13 +949,12 @@ const createFromPost = async (req, res) => {
 };
 
 /**
- * Obtém as campanhas do usuário
+ * Busca campanhas do Meta Ads
  */
 const getCampaigns = async (req, res) => {
     try {
-        console.log('Buscando campanhas do Meta Ads (integração real)');
-        console.log('Query params:', req.query);
-
+        console.log('Buscando campanhas do Meta Ads');
+        
         // Verificar se o usuário está autenticado
         if (!req.user) {
             console.error('❌ Erro: Usuário não autenticado.');
@@ -989,13 +966,13 @@ const getCampaigns = async (req, res) => {
         
         if (!userAccessToken) {
             console.error('❌ Erro: Token de acesso Meta do usuário não encontrado.');
-            return res.status(401).json({ message: 'Token Meta não encontrado. Por favor, conecte sua conta Meta.' });
+            return res.status(401).json({ message: 'Usuário não autenticado ou token Meta não encontrado. Por favor, conecte sua conta Meta.' });
         }
 
         console.log('Token Meta do usuário obtido com sucesso (primeiros 10 caracteres):', userAccessToken.substring(0, 10) + '...');
 
         const { adAccountId } = req.query;
-
+        
         if (!adAccountId) {
             console.error('❌ Erro: ID da conta de anúncios não fornecido');
             return res.status(400).json({ message: 'ID da conta de anúncios (adAccountId) é obrigatório' });
