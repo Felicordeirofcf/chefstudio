@@ -102,10 +102,7 @@ const CampanhaManual = () => {
   const [tituloAnuncio, setTituloAnuncio] = useState('');
   const [descricaoAnuncio, setDescricaoAnuncio] = useState('');
   const [callToAction, setCallToAction] = useState('LEARN_MORE');
-  const [objective, setObjective] = useState('LINK_CLICKS'); // Novo estado para o objetivo da campanha
-  const [imagem, setImagem] = useState(null);
-  const [imagemPreview, setImagemPreview] = useState('');
-  const [tipoAnuncio, setTipoAnuncio] = useState('imagem'); // Alterado para 'imagem' como padrão
+  const [objective, setObjective] = useState('POST_ENGAGEMENT'); // Valor padrão alterado para POST_ENGAGEMENT
 
   // Estados Meta
   const [adAccountsList, setAdAccountsList] = useState([]);
@@ -120,8 +117,6 @@ const CampanhaManual = () => {
   const [carregandoCampanhas, setCarregandoCampanhas] = useState(false);
   const [erroCampanhas, setErroCampanhas] = useState(null);
 
-  const fileInputRef = useRef(null);
-
   // Estados do mapa
   const [mapLoaded, setMapLoaded] = useState(false);
   const [map, setMap] = useState(null);
@@ -131,6 +126,9 @@ const CampanhaManual = () => {
   // Estados de controle
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Estado para controle de campos avançados
+  const [mostrarCamposAvancados, setMostrarCamposAvancados] = useState(false);
 
   // Definir data de início padrão
   useEffect(() => {
@@ -319,31 +317,6 @@ const CampanhaManual = () => {
     }
   }, [raioAlcance, circle]);
 
-  // Lidar com a seleção de imagem
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast({ title: "Erro", description: "A imagem excede o limite de 5MB.", variant: "destructive" });
-        return;
-      }
-      setImagem(file);
-      setTipoAnuncio('imagem');
-      const reader = new FileReader();
-      reader.onloadend = () => setImagemPreview(reader.result);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Limpar a imagem selecionada
-  const handleClearImage = () => {
-    setImagem(null);
-    setImagemPreview('');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
   // Função para abrir o anúncio no Ads Manager
   const handleVerAds = (campanha) => {
     // URL do Ads Manager com o ID da campanha
@@ -362,8 +335,7 @@ const CampanhaManual = () => {
     setTituloAnuncio('');
     setDescricaoAnuncio('');
     setCallToAction('LEARN_MORE');
-    setObjective('LINK_CLICKS'); // Limpar o objetivo para o valor padrão
-    handleClearImage();
+    setObjective('POST_ENGAGEMENT'); // Limpar o objetivo para o valor padrão
   };
 
   // Função para criar a campanha
@@ -387,19 +359,9 @@ const CampanhaManual = () => {
        toast({ title: "Erro", description: "Selecione uma Página do Facebook.", variant: "destructive" });
       return;
     }
-    if (!nomeCampanha || !orcamento || !dataInicio || !descricaoAnuncio || !callToAction || !objective) {
+    if (!nomeCampanha || !orcamento || !dataInicio || !linkPublicacao || !callToAction) {
       setError('Preencha todos os campos obrigatórios (*).');
       toast({ title: "Erro", description: "Preencha todos os campos obrigatórios (*).", variant: "destructive" });
-      return;
-    }
-    if (tipoAnuncio === 'post' && !linkPublicacao) {
-      setError('Forneça o link da publicação existente.');
-      toast({ title: "Erro", description: "Forneça o link da publicação existente.", variant: "destructive" });
-      return;
-    }
-    if (tipoAnuncio === 'imagem' && !imagem) {
-      setError('Selecione uma imagem para o anúncio.');
-      toast({ title: "Erro", description: "Selecione uma imagem para o anúncio.", variant: "destructive" });
       return;
     }
     if (dataTermino && new Date(dataTermino) <= new Date(dataInicio)) {
@@ -418,15 +380,14 @@ const CampanhaManual = () => {
 
       const API_BASE_URL = "https://chefstudio-production.up.railway.app/api";
       
-      // Escolher o endpoint correto com base no tipo de anúncio
-      let endpoint;
-      let dataToSend;
-      let headers = {
+      // Usar o endpoint para criar anúncio a partir de publicação existente
+      const endpoint = `${API_BASE_URL}/meta-ads/create-from-post`;
+      const headers = {
         'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
+        'Content-Type': 'application/json'
       };
 
-      const commonData = {
+      const dataToSend = {
         adAccountId: selectedAdAccount,
         pageId: selectedPage,
         campaignName: nomeCampanha,
@@ -438,63 +399,36 @@ const CampanhaManual = () => {
           longitude: currentLocation.lng,
           radius: parseInt(raioAlcance)
         },
-        adDescription: descricaoAnuncio,
+        postUrl: linkPublicacao,
         callToAction: callToAction,
         menuUrl: linkCardapio || null,
         adTitle: tituloAnuncio || null,
-        objective: objective // Adicionar o objetivo ao payload
+        adDescription: descricaoAnuncio || null,
+        objective: objective
       };
 
-      if (tipoAnuncio === 'imagem') {
-        // Usar o endpoint para criar anúncio a partir de imagem
-        endpoint = `${API_BASE_URL}/meta-ads/create-from-image`;
-        headers['Content-Type'] = 'multipart/form-data';
-        dataToSend = new FormData();
-        
-        // Adicionar todos os campos comuns ao FormData
-        Object.keys(commonData).forEach(key => {
-          if (key === 'location') {
-            dataToSend.append(key, JSON.stringify(commonData[key]));
-          } else if (commonData[key] !== null && commonData[key] !== undefined) {
-            dataToSend.append(key, commonData[key]);
-          }
-        });
-        
-        // Adicionar a imagem ao FormData
-        dataToSend.append('image', imagem);
-        
-      } else if (tipoAnuncio === 'post') {
-        // Usar o endpoint para criar anúncio a partir de post existente
-        endpoint = `${API_BASE_URL}/meta-ads/create-from-post`;
-        headers['Content-Type'] = 'application/json';
-        dataToSend = {
-          ...commonData,
-          postUrl: linkPublicacao
-        };
-      }
-
-      console.log('Enviando dados para criação de anúncio:', tipoAnuncio === 'imagem' ? 'FormData com imagem' : dataToSend);
-      
+      console.log('Enviando dados para criação de anúncio:', dataToSend);
       const response = await axios.post(endpoint, dataToSend, { headers });
-      
+
       console.log('Resposta da criação de anúncio:', response.data);
       
+      // Adicionar a campanha à lista local
+      if (response.data.adDetails) {
+        setCampanhas(prev => [response.data.adDetails, ...prev]);
+      }
+      
       toast({ 
-        title: "Sucesso", 
-        description: "Anúncio criado com sucesso no Meta Ads!", 
-        variant: "default" 
+        title: "Sucesso!", 
+        description: "Anúncio criado com sucesso e publicado como ACTIVE", 
       });
       
-      // Limpar o formulário após o sucesso
+      // Limpar o formulário após sucesso
       limparFormulario();
       
-      // Atualizar a lista de campanhas
-      buscarCampanhas();
-      
     } catch (error) {
-      console.error('Erro ao criar anúncio:', error.response?.data || error.message);
+      console.error('Erro ao criar anúncio:', error);
       
-      let errorMsg = 'Erro ao criar anúncio. Tente novamente mais tarde.';
+      let errorMsg = 'Erro ao criar anúncio. Tente novamente.';
       
       if (error.response?.data?.message) {
         errorMsg = error.response.data.message;
@@ -527,8 +461,8 @@ const CampanhaManual = () => {
 
   // Opções para o objetivo da campanha
   const objectiveOptions = [
-    { value: 'LINK_CLICKS', label: 'Cliques no link (tráfego)' },
     { value: 'POST_ENGAGEMENT', label: 'Engajamento em publicação' },
+    { value: 'LINK_CLICKS', label: 'Cliques no link (tráfego)' },
     { value: 'LEAD_GENERATION', label: 'Geração de leads' },
     { value: 'OUTCOME_TRAFFIC', label: 'Tráfego (novo)' },
     { value: 'OUTCOME_LEADS', label: 'Leads (novo)' },
@@ -588,35 +522,6 @@ const CampanhaManual = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <div
-                id="map-container"
-                className="relative h-[300px] bg-gray-100 rounded-md overflow-hidden border"
-                style={{ width: '100%', height: '300px' }}
-              >
-                {!mapLoaded && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-                  </div>
-                )}
-              </div>
-              <div className="mt-4">
-                <label htmlFor="raioAlcanceSlider" className="block mb-2 text-sm font-medium">
-                  Raio de Alcance ({raioAlcance} Km)
-                </label>
-                <input
-                  id="raioAlcanceSlider"
-                  type="range"
-                  min="1"
-                  max="50" // Ajustado para máximo de 50km conforme solicitado
-                  value={raioAlcance}
-                  onChange={(e) => setRaioAlcance(parseInt(e.target.value))}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-                  disabled={!isMetaConnected}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-4">
               <div>
                 <label htmlFor="nomeCampanha" className="block text-sm font-medium mb-1">Nome da Campanha *</label>
                 <input
@@ -629,7 +534,8 @@ const CampanhaManual = () => {
                   disabled={!isMetaConnected}
                 />
               </div>
-              <div>
+              
+              <div className="mt-4">
                 <label htmlFor="orcamento" className="block text-sm font-medium mb-1">Orçamento Semanal (R$) *</label>
                 <input
                   type="number"
@@ -643,167 +549,153 @@ const CampanhaManual = () => {
                 />
                 <p className="text-xs text-gray-500 mt-1">Mínimo recomendado: R$70.</p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="dataInicio" className="block text-sm font-medium mb-1">Data de Início *</label>
-                  <input
-                    type="date"
-                    id="dataInicio"
-                    value={dataInicio}
-                    onChange={(e) => setDataInicio(e.target.value)}
-                    className="w-full p-2 border rounded-md"
-                    required
-                    disabled={!isMetaConnected}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="dataTermino" className="block text-sm font-medium mb-1">Data de Término (opcional)</label>
-                  <input
-                    type="date"
-                    id="dataTermino"
-                    value={dataTermino}
-                    onChange={(e) => setDataTermino(e.target.value)}
-                    className="w-full p-2 border rounded-md"
-                    min={dataInicio}
-                    disabled={!isMetaConnected}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <span className="block text-sm font-medium mb-1">Tipo de Anúncio *</span>
-                <div className="flex items-center space-x-4">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="tipoAnuncio"
-                      value="imagem"
-                      checked={tipoAnuncio === 'imagem'}
-                      onChange={() => { setTipoAnuncio('imagem'); setLinkPublicacao(''); }}
-                      className="mr-2"
-                      disabled={!isMetaConnected}
-                    />
-                    Upload de Imagem
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="tipoAnuncio"
-                      value="post"
-                      checked={tipoAnuncio === 'post'}
-                      onChange={() => { setTipoAnuncio('post'); handleClearImage(); }}
-                      className="mr-2"
-                      disabled={!isMetaConnected}
-                    />
-                    Publicação Existente
-                  </label>
-                </div>
-              </div>
-
-              {tipoAnuncio === 'imagem' && (
-                <div>
-                  <label htmlFor="imagem" className="block text-sm font-medium mb-1">Imagem para o Anúncio *</label>
-                  <input
-                    type="file"
-                    id="imagem"
-                    ref={fileInputRef}
-                    onChange={handleImageChange}
-                    accept="image/png, image/jpeg, image/gif"
-                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                    required
-                    disabled={!isMetaConnected}
-                  />
-                  {imagemPreview && (
-                    <div className="mt-2 relative w-32 h-32 border rounded overflow-hidden">
-                      <img src={imagemPreview} alt="Preview" className="object-cover w-full h-full" />
-                      <button
-                        type="button"
-                        onClick={handleClearImage}
-                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 text-xs"
-                        aria-label="Remover imagem"
-                      >
-                        X
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
               
-              {tipoAnuncio === 'post' && (
-                <div>
-                  <label htmlFor="linkPublicacao" className="block text-sm font-medium mb-1">Link da Publicação Existente *</label>
-                  <input
-                    type="url"
-                    id="linkPublicacao"
-                    value={linkPublicacao}
-                    onChange={(e) => setLinkPublicacao(e.target.value)}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="https://www.facebook.com/pagina/posts/123..."
-                    required
-                    disabled={!isMetaConnected}
-                  />
-                </div>
-              )}
-
-              <div>
-                <label htmlFor="tituloAnuncio" className="block text-sm font-medium mb-1">Título do Anúncio (opcional)</label>
+              <div className="mt-4">
+                <label htmlFor="dataInicio" className="block text-sm font-medium mb-1">Data de Início *</label>
                 <input
-                  type="text"
-                  id="tituloAnuncio"
-                  value={tituloAnuncio}
-                  onChange={(e) => setTituloAnuncio(e.target.value)}
+                  type="date"
+                  id="dataInicio"
+                  value={dataInicio}
+                  onChange={(e) => setDataInicio(e.target.value)}
                   className="w-full p-2 border rounded-md"
-                  disabled={!isMetaConnected}
-                />
-              </div>
-              <div>
-                <label htmlFor="descricaoAnuncio" className="block text-sm font-medium mb-1">Descrição do Anúncio *</label>
-                <textarea
-                  id="descricaoAnuncio"
-                  value={descricaoAnuncio}
-                  onChange={(e) => setDescricaoAnuncio(e.target.value)}
-                  className="w-full p-2 border rounded-md"
-                  rows="3"
-                  placeholder="Ex: Venha experimentar nossos pratos especiais com 20% de desconto!"
                   required
                   disabled={!isMetaConnected}
-                ></textarea>
+                />
               </div>
               
-              {/* Novo campo de seleção de objetivo */}
-              <SelectInput
-                id="objective"
-                label="Objetivo da Campanha"
-                value={objective}
-                onChange={(e) => setObjective(e.target.value)}
-                options={objectiveOptions}
-                placeholder="Selecione o objetivo"
-                required
-                disabled={!isMetaConnected}
-              />
-              
-              <SelectInput
-                id="callToAction"
-                label="Botão de Ação (Call to Action) *"
-                value={callToAction}
-                onChange={(e) => setCallToAction(e.target.value)}
-                options={ctaOptions}
-                placeholder="Selecione o CTA"
-                required
-                disabled={!isMetaConnected}
-              />
-              <div>
-                <label htmlFor="linkCardapio" className="block text-sm font-medium mb-1">Link de Destino (opcional)</label>
+              <div className="mt-4">
+                <label htmlFor="linkPublicacao" className="block text-sm font-medium mb-1">Link da Publicação Existente *</label>
                 <input
                   type="url"
-                  id="linkCardapio"
-                  value={linkCardapio}
-                  onChange={(e) => setLinkCardapio(e.target.value)}
+                  id="linkPublicacao"
+                  value={linkPublicacao}
+                  onChange={(e) => setLinkPublicacao(e.target.value)}
                   className="w-full p-2 border rounded-md"
-                  placeholder="https://seurestaurante.com/cardapio"
+                  placeholder="https://www.facebook.com/pagina/posts/123..."
+                  required
                   disabled={!isMetaConnected}
                 />
               </div>
+              
+              <div className="mt-4">
+                <SelectInput
+                  id="callToAction"
+                  label="Botão de Ação (Call to Action) *"
+                  value={callToAction}
+                  onChange={(e) => setCallToAction(e.target.value)}
+                  options={ctaOptions}
+                  placeholder="Selecione o CTA"
+                  required
+                  disabled={!isMetaConnected}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div
+                id="map-container"
+                className="relative h-[300px] bg-gray-100 rounded-md overflow-hidden border"
+                style={{ width: '100%', height: '300px' }}
+              >
+                {!mapLoaded && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+                  </div>
+                )}
+              </div>
+              
+              <button 
+                type="button" 
+                onClick={() => setMostrarCamposAvancados(!mostrarCamposAvancados)}
+                className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+              >
+                {mostrarCamposAvancados ? 'Ocultar configurações avançadas' : 'Mostrar configurações avançadas'}
+                <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ml-1 transition-transform ${mostrarCamposAvancados ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              {mostrarCamposAvancados && (
+                <div className="space-y-4 border-t pt-4 mt-2">
+                  <div>
+                    <label htmlFor="dataTermino" className="block text-sm font-medium mb-1">Data de Término (opcional)</label>
+                    <input
+                      type="date"
+                      id="dataTermino"
+                      value={dataTermino}
+                      onChange={(e) => setDataTermino(e.target.value)}
+                      className="w-full p-2 border rounded-md"
+                      min={dataInicio}
+                      disabled={!isMetaConnected}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="tituloAnuncio" className="block text-sm font-medium mb-1">Título do Anúncio (opcional)</label>
+                    <input
+                      type="text"
+                      id="tituloAnuncio"
+                      value={tituloAnuncio}
+                      onChange={(e) => setTituloAnuncio(e.target.value)}
+                      className="w-full p-2 border rounded-md"
+                      disabled={!isMetaConnected}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="descricaoAnuncio" className="block text-sm font-medium mb-1">Descrição do Anúncio (opcional)</label>
+                    <textarea
+                      id="descricaoAnuncio"
+                      value={descricaoAnuncio}
+                      onChange={(e) => setDescricaoAnuncio(e.target.value)}
+                      className="w-full p-2 border rounded-md"
+                      rows="3"
+                      placeholder="Ex: Venha experimentar nossos pratos especiais com 20% de desconto!"
+                      disabled={!isMetaConnected}
+                    ></textarea>
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="raioAlcanceSlider" className="block mb-2 text-sm font-medium">
+                      Raio de Alcance ({raioAlcance} Km)
+                    </label>
+                    <input
+                      id="raioAlcanceSlider"
+                      type="range"
+                      min="1"
+                      max="50"
+                      value={raioAlcance}
+                      onChange={(e) => setRaioAlcance(parseInt(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                      disabled={!isMetaConnected}
+                    />
+                  </div>
+                  
+                  <SelectInput
+                    id="objective"
+                    label="Objetivo da Campanha"
+                    value={objective}
+                    onChange={(e) => setObjective(e.target.value)}
+                    options={objectiveOptions}
+                    placeholder="Selecione o objetivo"
+                    required
+                    disabled={!isMetaConnected}
+                  />
+                  
+                  <div>
+                    <label htmlFor="linkCardapio" className="block text-sm font-medium mb-1">Link de Destino (opcional)</label>
+                    <input
+                      type="url"
+                      id="linkCardapio"
+                      value={linkCardapio}
+                      onChange={(e) => setLinkCardapio(e.target.value)}
+                      className="w-full p-2 border rounded-md"
+                      placeholder="https://seurestaurante.com/cardapio"
+                      disabled={!isMetaConnected}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
