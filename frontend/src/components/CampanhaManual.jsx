@@ -32,10 +32,21 @@ const CampanhaItem = ({ campanha, onVerAds }) => {
   // Formatar data para exibição
   const formatarData = (dataString) => {
     try {
+      if (!dataString) return 'Data não disponível';
+      
       const data = new Date(dataString);
-      return data.toLocaleDateString('pt-BR');
+      // Verificar se a data é válida
+      if (isNaN(data.getTime())) return 'Data não disponível';
+      
+      // Formatar como dd/mm/aaaa
+      return data.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
     } catch (e) {
-      return 'Data inválida';
+      console.error('Erro ao formatar data:', e);
+      return 'Data não disponível';
     }
   };
 
@@ -59,7 +70,7 @@ const CampanhaItem = ({ campanha, onVerAds }) => {
         <div>
           <h3 className="font-medium text-lg">{campanha.name}</h3>
           <div className="text-sm text-gray-500 mt-1">
-            Criada em: {formatarData(campanha.startDate)}
+            Criada em: {formatarData(campanha.startDate || campanha.created_time)}
           </div>
         </div>
         <div className="flex items-center">
@@ -83,6 +94,51 @@ const CampanhaItem = ({ campanha, onVerAds }) => {
         >
           Ver no Ads
         </button>
+      </div>
+    </div>
+  );
+};
+
+// Componente de alerta de sucesso
+const SuccessAlert = ({ message, adsUrl, onClose }) => {
+  return (
+    <div className="fixed top-4 right-4 left-4 md:left-auto md:w-96 bg-green-50 border-l-4 border-green-500 p-4 rounded shadow-lg z-50 animate-fade-in">
+      <div className="flex items-start">
+        <div className="flex-shrink-0">
+          <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+        </div>
+        <div className="ml-3 w-full">
+          <p className="text-sm font-medium text-green-800">
+            🎉 {message}
+          </p>
+          {adsUrl && (
+            <div className="mt-2">
+              <a 
+                href={adsUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              >
+                Ver no Ads Manager
+              </a>
+            </div>
+          )}
+        </div>
+        <div className="ml-auto pl-3">
+          <div className="-mx-1.5 -my-1.5">
+            <button
+              onClick={onClose}
+              className="inline-flex bg-green-50 rounded-md p-1.5 text-green-500 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              <span className="sr-only">Fechar</span>
+              <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -123,6 +179,9 @@ const CampanhaManual = () => {
   // Estados de controle
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Estado para alerta de sucesso
+  const [successAlert, setSuccessAlert] = useState(null);
 
   // Definir data de início padrão
   useEffect(() => {
@@ -301,6 +360,17 @@ const CampanhaManual = () => {
       }
     };
   }, []);
+
+  // Função para formatar data e hora
+  const formatarDataHora = (data = new Date()) => {
+    return data.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   // Função para validar o formato do link da publicação
   // Aceita APENAS links no formato facebook.com/{page_id}/posts/{post_id}
@@ -492,15 +562,31 @@ const CampanhaManual = () => {
 
       console.log('Resposta da criação de anúncio:', response.data);
       
-      // Adicionar a campanha à lista local
+      // Adicionar a campanha à lista local com data de criação
       if (response.data.adDetails) {
-        setCampanhas(prev => [response.data.adDetails, ...prev]);
+        // Garantir que a campanha tenha uma data de criação válida
+        const campanhaCriada = {
+          ...response.data.adDetails,
+          created_time: new Date().toISOString() // Adicionar data de criação atual
+        };
+        
+        setCampanhas(prev => [campanhaCriada, ...prev]);
+        
+        // Criar URL para o Ads Manager
+        const adsManagerUrl = `https://business.facebook.com/adsmanager/manage/campaigns?act=${selectedAdAccount}&selected_campaign_ids=${campanhaCriada.campaignId}`;
+        
+        // Exibir alerta de sucesso com data/hora e link para o Ads Manager
+        setSuccessAlert({
+          message: `Anúncio criado com sucesso em ${formatarDataHora()}`,
+          adsUrl: adsManagerUrl
+        });
+        
+        // Também exibir toast para feedback imediato
+        toast({ 
+          title: "Sucesso!", 
+          description: `Anúncio criado com sucesso em ${formatarDataHora()}`, 
+        });
       }
-      
-      toast({ 
-        title: "Sucesso!", 
-        description: "Anúncio criado com sucesso e publicado como ACTIVE", 
-      });
       
       // Limpar o formulário após sucesso
       limparFormulario();
@@ -549,6 +635,15 @@ const CampanhaManual = () => {
 
   return (
     <div className="w-full space-y-8">
+      {/* Alerta de sucesso */}
+      {successAlert && (
+        <SuccessAlert 
+          message={successAlert.message} 
+          adsUrl={successAlert.adsUrl} 
+          onClose={() => setSuccessAlert(null)} 
+        />
+      )}
+      
       {/* Formulário de criação de anúncio */}
       <div className="bg-white p-6 rounded-lg shadow">
         <form onSubmit={handleSubmit} className="space-y-6">
