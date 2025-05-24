@@ -95,6 +95,7 @@ const CampanhaManual = () => {
   const [nomeCampanha, setNomeCampanha] = useState('');
   const [orcamento, setOrcamento] = useState(70);
   const [linkPublicacao, setLinkPublicacao] = useState('');
+  const [linkPublicacaoError, setLinkPublicacaoError] = useState('');
   const [dataInicio, setDataInicio] = useState('');
   const [dataTermino, setDataTermino] = useState('');
   const [callToAction, setCallToAction] = useState('LEARN_MORE');
@@ -300,6 +301,55 @@ const CampanhaManual = () => {
     };
   }, []);
 
+  // Função para validar o formato do link da publicação
+  const validarLinkPublicacao = (link) => {
+    if (!link) return false;
+    
+    try {
+      const url = new URL(link);
+      
+      // Verificar se é um link do Facebook
+      if (!url.hostname.includes('facebook.com')) {
+        return {
+          valido: false,
+          mensagem: "O link deve ser do Facebook (facebook.com)"
+        };
+      }
+      
+      // Verificar se está no formato correto: /{page_id}/posts/{post_id}
+      const regexPostsFormat = /facebook\.com\/(\d+)\/posts\/(\d+)/;
+      if (!regexPostsFormat.test(link)) {
+        return {
+          valido: false,
+          mensagem: "Por favor, insira o link direto da publicação clicando no horário do post na sua página do Facebook. O link deve estar no formato facebook.com/{page_id}/posts/{post_id}"
+        };
+      }
+      
+      return {
+        valido: true,
+        mensagem: ""
+      };
+    } catch (error) {
+      return {
+        valido: false,
+        mensagem: "URL inválida. Verifique se o link está completo e correto."
+      };
+    }
+  };
+
+  // Handler para mudança no link da publicação
+  const handleLinkPublicacaoChange = (e) => {
+    const link = e.target.value;
+    setLinkPublicacao(link);
+    
+    if (link) {
+      const validacao = validarLinkPublicacao(link);
+      setLinkPublicacaoError(validacao.valido ? "" : validacao.mensagem);
+    } else {
+      setLinkPublicacaoError("");
+    }
+  };
+
   // Função para abrir o anúncio no Ads Manager
   const handleVerAds = (campanha) => {
     // URL do Ads Manager com o ID da campanha
@@ -312,6 +362,7 @@ const CampanhaManual = () => {
     setNomeCampanha('');
     setOrcamento(70);
     setLinkPublicacao('');
+    setLinkPublicacaoError('');
     setDataInicio(new Date().toISOString().split('T')[0]);
     setDataTermino('');
     setCallToAction('LEARN_MORE');
@@ -343,6 +394,16 @@ const CampanhaManual = () => {
       toast({ title: "Erro", description: "Preencha todos os campos obrigatórios (*).", variant: "destructive" });
       return;
     }
+    
+    // Validar formato do link da publicação
+    const validacaoLink = validarLinkPublicacao(linkPublicacao);
+    if (!validacaoLink.valido) {
+      setError(validacaoLink.mensagem);
+      setLinkPublicacaoError(validacaoLink.mensagem);
+      toast({ title: "Erro", description: validacaoLink.mensagem, variant: "destructive" });
+      return;
+    }
+    
     if (dataTermino && new Date(dataTermino) <= new Date(dataInicio)) {
       setError('A data de término deve ser posterior à data de início.');
       toast({ title: "Erro", description: "A data de término deve ser posterior à data de início.", variant: "destructive" });
@@ -534,12 +595,18 @@ const CampanhaManual = () => {
                   type="url"
                   id="linkPublicacao"
                   value={linkPublicacao}
-                  onChange={(e) => setLinkPublicacao(e.target.value)}
-                  className="w-full p-2 border rounded-md"
-                  placeholder="https://www.facebook.com/pagina/posts/123..."
+                  onChange={handleLinkPublicacaoChange}
+                  className={`w-full p-2 border rounded-md ${linkPublicacaoError ? 'border-red-500' : ''}`}
+                  placeholder="https://www.facebook.com/123456789/posts/987654321"
                   required
                   disabled={!isMetaConnected}
                 />
+                {linkPublicacaoError && (
+                  <p className="text-xs text-red-500 mt-1">{linkPublicacaoError}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  A publicação deve estar pública e o link deve estar no formato: facebook.com/página/posts/id
+                </p>
               </div>
               
               <SelectInput
@@ -570,7 +637,7 @@ const CampanhaManual = () => {
                 <button
                   type="submit"
                   className="w-full px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={loading || metaLoading || !isMetaConnected}
+                  disabled={loading || metaLoading || !isMetaConnected || !!linkPublicacaoError}
                 >
                   {loading ? (
                     <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mx-auto"></div>
