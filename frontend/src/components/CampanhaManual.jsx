@@ -153,6 +153,7 @@ const CampanhaManual = () => {
   const [linkPublicacao, setLinkPublicacao] = useState('');
   const [linkPublicacaoError, setLinkPublicacaoError] = useState('');
   const [linkPublicacaoProcessado, setLinkPublicacaoProcessado] = useState('');
+  const [linkOriginal, setLinkOriginal] = useState('');
   const [dataInicio, setDataInicio] = useState('');
   const [dataTermino, setDataTermino] = useState('');
   const [callToAction, setCallToAction] = useState('LEARN_MORE');
@@ -363,19 +364,44 @@ const CampanhaManual = () => {
 
   // Função para formatar data e hora
   const formatarDataHora = (data = new Date()) => {
-    return data.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    try {
+      if (!data) return 'Data não disponível';
+      
+      // Se for string, converter para objeto Date
+      if (typeof data === 'string') {
+        data = new Date(data);
+      }
+      
+      // Verificar se a data é válida
+      if (isNaN(data.getTime())) return 'Data não disponível';
+      
+      // Formatar como dd/mm/aaaa hh:mm
+      return data.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      console.error('Erro ao formatar data e hora:', e);
+      return 'Data não disponível';
+    }
   };
 
-  // Função para validar o formato do link da publicação
-  // Aceita APENAS links no formato facebook.com/{page_id}/posts/{post_id}
-  const validarLinkPublicacao = (link) => {
-    if (!link) return { valido: false, mensagem: "Link da publicação é obrigatório", linkProcessado: "" };
+  /**
+   * Função para extrair page_id e post_id de diferentes formatos de links do Facebook
+   * @param {string} link - Link da publicação do Facebook
+   * @returns {object} - Objeto com page_id, post_id, linkProcessado e mensagem
+   */
+  const extrairIdsDoLink = (link) => {
+    if (!link) return { 
+      valido: false, 
+      mensagem: "Link da publicação é obrigatório", 
+      pageId: null, 
+      postId: null, 
+      linkProcessado: "" 
+    };
     
     try {
       const url = new URL(link);
@@ -385,60 +411,161 @@ const CampanhaManual = () => {
         return {
           valido: false,
           mensagem: "O link deve ser do Facebook (facebook.com)",
+          pageId: null,
+          postId: null,
           linkProcessado: ""
         };
       }
       
-      // Verificar se está no formato correto: /{page_id}/posts/{post_id}
+      // Formato 1: facebook.com/{page_id}/posts/{post_id}
       const regexPostsFormat = /facebook\.com\/(\d+)\/posts\/(\d+)/;
       const matchPosts = link.match(regexPostsFormat);
       
       if (matchPosts) {
-        // Está no formato correto
+        const pageId = matchPosts[1];
+        const postId = matchPosts[2];
         return {
           valido: true,
           mensagem: "",
-          linkProcessado: link
+          pageId,
+          postId,
+          linkProcessado: `https://www.facebook.com/${pageId}/posts/${postId}`
         };
       }
       
-      // Rejeitar permalink
+      // Formato 2: permalink.php?story_fbid={post_id}&id={page_id}
       if (url.pathname.includes('/permalink.php')) {
-        return {
-          valido: false,
-          mensagem: "Links de permalink (permalink.php) não são aceitos. Por favor, forneça o link direto da publicação clicando no horário dela na sua página. O link deve estar no formato facebook.com/{page_id}/posts/{post_id}.",
-          linkProcessado: ""
-        };
+        const storyFbid = url.searchParams.get('story_fbid');
+        const pageId = url.searchParams.get('id');
+        
+        if (storyFbid && pageId) {
+          return {
+            valido: true,
+            mensagem: "Link convertido para o formato padrão",
+            pageId,
+            postId: storyFbid,
+            linkProcessado: `https://www.facebook.com/${pageId}/posts/${storyFbid}`
+          };
+        }
       }
       
-      // Rejeitar links de compartilhamento
+      // Formato 3: photo.php?fbid={post_id}&set=a.{album_id}&id={page_id}
+      if (url.pathname.includes('/photo.php') || url.pathname.includes('/photo')) {
+        const fbid = url.searchParams.get('fbid');
+        let pageId = url.searchParams.get('id');
+        
+        // Se não tiver id explícito, tentar extrair de outros parâmetros
+        if (!pageId) {
+          // Tentar extrair do set
+          const set = url.searchParams.get('set');
+          if (set) {
+            const setMatch = set.match(/a\.(\d+)/);
+            if (setMatch) {
+              pageId = setMatch[1];
+            }
+          }
+        }
+        
+        if (fbid && pageId) {
+          return {
+            valido: true,
+            mensagem: "Link de foto convertido para o formato padrão",
+            pageId,
+            postId: fbid,
+            linkProcessado: `https://www.facebook.com/${pageId}/posts/${fbid}`
+          };
+        }
+      }
+      
+      // Formato 4: share/p/{hash}
       if (url.pathname.includes('/share/p/')) {
-        return {
-          valido: false,
-          mensagem: "Links de compartilhamento (share/p/) não são aceitos. Por favor, forneça o link direto da publicação clicando no horário dela na sua página. O link deve estar no formato facebook.com/{page_id}/posts/{post_id}.",
-          linkProcessado: ""
-        };
+        // Para links de compartilhamento, precisamos do ID da página selecionada
+        if (selectedPage) {
+          const pathParts = url.pathname.split('/');
+          const hash = pathParts[pathParts.length - 1];
+          
+          return {
+            valido: true,
+            mensagem: "Link de compartilhamento convertido usando a página selecionada",
+            pageId: selectedPage,
+            postId: hash,
+            linkProcessado: `https://www.facebook.com/${selectedPage}/posts/${hash}`
+          };
+        } else {
+          return {
+            valido: false,
+            mensagem: "Não foi possível usar o link de compartilhamento. Selecione uma página primeiro.",
+            pageId: null,
+            postId: null,
+            linkProcessado: ""
+          };
+        }
       }
       
-      // Rejeitar links de foto
-      if (url.pathname.includes('/photo') || url.searchParams.has('fbid')) {
-        return {
-          valido: false,
-          mensagem: "Links de foto (photo?fbid=) não são aceitos. Por favor, forneça o link direto da publicação clicando no horário dela na sua página. O link deve estar no formato facebook.com/{page_id}/posts/{post_id}.",
-          linkProcessado: ""
-        };
+      // Formato 5: pfbid0{hash} em qualquer parte do URL
+      const pfbidMatch = link.match(/pfbid0([a-zA-Z0-9]+)/);
+      if (pfbidMatch) {
+        if (selectedPage) {
+          const postId = pfbidMatch[1];
+          
+          return {
+            valido: true,
+            mensagem: "Link com pfbid convertido usando a página selecionada",
+            pageId: selectedPage,
+            postId: postId,
+            linkProcessado: `https://www.facebook.com/${selectedPage}/posts/${postId}`
+          };
+        } else {
+          return {
+            valido: false,
+            mensagem: "Não foi possível extrair o ID da página. Selecione uma página primeiro.",
+            pageId: null,
+            postId: null,
+            linkProcessado: ""
+          };
+        }
       }
       
-      // Mensagem genérica para outros formatos
+      // Formato 6: facebook.com/{username}/posts/{post_id} (username não numérico)
+      const usernamePostsMatch = link.match(/facebook\.com\/([^\/]+)\/posts\/(\d+)/);
+      if (usernamePostsMatch && !/^\d+$/.test(usernamePostsMatch[1])) {
+        // Se temos um username em vez de page_id, usar o ID da página selecionada
+        const postId = usernamePostsMatch[2];
+        
+        if (selectedPage) {
+          return {
+            valido: true,
+            mensagem: "Link com nome de usuário convertido usando a página selecionada",
+            pageId: selectedPage,
+            postId: postId,
+            linkProcessado: `https://www.facebook.com/${selectedPage}/posts/${postId}`
+          };
+        } else {
+          return {
+            valido: false,
+            mensagem: "Não foi possível usar o link com nome de usuário. Selecione uma página primeiro.",
+            pageId: null,
+            postId: null,
+            linkProcessado: ""
+          };
+        }
+      }
+      
+      // Se chegamos aqui, não conseguimos extrair os IDs
       return {
         valido: false,
-        mensagem: "Formato de link não suportado. Por favor, forneça o link direto da publicação clicando no horário dela na sua página. O link deve estar no formato facebook.com/{page_id}/posts/{post_id}.",
+        mensagem: "Não foi possível extrair os IDs da publicação deste link. Tente usar o link direto da publicação.",
+        pageId: null,
+        postId: null,
         linkProcessado: ""
       };
     } catch (error) {
+      console.error("Erro ao processar link:", error);
       return {
         valido: false,
         mensagem: "URL inválida. Verifique se o link está completo e correto.",
+        pageId: null,
+        postId: null,
         linkProcessado: ""
       };
     }
@@ -448,11 +575,26 @@ const CampanhaManual = () => {
   const handleLinkPublicacaoChange = (e) => {
     const link = e.target.value;
     setLinkPublicacao(link);
+    setLinkOriginal(link);
     
     if (link) {
-      const validacao = validarLinkPublicacao(link);
-      setLinkPublicacaoError(validacao.valido ? "" : validacao.mensagem);
-      setLinkPublicacaoProcessado(validacao.linkProcessado);
+      const resultado = extrairIdsDoLink(link);
+      
+      if (resultado.valido) {
+        setLinkPublicacaoError("");
+        setLinkPublicacaoProcessado(resultado.linkProcessado);
+        
+        // Se o link foi convertido, mostrar mensagem informativa
+        if (link !== resultado.linkProcessado) {
+          toast({ 
+            title: "Link convertido", 
+            description: `O link foi convertido para o formato padrão: ${resultado.linkProcessado}`,
+          });
+        }
+      } else {
+        setLinkPublicacaoError(resultado.mensagem);
+        setLinkPublicacaoProcessado("");
+      }
     } else {
       setLinkPublicacaoError("");
       setLinkPublicacaoProcessado("");
@@ -473,6 +615,7 @@ const CampanhaManual = () => {
     setLinkPublicacao('');
     setLinkPublicacaoError('');
     setLinkPublicacaoProcessado('');
+    setLinkOriginal('');
     setDataInicio(new Date().toISOString().split('T')[0]);
     setDataTermino('');
     setCallToAction('LEARN_MORE');
@@ -505,12 +648,12 @@ const CampanhaManual = () => {
       return;
     }
     
-    // Validar formato do link da publicação
-    const validacaoLink = validarLinkPublicacao(linkPublicacao);
-    if (!validacaoLink.valido) {
-      setError(validacaoLink.mensagem);
-      setLinkPublicacaoError(validacaoLink.mensagem);
-      toast({ title: "Erro", description: validacaoLink.mensagem, variant: "destructive" });
+    // Processar o link da publicação
+    const resultadoLink = extrairIdsDoLink(linkPublicacao);
+    if (!resultadoLink.valido) {
+      setError(resultadoLink.mensagem);
+      setLinkPublicacaoError(resultadoLink.mensagem);
+      toast({ title: "Erro", description: resultadoLink.mensagem, variant: "destructive" });
       return;
     }
     
@@ -538,7 +681,7 @@ const CampanhaManual = () => {
       };
 
       // Usar o link processado se disponível, caso contrário usar o link original
-      const linkFinal = validacaoLink.linkProcessado || linkPublicacao;
+      const linkFinal = resultadoLink.linkProcessado || linkPublicacao;
 
       const dataToSend = {
         adAccountId: selectedAdAccount,
@@ -564,10 +707,9 @@ const CampanhaManual = () => {
       
       // Adicionar a campanha à lista local com data de criação
       if (response.data.adDetails) {
-        // Garantir que a campanha tenha uma data de criação válida
+        // Usar a data de criação retornada pelo backend
         const campanhaCriada = {
-          ...response.data.adDetails,
-          created_time: new Date().toISOString() // Adicionar data de criação atual
+          ...response.data.adDetails
         };
         
         setCampanhas(prev => [campanhaCriada, ...prev]);
@@ -575,16 +717,19 @@ const CampanhaManual = () => {
         // Criar URL para o Ads Manager
         const adsManagerUrl = `https://business.facebook.com/adsmanager/manage/campaigns?act=${selectedAdAccount}&selected_campaign_ids=${campanhaCriada.campaignId}`;
         
-        // Exibir alerta de sucesso com data/hora e link para o Ads Manager
+        // Obter a data de criação do backend ou usar a data atual como fallback
+        const dataCriacao = campanhaCriada.createdAt || new Date();
+        
+        // Exibir alerta de sucesso com data/hora real de criação e link para o Ads Manager
         setSuccessAlert({
-          message: `Anúncio criado com sucesso em ${formatarDataHora()}`,
+          message: `Anúncio criado com sucesso em ${formatarDataHora(dataCriacao)}`,
           adsUrl: adsManagerUrl
         });
         
         // Também exibir toast para feedback imediato
         toast({ 
           title: "Sucesso!", 
-          description: `Anúncio criado com sucesso em ${formatarDataHora()}`, 
+          description: `Anúncio criado com sucesso em ${formatarDataHora(dataCriacao)}`, 
         });
       }
       
@@ -613,7 +758,7 @@ const CampanhaManual = () => {
       
       // Verificar se é um erro de post_id inválido
       if (error.response?.data?.error?.message?.includes("Invalid post_id parameter")) {
-        errorMsg = "ID da publicação inválido. Certifique-se de que o link está no formato correto: facebook.com/{page_id}/posts/{post_id} e que a publicação existe e está pública.";
+        errorMsg = "ID da publicação inválido. Certifique-se de que a publicação existe e está pública.";
       }
       
       setError(errorMsg);
@@ -753,12 +898,15 @@ const CampanhaManual = () => {
                   <p className="text-xs text-red-500 mt-1">{linkPublicacaoError}</p>
                 )}
                 {linkPublicacaoProcessado && !linkPublicacaoError && (
-                  <p className="text-xs text-green-500 mt-1">Link válido!</p>
+                  <p className="text-xs text-green-500 mt-1">
+                    Link válido! {linkOriginal !== linkPublicacaoProcessado && `(Convertido para: ${linkPublicacaoProcessado})`}
+                  </p>
                 )}
                 <p className="text-xs text-gray-500 mt-1">
-                  A publicação deve estar pública. Formato aceito:
+                  A publicação deve estar pública. Você pode colar links em qualquer formato:
                   <br />- facebook.com/página/posts/id
-                  <br />- Exemplo: https://www.facebook.com/61576205176576/posts/122108356796873505
+                  <br />- permalink.php?story_fbid=...&id=...
+                  <br />- photo?fbid=...
                 </p>
               </div>
               
