@@ -287,79 +287,93 @@ const createAdCreative = async (userAccessToken, adAccountId, pageId, creativeDa
         let imageHash = null;
         let imageUrl = null;
         
-        if (file) {
-            // Fazer upload da imagem e obter hash e URL
-            const imageData = await uploadImage(userAccessToken, adAccountId, file);
-            imageHash = imageData.hash;
-            imageUrl = imageData.url;
-        } else if (creativeData.imageUrl) {
-            // Verificar se a URL da imagem é acessível
-            const isAccessible = await isUrlAccessible(creativeData.imageUrl);
-            if (!isAccessible) {
-                throw new Error(`URL da imagem não acessível: ${creativeData.imageUrl}`);
-            }
-            imageUrl = creativeData.imageUrl;
-        }
-        
-        // Validar message (texto do anúncio)
-        if (!creativeData.adDescription && !creativeData.message) {
-            // Não exigir texto do anúncio, usar o texto da publicação existente
-            console.log('Nenhum texto de anúncio fornecido, usando texto da publicação existente.');
-        }
-        
-        // Usar message ou adDescription, priorizando message se ambos estiverem presentes
-        const adMessage = creativeData.message || creativeData.adDescription;
-        
-        // Validar CTA
-        let ctaType = creativeData.callToAction || DEFAULT_CTA;
-        if (!isValidCTA(ctaType)) {
-            console.warn(`CTA inválido: ${ctaType}. Usando CTA padrão: ${DEFAULT_CTA}`);
-            ctaType = DEFAULT_CTA;
-        }
-        
-        const creativePayload = {
-            name: `${creativeData.name} - Creative`,
-            object_story_spec: {
-                page_id: pageId,
-                link_data: {
-                    message: adMessage,
-                    link: creativeData.menuUrl || 'https://chefstudio.com',
-                    call_to_action: {
-                        type: ctaType
-                    }
-                }
-            },
-            access_token: userAccessToken // Usar token do usuário
-        };
-        
-        if (imageHash) {
-            creativePayload.object_story_spec.link_data.image_hash = imageHash;
-        }
-        
-        if (creativeData.adTitle) {
-            creativePayload.object_story_spec.link_data.name = creativeData.adTitle;
-        }
-        
-        // Se for anúncio de post, adicionar object_story_id
+        // Se for anúncio de publicação existente (postId presente)
         if (creativeData.postId) {
-             creativePayload.object_story_id = `${pageId}_${creativeData.postId}`;
-             // Remover link_data se object_story_id for usado
-             delete creativePayload.object_story_spec.link_data;
+            // Criar payload apenas com object_story_id, sem object_story_spec
+            const creativePayload = {
+                name: `${creativeData.name} - Creative`,
+                object_story_id: `${pageId}_${creativeData.postId}`,
+                access_token: userAccessToken
+            };
+            
+            console.log('Enviando payload para criação de criativo (publicação existente):', JSON.stringify(creativePayload, null, 2));
+            const response = await axios.post(
+                `${META_API_BASE_URL}/${adAccountId}/adcreatives`,
+                creativePayload
+            );
+            
+            console.log('Ad Creative criado com sucesso (publicação existente):', response.data);
+            return response.data;
+        } 
+        // Caso contrário, é um anúncio com imagem
+        else {
+            if (file) {
+                // Fazer upload da imagem e obter hash e URL
+                const imageData = await uploadImage(userAccessToken, adAccountId, file);
+                imageHash = imageData.hash;
+                imageUrl = imageData.url;
+            } else if (creativeData.imageUrl) {
+                // Verificar se a URL da imagem é acessível
+                const isAccessible = await isUrlAccessible(creativeData.imageUrl);
+                if (!isAccessible) {
+                    throw new Error(`URL da imagem não acessível: ${creativeData.imageUrl}`);
+                }
+                imageUrl = creativeData.imageUrl;
+            }
+            
+            // Validar message (texto do anúncio)
+            if (!creativeData.adDescription && !creativeData.message) {
+                // Não exigir texto do anúncio, usar o texto da publicação existente
+                console.log('Nenhum texto de anúncio fornecido, usando texto da publicação existente.');
+            }
+            
+            // Usar message ou adDescription, priorizando message se ambos estiverem presentes
+            const adMessage = creativeData.message || creativeData.adDescription;
+            
+            // Validar CTA
+            let ctaType = creativeData.callToAction || DEFAULT_CTA;
+            if (!isValidCTA(ctaType)) {
+                console.warn(`CTA inválido: ${ctaType}. Usando CTA padrão: ${DEFAULT_CTA}`);
+                ctaType = DEFAULT_CTA;
+            }
+            
+            const creativePayload = {
+                name: `${creativeData.name} - Creative`,
+                object_story_spec: {
+                    page_id: pageId,
+                    link_data: {
+                        message: adMessage,
+                        link: creativeData.menuUrl || 'https://chefstudio.com',
+                        call_to_action: {
+                            type: ctaType
+                        }
+                    }
+                },
+                access_token: userAccessToken // Usar token do usuário
+            };
+            
+            if (imageHash) {
+                creativePayload.object_story_spec.link_data.image_hash = imageHash;
+            }
+            
+            if (creativeData.adTitle) {
+                creativePayload.object_story_spec.link_data.name = creativeData.adTitle;
+            }
+            
+            console.log('Enviando payload para criação de criativo (imagem):', JSON.stringify(creativePayload, null, 2));
+            const response = await axios.post(
+                `${META_API_BASE_URL}/${adAccountId}/adcreatives`,
+                creativePayload
+            );
+            
+            console.log('Ad Creative criado com sucesso (imagem):', response.data);
+            
+            // Adicionar URL da imagem ao resultado
+            return {
+                ...response.data,
+                imageUrl: imageUrl
+            };
         }
-
-        console.log('Enviando payload para criação de criativo:', JSON.stringify(creativePayload, null, 2));
-        const response = await axios.post(
-            `${META_API_BASE_URL}/${adAccountId}/adcreatives`,
-            creativePayload
-        );
-        
-        console.log('Ad Creative criado com sucesso:', response.data);
-        
-        // Adicionar URL da imagem ao resultado
-        return {
-            ...response.data,
-            imageUrl: imageUrl
-        };
     } catch (error) {
         console.error('Erro ao criar criativo de anúncio no Meta Ads:', error.response?.data || error.message);
         if (error.response?.data) {
