@@ -438,7 +438,22 @@ const CampanhaManual = () => {
         const storyFbid = url.searchParams.get('story_fbid');
         const pageId = url.searchParams.get('id');
         
+        // Verificar se temos tanto story_fbid quanto id
         if (storyFbid && pageId) {
+          // Tratar especificamente o caso de story_fbid começando com "pfbid"
+          if (storyFbid.startsWith('pfbid')) {
+            console.log("Detectado link com pfbid:", storyFbid);
+            
+            return {
+              valido: true,
+              mensagem: "Link com pfbid convertido para o formato padrão",
+              pageId,
+              postId: storyFbid, // Usar o pfbid completo como postId
+              linkProcessado: `https://www.facebook.com/${pageId}/posts/${storyFbid}`
+            };
+          }
+          
+          // Caso normal (não pfbid)
           return {
             valido: true,
             mensagem: "Link convertido para o formato padrão",
@@ -506,7 +521,7 @@ const CampanhaManual = () => {
       const pfbidMatch = link.match(/pfbid0([a-zA-Z0-9]+)/);
       if (pfbidMatch) {
         if (selectedPage) {
-          const postId = pfbidMatch[1];
+          const postId = "pfbid0" + pfbidMatch[1]; // Reconstruir o pfbid completo
           
           return {
             valido: true,

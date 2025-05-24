@@ -109,7 +109,7 @@ const extractFacebookPostIds = (url, defaultPageId = null) => {
     
     try {
         // Formato 1: facebook.com/{page_id}/posts/{post_id}
-        const postsRegex = /facebook\.com\/(\d+)\/posts\/(\d+)/;
+        const postsRegex = /facebook\.com\/(\d+)\/posts\/([^\/\?]+)/;
         const postsMatch = url.match(postsRegex);
         
         if (postsMatch) {
@@ -126,6 +126,7 @@ const extractFacebookPostIds = (url, defaultPageId = null) => {
             const pageId = urlObj.searchParams.get('id');
             
             if (storyFbid && pageId) {
+                // Aceitar qualquer formato de story_fbid, incluindo pfbid
                 return {
                     pageId: pageId,
                     postId: storyFbid
@@ -180,14 +181,15 @@ const extractFacebookPostIds = (url, defaultPageId = null) => {
         // Formato 5: pfbid0{hash} em qualquer parte do URL
         const pfbidMatch = url.match(/pfbid0([a-zA-Z0-9]+)/);
         if (pfbidMatch && defaultPageId) {
+            const pfbid = "pfbid0" + pfbidMatch[1]; // Reconstruir o pfbid completo
             return {
                 pageId: defaultPageId,
-                postId: pfbidMatch[1]
+                postId: pfbid
             };
         }
         
         // Formato 6: facebook.com/{username}/posts/{post_id} (username não numérico)
-        const usernamePostsMatch = url.match(/facebook\.com\/([^\/]+)\/posts\/(\d+)/);
+        const usernamePostsMatch = url.match(/facebook\.com\/([^\/]+)\/posts\/([^\/\?]+)/);
         if (usernamePostsMatch && !/^\d+$/.test(usernamePostsMatch[1]) && defaultPageId) {
             return {
                 pageId: defaultPageId,
@@ -432,41 +434,42 @@ const createAdCreative = async (userAccessToken, adAccountId, pageId, creativeDa
             
             // Validar message (texto do anúncio)
             if (!creativeData.adDescription && !creativeData.message) {
-                // Não exigir texto do anúncio, usar o texto da publicação existente
-                console.log('Nenhum texto de anúncio fornecido, usando texto da publicação existente.');
+                creativeData.message = `Confira nossa oferta especial! ${creativeData.linkUrl || ''}`;
             }
-            
-            // Usar message ou adDescription, priorizando message se ambos estiverem presentes
-            const adMessage = creativeData.message || creativeData.adDescription;
             
             // Validar CTA
-            let ctaType = creativeData.callToAction || DEFAULT_CTA;
+            const ctaType = creativeData.callToAction || DEFAULT_CTA;
             if (!isValidCTA(ctaType)) {
-                console.warn(`CTA inválido: ${ctaType}. Usando CTA padrão: ${DEFAULT_CTA}`);
-                ctaType = DEFAULT_CTA;
+                console.warn(`CTA inválido: ${ctaType}, usando padrão: ${DEFAULT_CTA}`);
+                creativeData.callToAction = DEFAULT_CTA;
             }
             
+            // Criar payload com object_story_spec
             const creativePayload = {
                 name: `${creativeData.name} - Creative`,
                 object_story_spec: {
                     page_id: pageId,
                     link_data: {
-                        message: adMessage,
-                        link: creativeData.menuUrl || 'https://chefstudio.com',
+                        message: creativeData.message || creativeData.adDescription || '',
+                        link: creativeData.linkUrl || 'https://facebook.com',
+                        caption: creativeData.caption || '',
+                        description: creativeData.adDescription || '',
                         call_to_action: {
-                            type: ctaType
+                            type: creativeData.callToAction || DEFAULT_CTA,
+                            value: {
+                                link: creativeData.linkUrl || 'https://facebook.com'
+                            }
                         }
                     }
                 },
-                access_token: userAccessToken // Usar token do usuário
+                access_token: userAccessToken
             };
             
+            // Adicionar imagem ao payload
             if (imageHash) {
                 creativePayload.object_story_spec.link_data.image_hash = imageHash;
-            }
-            
-            if (creativeData.adTitle) {
-                creativePayload.object_story_spec.link_data.name = creativeData.adTitle;
+            } else if (imageUrl) {
+                creativePayload.object_story_spec.link_data.picture = imageUrl;
             }
             
             console.log('Enviando payload para criação de criativo (imagem):', JSON.stringify(creativePayload, null, 2));
@@ -476,25 +479,12 @@ const createAdCreative = async (userAccessToken, adAccountId, pageId, creativeDa
             );
             
             console.log('Ad Creative criado com sucesso (imagem):', response.data);
-            
-            // Adicionar URL da imagem ao resultado
-            return {
-                ...response.data,
-                imageUrl: imageUrl
-            };
+            return response.data;
         }
     } catch (error) {
         console.error('Erro ao criar criativo de anúncio no Meta Ads:', error.response?.data || error.message);
         if (error.response?.data) {
             console.error('Detalhes do erro:', JSON.stringify(error.response.data));
-        }
-        
-        if (error.response) {
-            console.error('Detalhes do erro de criação de criativo:', {
-                status: error.response.status,
-                statusText: error.response.statusText,
-                data: error.response.data
-            });
         }
         throw error;
     }
@@ -511,7 +501,7 @@ const createAdCreative = async (userAccessToken, adAccountId, pageId, creativeDa
  */
 const createAd = async (userAccessToken, adAccountId, adSetId, creativeId, adData) => {
     try {
-        console.log(`Criando anúncio real no Meta Ads para ad set ${adSetId}`);
+        console.log(`Criando anúncio real no Meta Ads para adset ${adSetId} e creative ${creativeId}`);
         const response = await axios.post(
             `${META_API_BASE_URL}/${adAccountId}/ads`,
             {
@@ -534,478 +524,326 @@ const createAd = async (userAccessToken, adAccountId, adSetId, creativeId, adDat
 };
 
 /**
- * Cria um anúncio completo a partir de uma imagem
+ * Cria um anúncio a partir de uma imagem
+ * @param {object} req - Objeto de requisição
+ * @param {object} res - Objeto de resposta
+ * @returns {Promise<void>}
  */
 const createFromImage = async (req, res) => {
     try {
-        console.log('Iniciando criação de anúncio a partir de imagem (integração real)');
-        console.log('Corpo da requisição (req.body):', req.body);
-        console.log('Arquivo recebido:', req.file);
-
-        // Verificar se o usuário está autenticado
+        console.log('Iniciando criação de anúncio a partir de imagem');
+        
+        // Verificar se o usuário está autenticado e tem token Meta
         if (!req.user) {
-            console.error('❌ Erro: Usuário não autenticado.');
-            return res.status(401).json({ message: 'Usuário não autenticado. Por favor, faça login novamente.' });
+            return res.status(401).json({ error: 'Usuário não autenticado' });
         }
-
-        // Obter token de acesso do usuário
+        
         const userAccessToken = getUserMetaToken(req.user);
         if (!userAccessToken) {
-            console.error('❌ Erro: Token de acesso Meta não encontrado para o usuário.');
-            return res.status(401).json({ message: 'Token de acesso Meta não encontrado. Por favor, conecte sua conta Meta Ads.' });
+            return res.status(401).json({ error: 'Token de acesso Meta não encontrado. Conecte sua conta Meta primeiro.' });
         }
-
+        
         // Extrair dados da requisição
-        const { 
-            adAccountId, 
-            pageId, 
-            campaignName, 
-            weeklyBudget, 
-            startDate, 
-            endDate, 
-            objective, 
-            adTitle, 
-            adDescription, 
-            message, 
-            callToAction, 
-            menuUrl, 
-            image_url 
+        const {
+            adAccountId,
+            pageId,
+            campaignName,
+            weeklyBudget,
+            startDate,
+            endDate,
+            location,
+            imageUrl,
+            linkUrl,
+            adTitle,
+            adDescription,
+            callToAction,
+            objective
         } = req.body;
-
-        // Verificar campos obrigatórios
-        const camposObrigatorios = {
-            adAccountId: !!adAccountId,
-            pageId: !!pageId,
-            campaignName: !!campaignName,
-            weeklyBudget: !!weeklyBudget,
-            startDate: !!startDate
+        
+        // Validar campos obrigatórios
+        if (!adAccountId || !pageId || !campaignName || !weeklyBudget || !startDate) {
+            return res.status(400).json({ error: 'Campos obrigatórios não fornecidos' });
+        }
+        
+        // Validar imagem (arquivo ou URL)
+        const file = req.file;
+        if (!file && !imageUrl) {
+            return res.status(400).json({ error: 'Imagem não fornecida (arquivo ou URL)' });
+        }
+        
+        // Validar URL de destino
+        if (!linkUrl) {
+            return res.status(400).json({ error: 'URL de destino não fornecida' });
+        }
+        
+        // Usar objetivo fixo OUTCOME_TRAFFIC, ignorando qualquer valor recebido
+        const finalObjective = DEFAULT_TRAFFIC_OBJECTIVE;
+        
+        // Criar campanha
+        const campaignData = {
+            name: campaignName,
+            objective: finalObjective
         };
+        const campaign = await createCampaign(userAccessToken, adAccountId, campaignData);
         
-        console.log('Validação de campos obrigatórios:', camposObrigatorios);
-        
-        if (!req.file && !image_url) {
-            console.error('❌ Erro: Imagem não fornecida (nem arquivo nem URL)');
-            return res.status(400).json({ 
-                message: 'Imagem é obrigatória (forneça um arquivo ou image_url)', 
-                camposFaltantes: { imagem: true } 
-            });
-        }
-        
-        const camposFaltantes = Object.entries(camposObrigatorios)
-            .filter(([_, valor]) => !valor)
-            .reduce((acc, [campo]) => ({ ...acc, [campo]: true }), {});
-            
-        if (Object.keys(camposFaltantes).length > 0) {
-            console.error('❌ Erro: Campos obrigatórios não preenchidos:', camposFaltantes);
-            return res.status(400).json({ 
-                message: 'Campos obrigatórios não preenchidos', 
-                camposFaltantes 
-            });
-        }
-        
-        // Validar CTA se fornecido
-        if (callToAction && !isValidCTA(callToAction)) {
-            console.error('❌ Erro: CTA inválido:', callToAction);
-            return res.status(400).json({ 
-                message: `CTA inválido: ${callToAction}. Valores válidos: ${VALID_CTA_TYPES.join(', ')}`,
-                ctaValidos: VALID_CTA_TYPES
-            });
-        }
-        
-        // Validar image_url se fornecido
-        if (image_url && !req.file) {
-            try {
-                const isAccessible = await isUrlAccessible(image_url);
-                if (!isAccessible) {
-                    console.error('❌ Erro: URL da imagem não acessível:', image_url);
-                    return res.status(400).json({ 
-                        message: `URL da imagem não acessível: ${image_url}`,
-                        camposFaltantes: { image_url: true }
-                    });
-                }
-                console.log('✅ URL da imagem validada com sucesso:', image_url);
-            } catch (error) {
-                console.error('❌ Erro ao validar URL da imagem:', error);
-                return res.status(400).json({ 
-                    message: `Erro ao validar URL da imagem: ${error.message}`,
-                    camposFaltantes: { image_url: true }
-                });
-            }
-        }
-
-        // Obter informações de localização
-        let location = { latitude: -23.5505, longitude: -46.6333, radius: 10 }; // Padrão: São Paulo com raio de 10km
-        if (req.body.location) {
-            try {
-                if (typeof req.body.location === 'string') {
-                    location = JSON.parse(req.body.location);
-                } else if (req.body['location[latitude]'] && req.body['location[longitude]'] && req.body['location[radius]']) {
-                    location = {
-                        latitude: parseFloat(req.body['location[latitude]']),
-                        longitude: parseFloat(req.body['location[longitude]']),
-                        radius: parseInt(req.body['location[radius]'])
-                    };
-                }
-                console.log('Localização processada:', location);
-            } catch (error) {
-                console.error('Erro ao processar localização:', error);
-                console.log('Usando localização padrão:', location);
-                 // Continuar com a localização padrão se houver erro
-            }
-        }
-
-        // Criar campanha, ad set, criativo e anúncio em sequência usando o token do usuário
-        console.log('Iniciando criação de campanha...');
-        const campaignResult = await createCampaign(userAccessToken, adAccountId, {
-            name: campaignName
-            // Não passamos objective, será usado o valor fixo DEFAULT_TRAFFIC_OBJECTIVE
-        });
-
-        console.log('Iniciando criação de ad set...');
-        const adSetResult = await createAdSet(userAccessToken, adAccountId, campaignResult.id, {
+        // Criar conjunto de anúncios (Ad Set)
+        const adSetData = {
             name: campaignName,
             weeklyBudget: parseFloat(weeklyBudget),
-            startDate: startDate,
-            endDate: endDate || null,
-            location: location
-        });
-
-        console.log('Iniciando criação de criativo...');
-        const creativeResult = await createAdCreative(userAccessToken, adAccountId, pageId, {
-            name: campaignName,
-            adDescription: adDescription,
-            message: message, // Adicionar message como campo separado
-            adTitle: adTitle || null,
-            callToAction: callToAction || DEFAULT_CTA,
-            menuUrl: menuUrl || null,
-            imageUrl: image_url // Passar URL da imagem se fornecida
-        }, req.file); // Passar o arquivo de imagem se fornecido
-
-        console.log('Iniciando criação de anúncio...');
-        const adResult = await createAd(userAccessToken, adAccountId, adSetResult.id, creativeResult.id, {
-            name: campaignName
-        });
-
-        // Criar objeto com detalhes completos do anúncio
-        const adDetails = {
-            id: campaignResult.id,
-            campaignId: campaignResult.id,
-            name: campaignName,
-            adAccountId: adAccountId,
-            pageId: pageId,
-            weeklyBudget: parseFloat(weeklyBudget),
-            dailyBudget: parseFloat(weeklyBudget) / 7,
-            startDate: new Date(startDate),
-            endDate: endDate ? new Date(endDate) : null,
-            location: location,
-            message: message || adDescription, // Usar message ou adDescription
-            adTitle: adTitle || null,
-            callToAction: callToAction || DEFAULT_CTA,
-            menuUrl: menuUrl || null,
-            status: 'ACTIVE',
-            imageUrl: creativeResult.imageUrl || image_url, // Usar URL da imagem do criativo ou a fornecida
-            adSetId: adSetResult.id,
-            adId: adResult.id,
-            creativeId: creativeResult.id,
-            createdAt: new Date(),
-            type: 'image',
-            objective: DEFAULT_TRAFFIC_OBJECTIVE // Usar o objetivo fixo
+            startDate,
+            endDate,
+            location: location || {
+                latitude: -23.5505,
+                longitude: -46.6333,
+                radius: 10
+            }
         };
-
-        // Armazenar a campanha em memória (backup local)
-        if (!campaignsStore[adAccountId]) {
-            campaignsStore[adAccountId] = [];
-        }
-        campaignsStore[adAccountId].unshift(adDetails);
-
-        console.log('✅ Anúncio criado com sucesso!');
-        res.status(201).json({
+        const adSet = await createAdSet(userAccessToken, adAccountId, campaign.id, adSetData);
+        
+        // Criar criativo de anúncio
+        const creativeData = {
+            name: campaignName,
+            imageUrl,
+            linkUrl,
+            adTitle,
+            adDescription,
+            callToAction: callToAction || DEFAULT_CTA,
+            message: adDescription
+        };
+        const creative = await createAdCreative(userAccessToken, adAccountId, pageId, creativeData, file);
+        
+        // Criar anúncio
+        const adData = {
+            name: campaignName
+        };
+        const ad = await createAd(userAccessToken, adAccountId, adSet.id, creative.id, adData);
+        
+        // Armazenar dados da campanha localmente
+        const campaignDetails = {
+            id: campaign.id,
+            name: campaignName,
+            adSetId: adSet.id,
+            creativeId: creative.id,
+            adId: ad.id,
+            startDate,
+            endDate,
+            weeklyBudget: parseFloat(weeklyBudget),
+            createdAt: new Date().toISOString()
+        };
+        campaignsStore[campaign.id] = campaignDetails;
+        
+        // Retornar detalhes do anúncio criado
+        return res.status(200).json({
             success: true,
-            message: 'Anúncio criado com sucesso e publicado como ACTIVE',
-            campaignId: adDetails.campaignId,
-            adSetId: adDetails.adSetId,
-            adId: adDetails.adId,
-            status: 'ACTIVE',
-            adDetails
+            message: 'Anúncio criado com sucesso',
+            adDetails: {
+                campaignId: campaign.id,
+                adSetId: adSet.id,
+                creativeId: creative.id,
+                adId: ad.id,
+                name: campaignName,
+                startDate,
+                endDate,
+                weeklyBudget: parseFloat(weeklyBudget),
+                createdAt: new Date().toISOString()
+            }
         });
     } catch (error) {
-        console.error('❌ Erro ao criar anúncio a partir de imagem:', error.response?.data || error.message);
-        if (error.response?.data) {
-            console.error('Detalhes do erro:', JSON.stringify(error.response.data));
+        console.error('Erro ao criar anúncio a partir de imagem:', error);
+        
+        // Formatar mensagem de erro
+        let errorMessage = 'Erro ao criar anúncio no Meta Ads';
+        let errorDetails = null;
+        
+        if (error.response?.data?.error) {
+            errorMessage = `Erro ao criar anúncio no Meta Ads: ${JSON.stringify(error.response.data.error)}`;
+            errorDetails = error.response.data.error;
+            console.error('Detalhes do erro:', errorDetails);
+        } else if (error.message) {
+            errorMessage = error.message;
         }
         
-        if (error.response) {
-            console.error('Detalhes do erro:', {
-                status: error.response.status,
-                statusText: error.response.statusText,
-                data: error.response.data
-            });
-        } else {
-            console.error('Stack trace do erro:', error.stack);
-        }
-        
-        // Limpar arquivo temporário se existir em caso de erro
-        if (req.file && req.file.path) {
-             fs.unlink(req.file.path, (err) => {
-                if (err) console.error('Erro ao limpar arquivo temporário (após erro no controller):', err);
-            });
-        }
-        
-        res.status(500).json({
-            message: 'Erro ao criar anúncio',
-            error: error.response?.data || error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        return res.status(500).json({
+            error: errorMessage,
+            details: errorDetails
         });
     }
 };
 
 /**
- * Cria um anúncio completo a partir de uma publicação existente
+ * Cria um anúncio a partir de uma publicação existente
+ * @param {object} req - Objeto de requisição
+ * @param {object} res - Objeto de resposta
+ * @returns {Promise<void>}
  */
 const createFromPost = async (req, res) => {
     try {
-        console.log('Iniciando criação de anúncio a partir de publicação existente (integração real)');
-        console.log('Corpo da requisição (req.body):', req.body);
-
-        // Verificar se o usuário está autenticado
+        console.log('Iniciando criação de anúncio a partir de publicação existente');
+        
+        // Verificar se o usuário está autenticado e tem token Meta
         if (!req.user) {
-            console.error('❌ Erro: Usuário não autenticado.');
-            return res.status(401).json({ message: 'Usuário não autenticado. Por favor, faça login novamente.' });
+            return res.status(401).json({ error: 'Usuário não autenticado' });
         }
-
-        // Obter token de acesso do usuário
+        
         const userAccessToken = getUserMetaToken(req.user);
         if (!userAccessToken) {
-            console.error('❌ Erro: Token de acesso Meta não encontrado para o usuário.');
-            return res.status(401).json({ message: 'Token de acesso Meta não encontrado. Por favor, conecte sua conta Meta Ads.' });
+            return res.status(401).json({ error: 'Token de acesso Meta não encontrado. Conecte sua conta Meta primeiro.' });
         }
-
+        
         // Extrair dados da requisição
-        const { 
-            adAccountId, 
-            pageId, 
-            campaignName, 
-            weeklyBudget, 
-            startDate, 
-            endDate, 
-            callToAction, 
-            postUrl 
+        const {
+            adAccountId,
+            pageId,
+            campaignName,
+            weeklyBudget,
+            startDate,
+            endDate,
+            location,
+            postUrl,
+            callToAction
         } = req.body;
-
-        // Verificar campos obrigatórios
-        const camposObrigatorios = {
-            adAccountId: !!adAccountId,
-            pageId: !!pageId,
-            campaignName: !!campaignName,
-            weeklyBudget: !!weeklyBudget,
-            startDate: !!startDate,
-            postUrl: !!postUrl
-        };
         
-        console.log('Validação de campos obrigatórios:', camposObrigatorios);
-        
-        const camposFaltantes = Object.entries(camposObrigatorios)
-            .filter(([_, valor]) => !valor)
-            .reduce((acc, [campo]) => ({ ...acc, [campo]: true }), {});
-            
-        if (Object.keys(camposFaltantes).length > 0) {
-            console.error('❌ Erro: Campos obrigatórios não preenchidos:', camposFaltantes);
-            return res.status(400).json({ 
-                message: 'Campos obrigatórios não preenchidos', 
-                camposFaltantes 
-            });
+        // Validar campos obrigatórios
+        if (!adAccountId || !pageId || !campaignName || !weeklyBudget || !startDate || !postUrl) {
+            return res.status(400).json({ error: 'Campos obrigatórios não fornecidos' });
         }
         
-        // Validar CTA se fornecido
-        if (callToAction && !isValidCTA(callToAction)) {
-            console.error('❌ Erro: CTA inválido:', callToAction);
-            return res.status(400).json({ 
-                message: `CTA inválido: ${callToAction}. Valores válidos: ${VALID_CTA_TYPES.join(', ')}`,
-                ctaValidos: VALID_CTA_TYPES
-            });
-        }
-
         // Extrair post_id da URL da publicação
-        let postId = null;
-        
-        // Tentar extrair IDs da URL usando a função robusta
-        const extractedIds = extractFacebookPostIds(postUrl, pageId);
-        
-        if (extractedIds && extractedIds.postId) {
-            postId = extractedIds.postId;
-            console.log(`✅ Post ID extraído com sucesso: ${postId}`);
-        } else {
-            // Tentar extrair usando regex simples como fallback
-            const regexPostId = /\/posts\/(\d+)/;
-            const match = postUrl.match(regexPostId);
-            
-            if (match && match[1]) {
-                postId = match[1];
-                console.log(`✅ Post ID extraído com regex simples: ${postId}`);
-            } else {
-                console.error('❌ Erro: Não foi possível extrair o ID da publicação da URL:', postUrl);
-                return res.status(400).json({ 
-                    message: 'URL da publicação inválida. Certifique-se de que o link está no formato correto (ex: https://www.facebook.com/{page_id}/posts/{post_id}).',
-                    camposFaltantes: { postUrl: true }
-                });
-            }
+        const postIds = extractFacebookPostIds(postUrl, pageId);
+        if (!postIds || !postIds.postId) {
+            return res.status(400).json({ error: 'Não foi possível extrair o ID da publicação da URL fornecida' });
         }
-
-        // Obter informações de localização
-        let location = { latitude: -23.5505, longitude: -46.6333, radius: 10 }; // Padrão: São Paulo com raio de 10km
-        if (req.body.location) {
-            try {
-                if (typeof req.body.location === 'string') {
-                    location = JSON.parse(req.body.location);
-                } else if (req.body['location[latitude]'] && req.body['location[longitude]'] && req.body['location[radius]']) {
-                    location = {
-                        latitude: parseFloat(req.body['location[latitude]']),
-                        longitude: parseFloat(req.body['location[longitude]']),
-                        radius: parseInt(req.body['location[radius]'])
-                    };
-                }
-                console.log('Localização processada:', location);
-            } catch (error) {
-                console.error('Erro ao processar localização:', error);
-                console.log('Usando localização padrão:', location);
-                // Continuar com a localização padrão se houver erro
-            }
-        }
-
-        // Criar campanha, ad set, criativo e anúncio em sequência usando o token do usuário
-        console.log('Iniciando criação de campanha...');
-        const campaignResult = await createCampaign(userAccessToken, adAccountId, {
-            name: campaignName
-            // Não passamos objective, será usado o valor fixo DEFAULT_TRAFFIC_OBJECTIVE
-        });
-
-        console.log('Iniciando criação de ad set...');
-        const adSetResult = await createAdSet(userAccessToken, adAccountId, campaignResult.id, {
+        
+        console.log('IDs extraídos da URL da publicação:', postIds);
+        
+        // Usar objetivo fixo OUTCOME_TRAFFIC, ignorando qualquer valor recebido
+        const finalObjective = DEFAULT_TRAFFIC_OBJECTIVE;
+        
+        // Criar campanha
+        const campaignData = {
             name: campaignName,
-            weeklyBudget: parseFloat(weeklyBudget),
-            startDate: startDate,
-            endDate: endDate || null,
-            location: location
-        });
-
-        console.log('Iniciando criação de criativo...');
-        const creativeResult = await createAdCreative(userAccessToken, adAccountId, pageId, {
-            name: campaignName,
-            postId: postId, // Passar o ID da publicação extraído
-            callToAction: callToAction || DEFAULT_CTA
-        });
-
-        console.log('Iniciando criação de anúncio...');
-        const adResult = await createAd(userAccessToken, adAccountId, adSetResult.id, creativeResult.id, {
-            name: campaignName
-        });
-
-        // Criar objeto com detalhes completos do anúncio
-        const adDetails = {
-            id: campaignResult.id,
-            campaignId: campaignResult.id,
-            name: campaignName,
-            adAccountId: adAccountId,
-            pageId: pageId,
-            weeklyBudget: parseFloat(weeklyBudget),
-            dailyBudget: parseFloat(weeklyBudget) / 7,
-            startDate: new Date(startDate),
-            endDate: endDate ? new Date(endDate) : null,
-            location: location,
-            postUrl: postUrl,
-            postId: postId,
-            callToAction: callToAction || DEFAULT_CTA,
-            status: 'ACTIVE',
-            adSetId: adSetResult.id,
-            adId: adResult.id,
-            creativeId: creativeResult.id,
-            createdAt: new Date(),
-            type: 'post',
-            objective: DEFAULT_TRAFFIC_OBJECTIVE // Usar o objetivo fixo
+            objective: finalObjective
         };
-
-        // Armazenar a campanha em memória (backup local)
-        if (!campaignsStore[adAccountId]) {
-            campaignsStore[adAccountId] = [];
-        }
-        campaignsStore[adAccountId].unshift(adDetails);
-
-        console.log('✅ Anúncio criado com sucesso!');
-        res.status(201).json({
+        const campaign = await createCampaign(userAccessToken, adAccountId, campaignData);
+        
+        // Criar conjunto de anúncios (Ad Set)
+        const adSetData = {
+            name: campaignName,
+            weeklyBudget: parseFloat(weeklyBudget),
+            startDate,
+            endDate,
+            location: location || {
+                latitude: -23.5505,
+                longitude: -46.6333,
+                radius: 10
+            }
+        };
+        const adSet = await createAdSet(userAccessToken, adAccountId, campaign.id, adSetData);
+        
+        // Criar criativo de anúncio com a publicação existente
+        const creativeData = {
+            name: campaignName,
+            postId: postIds.postId,
+            callToAction: callToAction || DEFAULT_CTA
+        };
+        const creative = await createAdCreative(userAccessToken, adAccountId, pageId, creativeData);
+        
+        // Criar anúncio
+        const adData = {
+            name: campaignName
+        };
+        const ad = await createAd(userAccessToken, adAccountId, adSet.id, creative.id, adData);
+        
+        // Armazenar dados da campanha localmente
+        const campaignDetails = {
+            id: campaign.id,
+            name: campaignName,
+            adSetId: adSet.id,
+            creativeId: creative.id,
+            adId: ad.id,
+            startDate,
+            endDate,
+            weeklyBudget: parseFloat(weeklyBudget),
+            createdAt: new Date().toISOString()
+        };
+        campaignsStore[campaign.id] = campaignDetails;
+        
+        // Retornar detalhes do anúncio criado
+        return res.status(200).json({
             success: true,
-            message: 'Anúncio criado com sucesso e publicado como ACTIVE',
-            campaignId: adDetails.campaignId,
-            adSetId: adDetails.adSetId,
-            adId: adDetails.adId,
-            status: 'ACTIVE',
-            adDetails
+            message: 'Anúncio criado com sucesso a partir da publicação existente',
+            adDetails: {
+                campaignId: campaign.id,
+                adSetId: adSet.id,
+                creativeId: creative.id,
+                adId: ad.id,
+                name: campaignName,
+                startDate,
+                endDate,
+                weeklyBudget: parseFloat(weeklyBudget),
+                createdAt: new Date().toISOString()
+            }
         });
     } catch (error) {
-        console.error('❌ Erro ao criar anúncio a partir de publicação:', error.response?.data || error.message);
-        if (error.response?.data) {
-            console.error('Detalhes do erro:', JSON.stringify(error.response.data));
+        console.error('Erro ao criar anúncio a partir de publicação existente:', error);
+        
+        // Formatar mensagem de erro
+        let errorMessage = 'Erro ao criar anúncio no Meta Ads';
+        let errorDetails = null;
+        
+        if (error.response?.data?.error) {
+            errorMessage = `Erro ao criar anúncio no Meta Ads: ${JSON.stringify(error.response.data.error)}`;
+            errorDetails = error.response.data.error;
+            console.error('Detalhes do erro:', errorDetails);
+        } else if (error.message) {
+            errorMessage = error.message;
         }
         
-        if (error.response) {
-            console.error('Detalhes do erro:', {
-                status: error.response.status,
-                statusText: error.response.statusText,
-                data: error.response.data
-            });
-        } else {
-            console.error('Stack trace do erro:', error.stack);
-        }
-        
-        res.status(500).json({
-            message: 'Erro ao criar anúncio a partir de publicação',
-            error: error.response?.data || error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        return res.status(500).json({
+            error: errorMessage,
+            details: errorDetails
         });
     }
 };
 
 /**
- * Busca campanhas do Meta Ads
+ * Busca campanhas da conta de anúncios
+ * @param {object} req - Objeto de requisição
+ * @param {object} res - Objeto de resposta
+ * @returns {Promise<void>}
  */
 const getCampaigns = async (req, res) => {
     try {
-        console.log('Buscando campanhas do Meta Ads (integração real)');
+        console.log('Buscando campanhas da conta de anúncios');
         
-        // Verificar se o usuário está autenticado
+        // Verificar se o usuário está autenticado e tem token Meta
         if (!req.user) {
-            console.error('❌ Erro: Usuário não autenticado.');
-            return res.status(401).json({ message: 'Usuário não autenticado. Por favor, faça login novamente.' });
+            return res.status(401).json({ error: 'Usuário não autenticado' });
         }
-
-        // Obter token de acesso do usuário
+        
         const userAccessToken = getUserMetaToken(req.user);
         if (!userAccessToken) {
-            console.error('❌ Erro: Token de acesso Meta não encontrado para o usuário.');
-            return res.status(401).json({ message: 'Token de acesso Meta não encontrado. Por favor, conecte sua conta Meta Ads.' });
+            return res.status(401).json({ error: 'Token de acesso Meta não encontrado. Conecte sua conta Meta primeiro.' });
         }
-
-        // Obter ID da conta de anúncios da query ou do corpo da requisição
-        const adAccountId = req.query.adAccountId || req.body.adAccountId;
+        
+        // Extrair ID da conta de anúncios da requisição
+        const { adAccountId } = req.query;
         if (!adAccountId) {
-            console.error('❌ Erro: ID da conta de anúncios não fornecido.');
-            return res.status(400).json({ message: 'ID da conta de anúncios é obrigatório.' });
+            return res.status(400).json({ error: 'ID da conta de anúncios não fornecido' });
         }
-
-        // Buscar campanhas da API do Meta
-        console.log(`Buscando campanhas para a conta ${adAccountId}...`);
+        
+        // Buscar campanhas da conta de anúncios
         const response = await axios.get(
             `${META_API_BASE_URL}/${adAccountId}/campaigns`,
             {
                 params: {
-                    fields: 'id,name,objective,status,created_time,start_time,stop_time,daily_budget,lifetime_budget,insights{impressions,clicks,ctr,cpc,reach,spend}',
+                    fields: 'id,name,status,objective,created_time,start_time,stop_time,daily_budget,lifetime_budget',
                     access_token: userAccessToken
                 }
             }
         );
-
-        console.log(`Encontradas ${response.data.data.length} campanhas.`);
         
-        // Processar campanhas para formato padronizado
+        // Processar campanhas
         const campaigns = response.data.data.map(campaign => {
             // Calcular orçamento semanal a partir do orçamento diário
             let weeklyBudget = null;
@@ -1015,83 +853,141 @@ const getCampaigns = async (req, res) => {
                 dailyBudget = parseFloat(campaign.daily_budget) / 100; // Converter de centavos para reais
                 weeklyBudget = dailyBudget * 7;
             } else if (campaign.lifetime_budget) {
-                // Se for orçamento vitalício, dividir por 30 dias para obter diário aproximado
-                dailyBudget = parseFloat(campaign.lifetime_budget) / 100 / 30;
+                // Estimar orçamento diário a partir do orçamento total
+                const lifetimeBudget = parseFloat(campaign.lifetime_budget) / 100;
+                const startDate = campaign.start_time ? new Date(campaign.start_time) : new Date();
+                const endDate = campaign.stop_time ? new Date(campaign.stop_time) : new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+                const days = Math.max(1, Math.ceil((endDate - startDate) / (24 * 60 * 60 * 1000)));
+                
+                dailyBudget = lifetimeBudget / days;
                 weeklyBudget = dailyBudget * 7;
             }
             
-            // Extrair métricas de insights se disponíveis
-            let impressions = 0;
-            let clicks = 0;
-            let ctr = 0;
-            let cpc = 0;
-            let reach = 0;
-            let spend = 0;
-            
-            if (campaign.insights && campaign.insights.data && campaign.insights.data.length > 0) {
-                const insights = campaign.insights.data[0];
-                impressions = parseInt(insights.impressions || 0);
-                clicks = parseInt(insights.clicks || 0);
-                ctr = parseFloat(insights.ctr || 0);
-                cpc = parseFloat(insights.cpc || 0);
-                reach = parseInt(insights.reach || 0);
-                spend = parseFloat(insights.spend || 0);
-            }
+            // Adicionar dados locais da campanha, se disponíveis
+            const localCampaign = campaignsStore[campaign.id];
             
             return {
-                id: campaign.id,
                 campaignId: campaign.id,
                 name: campaign.name,
-                objective: campaign.objective,
                 status: campaign.status,
+                objective: campaign.objective,
                 created_time: campaign.created_time,
                 startDate: campaign.start_time,
                 endDate: campaign.stop_time,
-                dailyBudget: dailyBudget,
-                weeklyBudget: weeklyBudget,
-                metrics: {
-                    impressions,
-                    clicks,
-                    ctr,
-                    cpc,
-                    reach,
-                    spend
-                }
+                dailyBudget,
+                weeklyBudget,
+                // Adicionar dados locais, se disponíveis
+                ...(localCampaign || {})
             };
         });
-
-        // Adicionar campanhas do armazenamento local se existirem
-        if (campaignsStore[adAccountId] && campaignsStore[adAccountId].length > 0) {
-            console.log(`Adicionando ${campaignsStore[adAccountId].length} campanhas do armazenamento local.`);
-            
-            // Verificar se alguma campanha local já existe na lista da API para evitar duplicatas
-            const apiCampaignIds = campaigns.map(c => c.id);
-            const localCampaignsToAdd = campaignsStore[adAccountId].filter(c => !apiCampaignIds.includes(c.id));
-            
-            campaigns.push(...localCampaignsToAdd);
-        }
-
-        // Ordenar campanhas por data de criação (mais recentes primeiro)
-        campaigns.sort((a, b) => {
-            const dateA = new Date(a.created_time || a.createdAt || a.startDate);
-            const dateB = new Date(b.created_time || b.createdAt || b.startDate);
-            return dateB - dateA;
-        });
-
-        res.status(200).json({
+        
+        return res.status(200).json({
             success: true,
-            count: campaigns.length,
             campaigns
         });
     } catch (error) {
-        console.error('❌ Erro ao buscar campanhas do Meta Ads:', error.response?.data || error.message);
-        if (error.response?.data) {
-            console.error('Detalhes do erro:', JSON.stringify(error.response.data));
+        console.error('Erro ao buscar campanhas:', error);
+        
+        // Formatar mensagem de erro
+        let errorMessage = 'Erro ao buscar campanhas do Meta Ads';
+        
+        if (error.response?.data?.error) {
+            errorMessage = `Erro ao buscar campanhas: ${error.response.data.error.message}`;
+        } else if (error.message) {
+            errorMessage = error.message;
         }
         
-        res.status(500).json({
-            message: 'Erro ao buscar campanhas',
-            error: error.response?.data || error.message
+        return res.status(500).json({
+            error: errorMessage
+        });
+    }
+};
+
+/**
+ * Busca métricas de anúncios
+ * @param {object} req - Objeto de requisição
+ * @param {object} res - Objeto de resposta
+ * @returns {Promise<void>}
+ */
+const getMetrics = async (req, res) => {
+    try {
+        console.log('Buscando métricas de anúncios');
+        
+        // Verificar se o usuário está autenticado e tem token Meta
+        if (!req.user) {
+            return res.status(401).json({ error: 'Usuário não autenticado' });
+        }
+        
+        const userAccessToken = getUserMetaToken(req.user);
+        if (!userAccessToken) {
+            return res.status(401).json({ error: 'Token de acesso Meta não encontrado. Conecte sua conta Meta primeiro.' });
+        }
+        
+        // Extrair parâmetros da requisição
+        const { adAccountId, timeRange = 'last_30_days' } = req.query;
+        if (!adAccountId) {
+            return res.status(400).json({ error: 'ID da conta de anúncios não fornecido' });
+        }
+        
+        // Validar timeRange
+        const validTimeRanges = ['today', 'yesterday', 'last_7_days', 'last_30_days', 'this_month', 'last_month'];
+        if (!validTimeRanges.includes(timeRange)) {
+            return res.status(400).json({ error: 'Intervalo de tempo inválido' });
+        }
+        
+        // Buscar métricas da conta de anúncios
+        const response = await axios.get(
+            `${META_API_BASE_URL}/${adAccountId}/insights`,
+            {
+                params: {
+                    fields: 'impressions,clicks,spend,ctr,cpc,reach,frequency',
+                    time_range: `{"since":"${timeRange}"}`,
+                    access_token: userAccessToken
+                }
+            }
+        );
+        
+        // Processar métricas
+        const metrics = response.data.data[0] || {
+            impressions: '0',
+            clicks: '0',
+            spend: '0',
+            ctr: '0',
+            cpc: '0',
+            reach: '0',
+            frequency: '0'
+        };
+        
+        // Converter valores para números
+        const processedMetrics = {
+            impressions: parseInt(metrics.impressions || 0),
+            clicks: parseInt(metrics.clicks || 0),
+            spend: parseFloat(metrics.spend || 0),
+            ctr: parseFloat(metrics.ctr || 0) * 100, // Converter para porcentagem
+            cpc: parseFloat(metrics.cpc || 0),
+            reach: parseInt(metrics.reach || 0),
+            frequency: parseFloat(metrics.frequency || 0)
+        };
+        
+        return res.status(200).json({
+            success: true,
+            metrics: processedMetrics,
+            timeRange
+        });
+    } catch (error) {
+        console.error('Erro ao buscar métricas:', error);
+        
+        // Formatar mensagem de erro
+        let errorMessage = 'Erro ao buscar métricas do Meta Ads';
+        
+        if (error.response?.data?.error) {
+            errorMessage = `Erro ao buscar métricas: ${error.response.data.error.message}`;
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+        
+        return res.status(500).json({
+            error: errorMessage
         });
     }
 };
@@ -1099,5 +995,6 @@ const getCampaigns = async (req, res) => {
 module.exports = {
     createFromImage,
     createFromPost,
-    getCampaigns
+    getCampaigns,
+    getMetrics
 };
