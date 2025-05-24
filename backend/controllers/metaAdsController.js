@@ -99,70 +99,6 @@ const isUrlAccessible = async (url) => {
 };
 
 /**
- * Verifica se uma publicação existe e está acessível
- * @param {string} userAccessToken - Token de acesso do usuário Meta
- * @param {string} objectStoryId - ID da publicação no formato pageId_postId
- * @returns {Promise<boolean>} - True se a publicação existe e está acessível, false caso contrário
- */
-const validatePostExists = async (userAccessToken, objectStoryId) => {
-    try {
-        console.log(`Validando existência da publicação: ${objectStoryId}`);
-        
-        // Extrair pageId e postId do objectStoryId
-        const [pageId, postId] = objectStoryId.split('_');
-        
-        if (!pageId || !postId) {
-            console.error('❌ Erro: object_story_id inválido, formato esperado: pageId_postId');
-            return false;
-        }
-        
-        // Tentar buscar a publicação usando o token do usuário
-        const response = await axios.get(`${META_API_BASE_URL}/${postId}`, {
-            params: {
-                fields: 'id,permalink_url,is_published',
-                access_token: userAccessToken
-            }
-        });
-        
-        // Verificar se a publicação existe e está publicada
-        if (response.data && response.data.id) {
-            console.log('✅ Publicação encontrada:', response.data);
-            
-            // Verificar se a publicação está publicada
-            if (response.data.is_published === false) {
-                console.error('❌ Erro: A publicação existe, mas não está publicada');
-                return false;
-            }
-            
-            return true;
-        }
-        
-        console.error('❌ Erro: Publicação não encontrada');
-        return false;
-    } catch (error) {
-        console.error('❌ Erro ao validar publicação:', error.response?.data || error.message);
-        
-        // Verificar se o erro é de permissão ou publicação não encontrada
-        if (error.response?.data?.error) {
-            const errorCode = error.response.data.error.code;
-            const errorMessage = error.response.data.error.message;
-            
-            // Códigos comuns: 100 (parâmetro inválido), 190 (token inválido), 10 (permissão)
-            console.error(`Código de erro: ${errorCode}, Mensagem: ${errorMessage}`);
-            
-            // Se for erro de permissão, pode ser que a publicação exista mas o usuário não tenha acesso
-            if (errorCode === 10) {
-                console.warn('⚠️ Aviso: Erro de permissão ao validar publicação. A publicação pode existir, mas o token não tem permissão para acessá-la.');
-                // Retornar true neste caso, pois o Meta Ads pode ter permissão mesmo que a API Graph não tenha
-                return true;
-            }
-        }
-        
-        return false;
-    }
-};
-
-/**
  * Cria uma campanha no Meta Ads
  * @param {string} userAccessToken - Token de acesso do usuário Meta
  * @param {string} adAccountId - ID da conta de anúncios
@@ -353,18 +289,6 @@ const createAdCreative = async (userAccessToken, adAccountId, pageId, creativeDa
             // Montar o object_story_id no formato correto: pageId_postId
             const objectStoryId = `${pageId}_${creativeData.postId}`;
             console.log(`Object Story ID montado: ${objectStoryId}`);
-            
-            // Validar se a publicação existe e está acessível
-            try {
-                const isValid = await validatePostExists(userAccessToken, objectStoryId);
-                if (!isValid) {
-                    throw new Error(`Publicação não encontrada ou não está acessível: ${objectStoryId}`);
-                }
-                console.log('✅ Publicação validada com sucesso!');
-            } catch (validationError) {
-                console.warn('⚠️ Aviso na validação da publicação:', validationError.message);
-                // Continuar mesmo com erro de validação, pois pode ser apenas um problema de permissão da API
-            }
             
             // Criar payload APENAS com object_story_id, sem object_story_spec
             const creativePayload = {
@@ -942,23 +866,6 @@ const createFromPost = async (req, res) => {
             }
             
             console.log('ID da publicação extraído com sucesso:', postId);
-            
-            // Validar o formato do object_story_id
-            const objectStoryId = `${pageId}_${postId}`;
-            console.log(`Object Story ID montado: ${objectStoryId}`);
-            
-            // Validar se a publicação existe e está acessível
-            try {
-                const isValid = await validatePostExists(userAccessToken, objectStoryId);
-                if (!isValid) {
-                    console.warn('⚠️ Aviso: Publicação pode não estar acessível, mas continuando mesmo assim...');
-                } else {
-                    console.log('✅ Publicação validada com sucesso!');
-                }
-            } catch (validationError) {
-                console.warn('⚠️ Aviso na validação da publicação:', validationError.message);
-                // Continuar mesmo com erro de validação, pois pode ser apenas um problema de permissão da API
-            }
             
         } catch (error) {
             console.error('❌ Erro ao extrair ID da publicação:', error.message);
