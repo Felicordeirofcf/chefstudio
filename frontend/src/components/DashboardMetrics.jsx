@@ -1,4 +1,4 @@
-// Componente DashboardMetrics corrigido para usar api.ts
+// Componente DashboardMetrics simplificado para mostrar apenas 3 métricas essenciais
 // Arquivo: frontend/src/components/DashboardMetrics.jsx
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
@@ -9,8 +9,7 @@ const DashboardMetrics = () => {
   const [metrics, setMetrics] = useState({
     impressions: 1234,
     clicks: 89,
-    spend: 567,
-    ctr: 0.098
+    spend: 567
   });
   const [timeRange, setTimeRange] = useState('last_30_days');
   const [error, setError] = useState(null);
@@ -27,26 +26,22 @@ const DashboardMetrics = () => {
           'today': {
             impressions: 234,
             clicks: 12,
-            spend: 78,
-            ctr: 0.051
+            spend: 78
           },
           'yesterday': {
             impressions: 345,
             clicks: 23,
-            spend: 98,
-            ctr: 0.067
+            spend: 98
           },
           'last_7_days': {
             impressions: 876,
             clicks: 54,
-            spend: 234,
-            ctr: 0.062
+            spend: 234
           },
           'last_30_days': {
             impressions: 1234,
             clicks: 89,
-            spend: 567,
-            ctr: 0.098
+            spend: 567
           }
         };
 
@@ -70,12 +65,11 @@ const DashboardMetrics = () => {
             const apiMetrics = {
               impressions: response.data.impressions || response.data.impressoes || 0,
               clicks: response.data.clicks || response.data.cliques || 0,
-              spend: response.data.spend || response.data.gastos || 0,
-              ctr: response.data.ctr || response.data.taxa_cliques || 0
+              spend: response.data.spend || response.data.gastos || 0
             };
             
             // Verificar se há pelo menos um valor válido
-            if (apiMetrics.impressions || apiMetrics.clicks || apiMetrics.spend || apiMetrics.ctr) {
+            if (apiMetrics.impressions || apiMetrics.clicks || apiMetrics.spend) {
               setMetrics(apiMetrics);
               setLoading(false);
               return;
@@ -104,7 +98,6 @@ const DashboardMetrics = () => {
     if (!value && value !== 0) return '0';
     
     if (metric === 'spend') return `R$ ${value}`;
-    if (metric === 'ctr') return `${(value * 100).toFixed(2)}%`;
     return value.toLocaleString();
   };
 
@@ -144,30 +137,21 @@ const DashboardMetrics = () => {
         </div>
       )}
       
-      {/* Cards de métricas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Cards de métricas - APENAS 3 MÉTRICAS ESSENCIAIS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-4 rounded-lg border">
           <h3 className="text-sm font-medium text-gray-500">Impressões</h3>
           <p className="text-2xl font-bold">{formatMetricValue('impressions', metrics?.impressions)}</p>
-          <p className="text-xs text-gray-500">+10% vs mês passado</p>
         </div>
         
         <div className="bg-white p-4 rounded-lg border">
           <h3 className="text-sm font-medium text-gray-500">Cliques</h3>
           <p className="text-2xl font-bold">{formatMetricValue('clicks', metrics?.clicks)}</p>
-          <p className="text-xs text-gray-500">+2% vs mês passado</p>
         </div>
         
         <div className="bg-white p-4 rounded-lg border">
-          <h3 className="text-sm font-medium text-gray-500">Gastos</h3>
+          <h3 className="text-sm font-medium text-gray-500">Valor Usado</h3>
           <p className="text-2xl font-bold">{formatMetricValue('spend', metrics?.spend)}</p>
-          <p className="text-xs text-gray-500">+5% vs mês passado</p>
-        </div>
-        
-        <div className="bg-white p-4 rounded-lg border">
-          <h3 className="text-sm font-medium text-gray-500">Taxa de Cliques</h3>
-          <p className="text-2xl font-bold">{formatMetricValue('ctr', metrics?.ctr)}</p>
-          <p className="text-xs text-gray-500">+1% vs mês passado</p>
         </div>
       </div>
     </div>
