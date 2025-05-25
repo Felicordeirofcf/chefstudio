@@ -1,5 +1,7 @@
 import React from 'react';
+import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Navigate, useLocation } from 'react-router-dom';
+import App from './App';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import DashboardLayout from './components/layout/DashboardLayout';
@@ -9,7 +11,6 @@ import PlansPage from './components/dashboard/PlansPage';
 import ConnectMeta from './components/auth/ConnectMeta';
 import MetaCallback from './components/auth/MetaCallback';
 import AnunciosTabsContainer from './components/AnunciosTabsContainer';
-import { Toaster } from "./components/ui/toaster";
 import './index.css';
 
 // 🔐 Lê informações do usuário armazenadas localmente
@@ -43,63 +44,65 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Login />,
-  },
-  {
-    path: "/register",
-    element: <Register />,
-  },
-  {
-    path: "/connect-meta",
-    element: (
-      <ProtectedRoute>
-        <ConnectMeta />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/meta-callback",
-    element: (
-      <ProtectedRoute>
-        <MetaCallback />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/dashboard",
-    element: (
-      <ProtectedRoute>
-        <DashboardLayout />
-      </ProtectedRoute>
-    ),
+    element: <App />, // App como elemento raiz
     children: [
       {
         index: true,
-        element: <DashboardHome />,
+        element: <Login />,
       },
       {
-        path: "profile",
-        element: <ProfilePage />,
+        path: "/register",
+        element: <Register />,
       },
       {
-        path: "plans",
-        element: <PlansPage />,
+        path: "/connect-meta",
+        element: (
+          <ProtectedRoute>
+            <ConnectMeta />
+          </ProtectedRoute>
+        ),
       },
       {
-        path: "anuncios",
-        element: <AnunciosTabsContainer />,
+        path: "/meta-callback",
+        element: (
+          <ProtectedRoute>
+            <MetaCallback />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard",
+        element: (
+          <ProtectedRoute>
+            <DashboardLayout />
+          </ProtectedRoute>
+        ),
+        children: [
+          {
+            index: true,
+            element: <DashboardHome />,
+          },
+          {
+            path: "profile",
+            element: <ProfilePage />,
+          },
+          {
+            path: "plans",
+            element: <PlansPage />,
+          },
+          {
+            path: "anuncios",
+            element: <AnunciosTabsContainer />,
+          },
+        ],
       },
     ],
   },
 ]);
 
-const Main = () => {
-  return (
-    <React.StrictMode>
-      <RouterProvider router={router} />
-      <Toaster />
-    </React.StrictMode>
-  );
-};
-
-export default Main;
+// Renderização do React
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <RouterProvider router={router} />
+  </React.StrictMode>
+);
