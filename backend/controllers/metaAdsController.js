@@ -319,7 +319,7 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
       },
       // <<< ADICIONADO PROMOTED_OBJECT COM POST_ID E PAGE_ID PARA POST_ENGAGEMENT >>>
       [AdSet.Fields.promoted_object]: { 
-          post_id: objectStoryId, // Usar o ID do post criado
+          object_story_id: objectStoryId, // <<< CORRIGIDO: Usar object_story_id em vez de post_id >>>
           page_id: pageId // <<< ADICIONADO PAGE_ID >>>
       }
     };
