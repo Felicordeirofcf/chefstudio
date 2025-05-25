@@ -198,25 +198,38 @@ const facebookCallback = asyncHandler(async (req, res) => {
 // @route   GET /api/meta/status
 // @access  Private
 const getMetaStatus = asyncHandler(async (req, res) => {
+  console.log(`[DEBUG] getMetaStatus - Iniciando para userId: ${req.user.id}`);
   const user = await User.findById(req.user.id).select('metaConnectionStatus metaPages metaAdAccounts').lean(); // Add .lean() here
   if (!user) {
+    console.log(`[DEBUG] getMetaStatus - Usuário não encontrado: ${req.user.id}`);
     return res.status(404).json({ message: 'Usuário não encontrado' });
   }
+
+  console.log(`[DEBUG] getMetaStatus - Dados brutos do usuário (metaPages):`, JSON.stringify(user.metaPages, null, 2));
+  console.log(`[DEBUG] getMetaStatus - Dados brutos do usuário (metaAdAccounts):`, JSON.stringify(user.metaAdAccounts, null, 2));
 
   // Use map and filter explicitly as suggested by the user
   const pages = (user.metaPages || [])
     .map(p => ({ id: p?.id, name: p?.name })) // Map first, handle potential undefined properties
     .filter(p => p.id && p.name); // Then filter for valid items
 
+  console.log(`[DEBUG] getMetaStatus - Pages após map/filter:`, JSON.stringify(pages, null, 2));
+
   const adAccounts = (user.metaAdAccounts || [])
     .map(a => ({ id: a?.id, name: a?.name })) // Map first, handle potential undefined properties
     .filter(a => a.id && a.name); // Then filter for valid items
 
-  res.json({
+  console.log(`[DEBUG] getMetaStatus - AdAccounts após map/filter:`, JSON.stringify(adAccounts, null, 2));
+
+  const responsePayload = {
     status: user.metaConnectionStatus || 'disconnected',
     pages: pages,
     adAccounts: adAccounts
-  });
+  };
+
+  console.log(`[DEBUG] getMetaStatus - Payload final da resposta:`, JSON.stringify(responsePayload, null, 2));
+
+  res.json(responsePayload);
 });
 
 // @desc    Desconectar da Meta
