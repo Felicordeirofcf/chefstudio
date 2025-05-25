@@ -271,5 +271,6 @@ module.exports = {
   facebookCallback,
   getMetaStatus,
   disconnectMeta,
+  getMetaMetrics, // <-- Adicionado para exportar a função que faltava
 };
 
