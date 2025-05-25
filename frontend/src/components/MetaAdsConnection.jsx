@@ -3,18 +3,17 @@ import { useMetaAds } from '../contexts/MetaAdsContext'; // Import the custom ho
 import { useAuth } from '../hooks/useAuth';
 import { Button } from "./ui/button"; // Assuming Button component exists
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert"; // Assuming Alert components exist
-import { InfoIcon, LoaderIcon } from "lucide-react"; // Assuming icons exist
+import { InfoIcon, LoaderIcon, CheckCircleIcon, AlertCircleIcon } from "lucide-react"; // Assuming icons exist
 
 const MetaAdsConnection = () => {
   // Consume state and functions from the context
   const { metaStatus, loading, error, connectMeta, disconnectMeta } = useMetaAds();
   const { userToken } = useAuth(); // Still need auth token check
 
-  // Determine if fully connected based on context state, checking for valid data
-  const isFullyConnected = 
-    metaStatus.status === 'connected' && 
-    Array.isArray(metaStatus.pages) && metaStatus.pages.length > 0 && metaStatus.pages[0]?.id &&
-    Array.isArray(metaStatus.adAccounts) && metaStatus.adAccounts.length > 0 && metaStatus.adAccounts[0]?.id;
+  // Refined check: Sufficiently connected if status is 'connected' and there's at least one valid page OR ad account
+  const hasValidPages = Array.isArray(metaStatus.pages) && metaStatus.pages.length > 0 && metaStatus.pages.some(p => p?.id);
+  const hasValidAdAccounts = Array.isArray(metaStatus.adAccounts) && metaStatus.adAccounts.length > 0 && metaStatus.adAccounts.some(a => a?.id);
+  const isSufficientlyConnected = metaStatus.status === 'connected' && (hasValidPages || hasValidAdAccounts);
 
   // Handle case where user is not logged in
   if (!userToken) {
@@ -24,7 +23,7 @@ const MetaAdsConnection = () => {
           Conexão com Meta Ads
         </h2>
         <Alert variant="warning">
-           <InfoIcon className="h-4 w-4" />
+           <AlertCircleIcon className="h-4 w-4" />
            <AlertTitle>Autenticação Necessária</AlertTitle>
            <AlertDescription>
              Você precisa estar autenticado para conectar ao Meta Ads. Por favor, faça login novamente.
@@ -43,7 +42,7 @@ const MetaAdsConnection = () => {
       {/* Display context error if any */}
       {error && (
         <Alert variant="destructive" className="mb-4">
-          <InfoIcon className="h-4 w-4" />
+          <AlertCircleIcon className="h-4 w-4" />
           <AlertTitle>Erro na Conexão Meta</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
@@ -57,14 +56,15 @@ const MetaAdsConnection = () => {
          </div>
       )}
 
-      {/* Conditional rendering based on context's metaStatus */}
-      {!loading && isFullyConnected ? (
+      {/* Conditional rendering based on context's metaStatus and refined check */}
+      {!loading && isSufficientlyConnected ? (
+        // Show connected status and disconnect button
         <div>
           <Alert variant="success" className="mb-4">
-             <InfoIcon className="h-4 w-4" />
+             <CheckCircleIcon className="h-4 w-4" />
              <AlertTitle>Conectado</AlertTitle>
              <AlertDescription>
-               Sua conta está conectada e pronta para criar anúncios.
+               Sua conta está conectada.{hasValidPages ? " Páginas encontradas." : ""}{hasValidAdAccounts ? " Contas de anúncio encontradas." : ""} Você pode criar anúncios.
              </AlertDescription>
           </Alert>
           <Button
@@ -81,15 +81,17 @@ const MetaAdsConnection = () => {
           </Button>
         </div>
       ) : !loading ? (
-        // Show connect button if not loading and not fully connected
+        // Show connect button or warning if not loading and not sufficiently connected
         <div>
-           <Alert variant="info" className="mb-4">
-             <InfoIcon className="h-4 w-4" />
-             <AlertTitle>Conexão Necessária</AlertTitle>
+           <Alert variant={metaStatus.status === 'connected' ? 'warning' : 'info'} className="mb-4">
+             {metaStatus.status === 'connected' ? <AlertCircleIcon className="h-4 w-4" /> : <InfoIcon className="h-4 w-4" />}
+             <AlertTitle>
+               {metaStatus.status === 'connected' ? 'Ação Necessária' : 'Conexão Necessária'}
+             </AlertTitle>
              <AlertDescription>
                {metaStatus.status === 'connected' 
-                 ? "Sua conta Meta está conectada, mas precisamos de acesso a páginas e contas de anúncio. Verifique as permissões ou tente reconectar."
-                 : "Conecte sua conta ao Meta Ads para criar anúncios."
+                 ? `Sua conta Meta está conectada, mas não encontramos ${!hasValidPages ? 'páginas válidas' : ''}${!hasValidPages && !hasValidAdAccounts ? ' ou ' : ''}${!hasValidAdAccounts ? 'contas de anúncio válidas' : ''} associadas. Verifique as permissões no Facebook ou tente reconectar.`
+                 : "Conecte sua conta ao Meta Ads para poder criar anúncios."
                }
              </AlertDescription>
            </Alert>
@@ -102,7 +104,7 @@ const MetaAdsConnection = () => {
                 <LoaderIcon className="mr-2 h-4 w-4 animate-spin" />
                 Processando...
               </span>
-            ) : 'Conectar ao Meta Ads'}
+            ) : (metaStatus.status === 'connected' ? 'Reconectar ao Meta Ads' : 'Conectar ao Meta Ads')}
           </Button>
         </div>
       ) : null} {/* Render nothing while loading initially if preferred */}
