@@ -2,8 +2,9 @@ const { scrapeIfoodProduct } = require("../services/ifoodScraper");
 
 /**
  * Controller para lidar com o scraping de produtos do iFood.
+ * Renomeado de scrapeProduct para extrairDadosIfood para consistência.
  */
-exports.scrapeProduct = async (req, res) => {
+exports.extrairDadosIfood = async (req, res) => { // <<< RENOMEADO AQUI
   const { url } = req.body;
 
   // Validação básica da URL
@@ -17,12 +18,12 @@ exports.scrapeProduct = async (req, res) => {
   }
 
   try {
-    console.log(`Recebida requisição para scraping da URL: ${url}`);
+    console.log(`Recebida requisição para extração da URL: ${url}`);
     const productData = await scrapeIfoodProduct(url);
-    console.log(`Scraping bem-sucedido para URL: ${url}`);
+    console.log(`Extração bem-sucedida para URL: ${url}`);
     res.status(200).json(productData);
   } catch (error) {
-    console.error(`Erro no controller ao processar scraping para ${url}:`, error.message);
+    console.error(`Erro no controller ao processar extração para ${url}:`, error.message);
     // Determinar o status code baseado no tipo de erro
     let statusCode = 500;
     if (error.message.includes("inválida") || error.message.includes("não parece ser do iFood")) {
