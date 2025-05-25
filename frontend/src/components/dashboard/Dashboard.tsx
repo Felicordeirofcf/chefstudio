@@ -43,7 +43,7 @@ export default function Dashboard() {
   const [timeRange, setTimeRange] = useState("last_30_days"); // Estado para o período
 
   // Fetch user profile (REMOVIDO FETCH DE MÉTRICAS TEMPORARIAMENTE)
-  use  useEffect(() => {
+  useEffect(() => {
     const fetchInitialData = async () => {
       // setLoadingMetrics(true); // Não precisamos mais disso por enquanto
       try {
