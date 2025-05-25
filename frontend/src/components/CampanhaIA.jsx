@@ -239,7 +239,6 @@ const CampanhaIA = () => {
   // Função para publicar post e criar anúncio
   const publicarPostECriarAnuncio = async () => {
     // Validar campos obrigatórios
-    // Precisa de imagem (manual ou iFood) e legenda
     if (!nomeCampanha || (!imagem && !scrapedImageUrl) || !legendaGerada || !selectedAdAccount || !selectedPage || !orcamento) {
       toast({
         title: "Campos obrigatórios",
@@ -259,45 +258,51 @@ const CampanhaIA = () => {
       }
 
       const API_BASE_URL = import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app";
-      
-      // Preparar FormData
-      const formData = new FormData();
-      formData.append('caption', legendaGerada);
-      formData.append('pageId', selectedPage);
-      formData.append('adAccountId', selectedAdAccount);
-      formData.append('campaignName', nomeCampanha);
-      
-      // Adicionar imagem: priorizar upload manual, senão usar URL do iFood
-      if (imagem) {
-        formData.append('image', imagem); // Envia o arquivo
-      } else if (scrapedImageUrl) {
-        formData.append('imageUrl', scrapedImageUrl); // Envia a URL
-        // IMPORTANTE: O backend (/api/meta-ads/publicar-post-criar-anuncio) PRECISA ser ajustado
-        // para aceitar 'imageUrl' além de 'image' (arquivo).
-        console.warn("Enviando imageUrl para o backend. Certifique-se que o endpoint /publicar-post-criar-anuncio aceita isso.");
-      }
+      const url = `${API_BASE_URL}/api/meta-ads/publicar-post-criar-anuncio`;
       
       // Determinar o orçamento final
       const orcamentoFinal = orcamento === 'custom' ? orcamentoCustom : orcamento;
-      formData.append('weeklyBudget', orcamentoFinal);
-      
-      // Adicionar datas
-      formData.append('startDate', dataInicio);
-      if (dataTermino) {
-        formData.append('endDate', dataTermino);
+
+      let requestData;
+      let requestHeaders = { Authorization: `Bearer ${token}` };
+
+      if (imagem) {
+        // Caso 1: Upload manual de imagem -> Usar FormData
+        const formData = new FormData();
+        formData.append('caption', legendaGerada);
+        formData.append('pageId', selectedPage);
+        formData.append('adAccountId', selectedAdAccount);
+        formData.append('campaignName', nomeCampanha);
+        formData.append('image', imagem); // Envia o arquivo
+        formData.append('weeklyBudget', orcamentoFinal);
+        formData.append('startDate', dataInicio);
+        if (dataTermino) {
+          formData.append('endDate', dataTermino);
+        }
+        requestData = formData;
+        // Content-Type é definido automaticamente pelo browser para FormData
+      } else if (scrapedImageUrl) {
+        // Caso 2: URL de imagem (iFood) -> Usar JSON
+        requestData = {
+          caption: legendaGerada,
+          pageId: selectedPage,
+          adAccountId: selectedAdAccount,
+          campaignName: nomeCampanha,
+          imageUrl: scrapedImageUrl, // Envia a URL
+          weeklyBudget: orcamentoFinal,
+          startDate: dataInicio,
+        };
+        if (dataTermino) {
+          requestData.endDate = dataTermino;
+        }
+        requestHeaders['Content-Type'] = 'application/json';
+      } else {
+        // Caso impossível devido à validação inicial, mas para segurança
+        throw new Error('Nenhuma imagem ou URL de imagem fornecida.');
       }
 
       // Enviar requisição
-      const response = await axios.post(
-        `${API_BASE_URL}/api/meta-ads/publicar-post-criar-anuncio`,
-        formData,
-        { 
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            // Content-Type é definido automaticamente pelo browser para FormData
-          } 
-        }
-      );
+      const response = await axios.post(url, requestData, { headers: requestHeaders });
 
       if (response.data && response.data.success) {
         const dataAtual = new Date();
@@ -318,6 +323,10 @@ const CampanhaIA = () => {
         setIfoodUrl('');
         setLegendaGerada('');
         setOrcamentoCustom('');
+        // Resetar datas? Depende do fluxo desejado
+        // const today = new Date().toISOString().split('T')[0];
+        // setDataInicio(today);
+        // setDataTermino('');
         
         toast({
           title: "Sucesso!",
@@ -328,10 +337,12 @@ const CampanhaIA = () => {
       }
     } catch (error) {
       console.error('Erro ao publicar post e criar anúncio:', error.response?.data || error.message);
-      setError('Falha ao publicar post e criar anúncio. Por favor, tente novamente.');
+      // Tentar extrair mensagem de erro específica do backend, se disponível
+      const backendErrorMessage = error.response?.data?.message || error.response?.data?.error || 'Falha ao publicar post e criar anúncio.';
+      setError(backendErrorMessage + ' Por favor, tente novamente.');
       toast({
         title: "Erro ao criar anúncio",
-        description: error.response?.data?.message || "Ocorreu um erro ao publicar o post e criar o anúncio. Tente novamente.",
+        description: backendErrorMessage + " Verifique os dados e tente novamente.",
         variant: "destructive"
       });
     } finally {
