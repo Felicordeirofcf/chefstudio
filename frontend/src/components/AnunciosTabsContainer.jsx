@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import CampanhaManual from '../CampanhaManual';
-import CampanhaIA from '../CampanhaIA';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import CampanhaManual from './CampanhaManual';
+import CampanhaIA from './CampanhaIA';
 
 const AnunciosTabsContainer = () => {
   const [activeTab, setActiveTab] = useState("manual");
