@@ -20,8 +20,7 @@ const upload = multer({ storage: storage });
 // Importar os controllers
 const { 
   publishPostAndCreateAd, 
-  listCampaigns, // Importar a nova função
-  criarCampanha // Manter se necessário para outras rotas
+  listCampaigns
 } = require("../controllers/metaAdsController");
 
 /**
@@ -30,9 +29,6 @@ const {
  *   name: Meta Ads
  *   description: Integração com a API de Anúncios da Meta (Facebook/Instagram)
  */
-
-// Rota antiga (manter se ainda usada, senão remover)
-// router.post("/campanhas", protect, criarCampanha);
 
 /**
  * @swagger
