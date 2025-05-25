@@ -468,7 +468,7 @@ const CampanhaIA = () => {
                   <div className="space-y-2 w-full">
                     <img 
                       src={previewImagem} 
-                      alt="Preview" 
+                      alt="Preview" crossOrigin="anonymous" referrerPolicy="no-referrer" 
                       className="mx-auto h-48 object-contain rounded-md"
                       // Adicionar tratamento de erro para imagens externas
                       onError={(e) => { e.target.onerror = null; e.target.src='/placeholder-image.png'; /* ou alguma imagem padrão */ }}
