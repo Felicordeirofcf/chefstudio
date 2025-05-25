@@ -203,14 +203,29 @@ const getMetaStatus = asyncHandler(async (req, res) => {
     return res.status(404).json({ message: 'Usuário não encontrado' });
   }
 
-  // Filter pages and adAccounts to ensure they have id and name
-  const validPages = (user.metaPages || []).filter(page => page && page.id && page.name);
-  const validAdAccounts = (user.metaAdAccounts || []).filter(acc => acc && acc.id && acc.name);
+  // Manually build the response arrays to ensure correct structure
+  const responsePages = [];
+  if (Array.isArray(user.metaPages)) {
+    for (const page of user.metaPages) {
+      if (page && page.id && page.name) {
+        responsePages.push({ id: page.id, name: page.name });
+      }
+    }
+  }
+
+  const responseAdAccounts = [];
+  if (Array.isArray(user.metaAdAccounts)) {
+    for (const acc of user.metaAdAccounts) {
+      if (acc && acc.id && acc.name) {
+        responseAdAccounts.push({ id: acc.id, name: acc.name });
+      }
+    }
+  }
 
   res.json({
     status: user.metaConnectionStatus || 'disconnected',
-    pages: validPages,
-    adAccounts: validAdAccounts
+    pages: responsePages,
+    adAccounts: responseAdAccounts
   });
 });
 
