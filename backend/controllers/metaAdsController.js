@@ -299,31 +299,21 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     const adSetData = {
       [AdSet.Fields.name]: `Ad Set para ${campaignName}`,
       [AdSet.Fields.campaign_id]: campaign.id,
-      [AdSet.Fields.status]: AdSet.Status.active, // <<< CORRIGIDO PARA ACTIVE >>>
+      [AdSet.Fields.status]: AdSet.Status.active, // <<< RE-CONFIRMADO PARA ACTIVE >>>
       [AdSet.Fields.billing_event]: AdSet.BillingEvent.impressions,
       [AdSet.Fields.optimization_goal]: AdSet.OptimizationGoal.post_engagement,
       [AdSet.Fields.daily_budget]: dailyBudget,
       [AdSet.Fields.start_time]: new Date(startDate).toISOString(),
       [AdSet.Fields.targeting]: {
         geo_locations: { countries: ["BR"] },
-        // <<< ADICIONADO: Placements padrão >>>
-        facebook_positions: ["feed", "story", "instagram_feed", "instagram_stories"], // Adicionado placements padrão
-        publisher_platforms: ["facebook", "instagram"] // Especificar plataformas
+        // publisher_platforms: ["facebook", "instagram"], // Exemplo: Definir placements se necessário
+        // facebook_positions: ["feed"], // Exemplo: Posições específicas
       },
-      // <<< ADICIONADO: Bid Amount padrão (ex: R$ 1,00 = 100 centavos) >>>
-      [AdSet.Fields.bid_amount]: 100,
-      // <<< ADICIONADO: Promoted Object para engajamento com a página >>>
-      // Para POST_ENGAGEMENT, geralmente se promove a página ou um post específico.
-      // Se o objetivo é engajamento GERAL com a página associada ao post, usamos page_id.
-      // Se for engajamento com o POST específico, a API pode exigir o post_id aqui, mas a documentação é ambígua.
-      // Vamos começar com page_id, pois é mais comum para engajamento geral.
-      // NOTA: O erro "(#100) Invalid keys \"post_id\" were found in param \"promoted_object\"" SUGERE que
-      // talvez 'post_id' seja esperado aqui para POST_ENGAGEMENT, mas a chave está errada.
-      // A documentação para Ad Set / POST_ENGAGEMENT precisa ser verificada com mais cuidado.
-      // Por ora, tentaremos com page_id. Se falhar, precisaremos investigar 'post_id' ou 'object_story_id' aqui.
-      [AdSet.Fields.promoted_object]: {
-        [AdSet.PromotedObjectFields.page_id]: pageId
-      },
+      // <<< ADICIONADO PROMOTED_OBJECT COM POST_ID E PAGE_ID PARA POST_ENGAGEMENT >>>
+      [AdSet.Fields.promoted_object]: { 
+          post_id: objectStoryId, // Usar o ID do post criado
+          page_id: pageId // <<< ADICIONADO PAGE_ID >>>
+      }
     };
     // <<< TRATAMENTO ROBUSTO PARA ENDDATE >>>
     if (endDate && endDate !== 'undefined' && endDate !== null && endDate !== '') {
@@ -332,14 +322,9 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
           console.log(`[Ad Creation] Adicionando end_time ao Ad Set: ${adSetData[AdSet.Fields.end_time]}`);
       } catch (dateError) {
           console.warn(`[Ad Creation] endDate fornecido ('${endDate}') é inválido. Ignorando end_time. Erro: ${dateError.message}`);
-          // Não definir end_time se a data for inválida
       }
     } else {
         console.log("[Ad Creation] endDate não fornecido ou inválido. Ad Set será contínuo.");
-        // Opcional: Definir uma data de término padrão se necessário
-        // const defaultEndDate = new Date();
-        // defaultEndDate.setDate(defaultEndDate.getDate() + 7); // Ex: 7 dias a partir de hoje
-        // adSetData[AdSet.Fields.end_time] = defaultEndDate.toISOString();
     }
     console.log("[Ad Creation] Payload para createAdSet:", JSON.stringify(adSetData, null, 2));
     const adSet = await adAccount.createAdSet([], adSetData);
@@ -350,8 +335,8 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     const adData = {
       [Ad.Fields.name]: `Anúncio para ${campaignName}`,
       [Ad.Fields.adset_id]: adSet.id,
-      [Ad.Fields.creative]: { creative_id: adCreative.id }, // <<< USA O ID DO CRIATIVO GERADO
-      [Ad.Fields.status]: Ad.Status.active, // <<< CORRIGIDO PARA ACTIVE >>>
+      [Ad.Fields.creative]: { creative_id: adCreative.id },
+      [Ad.Fields.status]: Ad.Status.active, // <<< RE-CONFIRMADO PARA ACTIVE >>>
     };
     console.log("[Ad Creation] Payload para createAd:", JSON.stringify(adData, null, 2));
     const ad = await adAccount.createAd([], adData);
