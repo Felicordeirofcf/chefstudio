@@ -310,7 +310,7 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
       [AdSet.Fields.status]: AdSet.Status.active, // <<< RE-CONFIRMADO PARA ACTIVE >>>
       [AdSet.Fields.billing_event]: AdSet.BillingEvent.impressions,
       [AdSet.Fields.optimization_goal]: AdSet.OptimizationGoal.post_engagement,
-      [AdSet.Fields.bid_strategy]: AdSet.BidStrategy.lowest_cost_without_bid_cap, // <<< ADICIONADO: Estratégia de lance obrigatória >>>
+      [AdSet.Fields.bid_strategy]: "LOWEST_COST_WITHOUT_BID_CAP", // <<< CORRIGIDO: Usar string diretamente >>>
       [AdSet.Fields.daily_budget]: dailyBudget,
       [AdSet.Fields.start_time]: new Date(startDate).toISOString(),
       [AdSet.Fields.targeting]: {
