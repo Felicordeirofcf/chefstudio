@@ -14,15 +14,12 @@ const initFacebookApi = (accessToken) => {
   if (!accessToken) {
     throw new Error("Access Token do Facebook não encontrado.");
   }
-  // Verifica se a API já foi inicializada para evitar erros
   try {
     return FacebookAdsApi.init(accessToken);
   } catch (e) {
-    // Ignora erro se já inicializado, mas loga para debug se for outro erro
     if (!e.message.includes("already been initialized")) {
       console.warn("Erro não esperado ao inicializar FacebookAdsApi:", e.message);
     }
-    // Retorna a instância existente ou null se falhar por outro motivo
     return FacebookAdsApi.getInstance();
   }
 };
@@ -40,14 +37,12 @@ const listCampaigns = asyncHandler(async (req, res) => {
     throw new Error("O parâmetro 'adAccountId' é obrigatório.");
   }
 
-  // 1. Get User's Facebook Access Token
   const user = await User.findById(req.user.id);
-  // CORRIGIDO: Usar metaAccessToken, que é o campo correto onde o token é salvo
   if (!user || !user.metaAccessToken) { 
     res.status(401);
     throw new Error("Usuário não encontrado ou token do Facebook ausente.");
   }
-  const accessToken = user.metaAccessToken; // CORRIGIDO
+  const accessToken = user.metaAccessToken;
   const api = initFacebookApi(accessToken);
 
   if (!api) {
@@ -56,7 +51,7 @@ const listCampaigns = asyncHandler(async (req, res) => {
   }
 
   try {
-    const account = new AdAccount(adAccountId); // Não precisa do 'act_'
+    const account = new AdAccount(adAccountId);
     const campaigns = await account.getCampaigns([
       Campaign.Fields.id,
       Campaign.Fields.name,
@@ -69,10 +64,9 @@ const listCampaigns = asyncHandler(async (req, res) => {
       Campaign.Fields.lifetime_budget,
       Campaign.Fields.budget_remaining
     ], {
-      limit: 100 // Ajuste o limite conforme necessário
+      limit: 100
     });
 
-    // Mapeia os dados para um formato mais simples, se necessário
     const formattedCampaigns = campaigns.map(campaign => ({
       id: campaign.id,
       name: campaign.name,
@@ -102,6 +96,7 @@ const listCampaigns = asyncHandler(async (req, res) => {
 
 /**
  * @description Publica uma foto na página do Facebook e cria um anúncio para impulsioná-la.
+ *              Aceita imagem via upload (req.file) ou URL (req.body.imageUrl).
  * @route POST /api/meta-ads/publicar-post-criar-anuncio
  * @access Privado
  */
@@ -111,15 +106,21 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     pageId, 
     adAccountId, 
     campaignName, 
-    weeklyBudget, // Orçamento semanal em REAIS (precisa converter para centavos)
+    weeklyBudget, 
     startDate, 
-    endDate // Opcional
+    endDate, // Opcional
+    imageUrl // <<< NOVO: Receber URL da imagem do iFood
   } = req.body;
   const imageFile = req.file; // Image file from multer
 
-  if (!imageFile) {
+  // --- Validação de Entrada ---
+  if (!imageFile && !imageUrl) { // Precisa de um dos dois
     res.status(400);
-    throw new Error("Nenhuma imagem foi enviada.");
+    throw new Error("Nenhuma imagem foi enviada (nem arquivo, nem URL).");
+  }
+  if (imageFile && imageUrl) {
+     console.warn("Imagem enviada via arquivo e URL. Priorizando arquivo.");
+     // Prioriza o arquivo se ambos forem enviados
   }
 
   if (!caption || !pageId || !adAccountId || !campaignName || !weeklyBudget || !startDate) {
@@ -127,14 +128,13 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     throw new Error("Campos obrigatórios faltando: caption, pageId, adAccountId, campaignName, weeklyBudget, startDate.");
   }
 
-  // 1. Get User's Facebook Access Token
-  const user = await User.findById(req.user.id); // Assuming req.user is populated by 'protect' middleware
-  // CORRIGIDO: Usar metaAccessToken, que é o campo correto onde o token é salvo
+  // --- Autenticação e Inicialização da API ---
+  const user = await User.findById(req.user.id);
   if (!user || !user.metaAccessToken) { 
     res.status(401);
     throw new Error("Usuário não encontrado ou token do Facebook ausente.");
   }
-  const accessToken = user.metaAccessToken; // CORRIGIDO
+  const accessToken = user.metaAccessToken;
   const api = initFacebookApi(accessToken);
    if (!api) {
       res.status(500);
@@ -142,46 +142,75 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
   }
 
   try {
-    // 2. Upload Photo to Facebook Page
-    const photoFormData = new FormData();
-    photoFormData.append('caption', caption);
-    photoFormData.append('source', imageFile.buffer, { filename: imageFile.originalname, contentType: imageFile.mimetype });
-    photoFormData.append('access_token', accessToken); // Include token for direct API call
+    // --- Publicação da Foto --- 
+    let postId;
+    // Prioriza upload de arquivo
+    if (imageFile) {
+        console.log("Publicando foto via upload de arquivo...");
+        const photoFormData = new FormData();
+        photoFormData.append("caption", caption);
+        photoFormData.append("source", imageFile.buffer, { filename: imageFile.originalname, contentType: imageFile.mimetype });
+        photoFormData.append("access_token", accessToken);
 
-    const uploadResponse = await axios.post(
-      `https://graph.facebook.com/v18.0/${pageId}/photos`,
-      photoFormData,
-      { headers: photoFormData.getHeaders() }
-    );
-
-    if (!uploadResponse.data || !uploadResponse.data.post_id) {
-      console.error("Facebook Photo Upload Response:", uploadResponse.data);
-      throw new Error("Falha ao fazer upload da foto para o Facebook. Resposta inválida.");
+        const uploadResponse = await axios.post(
+          `https://graph.facebook.com/v18.0/${pageId}/photos`,
+          photoFormData,
+          { headers: photoFormData.getHeaders() }
+        );
+        if (!uploadResponse.data || !uploadResponse.data.post_id) {
+            console.error("Facebook Photo Upload Response (File):", uploadResponse.data);
+            throw new Error("Falha ao fazer upload da foto (arquivo) para o Facebook. Resposta inválida.");
+        }
+        postId = uploadResponse.data.post_id;
+        console.log(`Foto publicada via arquivo com sucesso. Post ID: ${postId}`);
+    } else if (imageUrl) {
+        console.log(`Publicando foto via URL: ${imageUrl}`);
+        // Publicar usando a URL
+        const uploadResponse = await axios.post(
+          `https://graph.facebook.com/v18.0/${pageId}/photos`,
+          {
+            caption: caption,
+            url: imageUrl, // Usar a URL fornecida
+            access_token: accessToken
+          }
+          // Não precisa de headers especiais para JSON
+        );
+         if (!uploadResponse.data || !uploadResponse.data.post_id) {
+            console.error("Facebook Photo Upload Response (URL):", uploadResponse.data);
+            throw new Error("Falha ao fazer upload da foto (URL) para o Facebook. Resposta inválida.");
+        }
+        postId = uploadResponse.data.post_id;
+        console.log(`Foto publicada via URL com sucesso. Post ID: ${postId}`);
     }
-    const postId = uploadResponse.data.post_id;
-    const objectStoryId = `${pageId}_${postId.split('_')[1]}`; // Format: pageId_postId
 
-    // 3. Create Ad Campaign (Boost Post)
-    const adAccount = new AdAccount(adAccountId); // Não precisa do 'act_'
+    const objectStoryId = `${pageId}_${postId.split("_")[1]}`; // Format: pageId_postId
+    console.log(`Object Story ID para o anúncio: ${objectStoryId}`);
+
+    // --- Criação da Campanha de Anúncio --- 
+    console.log(`Iniciando criação da campanha: ${campaignName} na conta ${adAccountId}`);
+    const adAccount = new AdAccount(adAccountId);
     
-    // Convert budget from BRL string/number to cents integer
+    // Converter orçamento semanal (BRL) para diário (centavos)
     const budgetInCents = Math.round(parseFloat(weeklyBudget) * 100);
     const dailyBudget = Math.round(budgetInCents / 7);
+    console.log(`Orçamento semanal: R$${weeklyBudget}, Orçamento diário calculado: ${dailyBudget} centavos`);
 
-    // --- Create Campaign ---
+    // Criar Campanha
     const campaignData = {
       [Campaign.Fields.name]: campaignName,
-      [Campaign.Fields.objective]: Campaign.Objective.outcome_engagement, // Objective for boosting posts
-      [Campaign.Fields.status]: Campaign.Status.paused, // Start paused, activate later
-      [Campaign.Fields.special_ad_categories]: [], // Assuming no special categories
-      [Campaign.Fields.buying_type]: 'AUCTION',
+      [Campaign.Fields.objective]: Campaign.Objective.outcome_engagement, 
+      [Campaign.Fields.status]: Campaign.Status.paused, 
+      [Campaign.Fields.special_ad_categories]: [],
+      [Campaign.Fields.buying_type]: "AUCTION",
     };
     const campaign = await adAccount.createCampaign([], campaignData);
     const campaignId = campaign.id;
+    console.log(`Campanha criada com ID: ${campaignId}`);
 
-    // --- Create Ad Set ---
+    // Criar Conjunto de Anúncios (AdSet)
     const targeting = {
-      geo_locations: { countries: ['BR'] }, // Example: Target Brazil
+      geo_locations: { countries: ["BR"] }, // Exemplo: Brasil
+      // Adicionar mais opções de segmentação aqui se necessário
     };
     const adSetData = {
       [AdSet.Fields.name]: `AdSet - ${campaignName}`,
@@ -189,33 +218,36 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
       [AdSet.Fields.status]: AdSet.Status.paused,
       [AdSet.Fields.billing_event]: AdSet.BillingEvent.impressions,
       [AdSet.Fields.optimization_goal]: AdSet.OptimizationGoal.post_engagement,
-      [AdSet.Fields.daily_budget]: dailyBudget, // Use daily budget calculated from weekly
+      [AdSet.Fields.daily_budget]: dailyBudget,
       [AdSet.Fields.targeting]: targeting,
       [AdSet.Fields.start_time]: new Date(startDate).toISOString(),
-      ...(endDate && { [AdSet.Fields.end_time]: new Date(endDate).toISOString() }), // Add end date if provided
+      ...(endDate && { [AdSet.Fields.end_time]: new Date(endDate).toISOString() }),
     };
     const adSet = await adAccount.createAdSet([], adSetData);
     const adSetId = adSet.id;
+    console.log(`Conjunto de anúncios criado com ID: ${adSetId}`);
 
-    // --- Create Ad Creative (using existing post) ---
+    // Criar Criativo do Anúncio (AdCreative)
     const creativeData = {
       [AdCreative.Fields.name]: `Creative - ${campaignName}`,
       [AdCreative.Fields.object_story_id]: objectStoryId,
     };
     const creative = await adAccount.createAdCreative([], creativeData);
     const creativeId = creative.id;
+    console.log(`Criativo do anúncio criado com ID: ${creativeId}`);
 
-    // --- Create Ad ---
+    // Criar Anúncio (Ad)
     const adData = {
       [Ad.Fields.name]: `Ad - ${campaignName}`,
       [Ad.Fields.adset_id]: adSetId,
       [Ad.Fields.creative]: { creative_id: creativeId },
-      [Ad.Fields.status]: Ad.Status.paused, // Start paused
+      [Ad.Fields.status]: Ad.Status.paused,
     };
     const ad = await adAccount.createAd([], adData);
     const adId = ad.id;
+    console.log(`Anúncio criado com ID: ${adId}`);
 
-    // Activate Campaign, AdSet, Ad (Optional - can leave paused)
+    // Opcional: Ativar Campanha, AdSet, Ad (deixando em pausa por padrão)
     // await new Campaign(campaignId).update([], { [Campaign.Fields.status]: Campaign.Status.active });
     // await new AdSet(adSetId).update([], { [AdSet.Fields.status]: AdSet.Status.active });
     // await new Ad(adId).update([], { [Ad.Fields.status]: Ad.Status.active });
@@ -227,29 +259,33 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
       campaignId: campaignId,
       adSetId: adSetId,
       adId: adId,
-      adsManagerUrl: `https://business.facebook.com/adsmanager/manage/campaigns?act=${adAccountId.replace('act_','')}` // Remove act_ prefix for URL
+      adsManagerUrl: `https://business.facebook.com/adsmanager/manage/campaigns?act=${adAccountId.replace("act_","")}`
     });
 
   } catch (error) {
-    console.error("Erro ao publicar post ou criar anúncio no Facebook:", error.response ? error.response.data : error.message);
-    res.status(500);
-    let errorMessage = "Falha ao integrar com o Facebook.";
+    console.error("Erro detalhado ao publicar post ou criar anúncio:", error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
+    // Tentar extrair a mensagem de erro específica do Facebook
+    let fbErrorMessage = "Falha ao integrar com o Facebook.";
     if (error.response && error.response.data && error.response.data.error) {
-      errorMessage = error.response.data.error.message || errorMessage;
+      fbErrorMessage = error.response.data.error.message || fbErrorMessage;
+      if (error.response.data.error.error_user_title && error.response.data.error.error_user_msg) {
+          fbErrorMessage = `${error.response.data.error.error_user_title}: ${error.response.data.error.error_user_msg}`;
+      }
     }
-    throw new Error(`Erro na integração com Facebook: ${errorMessage}`);
+    res.status(500);
+    throw new Error(`Erro na integração com Facebook: ${fbErrorMessage}`);
   }
 });
 
-// Placeholder for the old criarCampanha function if it's still needed elsewhere
+// Placeholder para a função antiga, se necessário
 function criarCampanha(req, res) {
-  res.status(501).json({ message: 'Função criarCampanha não implementada neste contexto.' });
+  res.status(501).json({ message: "Função criarCampanha não implementada neste contexto." });
 }
 
 module.exports = {
   publishPostAndCreateAd,
-  listCampaigns, // Exportar a nova função
-  upload, // Export multer middleware
-  criarCampanha // Keep if needed, otherwise remove
+  listCampaigns,
+  upload, // Exportar multer middleware
+  criarCampanha // Manter se necessário
 };
 

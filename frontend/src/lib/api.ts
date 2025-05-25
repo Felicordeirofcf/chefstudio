@@ -344,3 +344,31 @@ export const getUserCampaigns = async () => {
 export { api };
 // Também exportar como default para compatibilidade máxima
 export default api;
+
+
+
+// --- iFood Scraping API Call ---
+/**
+ * Envia uma URL do iFood para o backend para extrair dados do produto.
+ * @param {string} url A URL completa do produto no iFood.
+ * @returns {Promise<object>} Um objeto com os dados extraídos (nome, descricao, preco, imagem, restaurante).
+ */
+export const scrapeIfoodProduct = async (url: string) => {
+  try {
+    const token = getToken();
+    if (!token) {
+      throw new Error("Você precisa estar autenticado para buscar dados do iFood.");
+    }
+
+    console.log(`Enviando URL para scraping: ${url}`);
+    // Usar a rota correta definida no backend
+    const response = await api.post(`/api/ifood/scrape`, { url }); 
+    console.log("Dados recebidos do scraping:", response.data);
+    return response.data; // Retorna o objeto com os dados extraídos
+  } catch (error: any) {
+    console.error("Erro ao buscar dados do iFood:", error);
+    // Re-lançar o erro para ser tratado no componente
+    throw new Error(error.message || "Erro ao tentar extrair dados do iFood."); 
+  }
+};
+

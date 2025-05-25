@@ -49,9 +49,8 @@ const metaAdsRoutes = require(
 const adRoutes = require(
 "./routes/adRoutes"
 ); 
-const openaiRoutes = require(
-"./routes/openaiRoutes"
-); // <<< IMPORTAR ROTAS OPENAI
+const openaiRoutes = require("./routes/openaiRoutes"); // <<< IMPORTAR ROTAS OPENAI
+const ifoodRoutes = require("./routes/ifoodRoutes"); // <<< IMPORTAR ROTAS IFOODAI
 
 // Configurar variáveis de ambiente
 dotenv.config();
@@ -154,9 +153,8 @@ app.use(
 app.use(
 "/api/ads"
 , adRoutes); 
-app.use(
-"/api/openai"
-, openaiRoutes); // <<< MONTAR ROTAS OPENAI
+aapp.use("/api/openai", openaiRoutes); // <<< MONTAR ROTAS OPENAI
+app.use("/api/ifood", ifoodRoutes); // <<< MONTAR ROTAS IFOODI
 
 // Rota básica para verificar se o servidor está funcionando
 app.get(
