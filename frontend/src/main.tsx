@@ -1,11 +1,5 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client';
-import {
-  createBrowserRouter,
-  RouterProvider,
-  Navigate,
-  useLocation,
-} from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate, useLocation } from 'react-router-dom';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import DashboardLayout from './components/layout/DashboardLayout';
@@ -14,6 +8,7 @@ import ProfilePage from './components/dashboard/ProfilePage';
 import PlansPage from './components/dashboard/PlansPage';
 import ConnectMeta from './components/auth/ConnectMeta';
 import MetaCallback from './components/auth/MetaCallback';
+import AnunciosTabsContainer from './components/AnunciosTabsContainer';
 import { Toaster } from "./components/ui/toaster";
 import './index.css';
 
@@ -90,13 +85,21 @@ const router = createBrowserRouter([
         path: "plans",
         element: <PlansPage />,
       },
+      {
+        path: "anuncios",
+        element: <AnunciosTabsContainer />,
+      },
     ],
   },
 ]);
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <RouterProvider router={router} />
-    <Toaster />
-  </React.StrictMode>
-);
+const Main = () => {
+  return (
+    <React.StrictMode>
+      <RouterProvider router={router} />
+      <Toaster />
+    </React.StrictMode>
+  );
+};
+
+export default Main;
