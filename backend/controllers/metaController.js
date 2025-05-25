@@ -268,5 +268,31 @@ module.exports = {
   getMetaStatus,
   disconnectMeta,
   getMetaMetrics, // Agora a função está definida acima e pode ser exportada corretamente
+  createRecommendedTrafficCampaign, // Adicionando a nova função exportada
 };
+
+
+
+
+// @desc    Criar campanha de tráfego recomendada (Placeholder)
+// @route   POST /api/ads/create-recommended-traffic-campaign
+// @access  Private
+const createRecommendedTrafficCampaign = asyncHandler(async (req, res) => {
+  console.log(`[Meta Campaign] Rota /create-recommended-traffic-campaign chamada para userId: ${req.user?.id}. Placeholder ativo.`);
+  // TODO: Implementar lógica real para criar campanha de tráfego recomendada na API do Facebook/Meta
+  // Exemplo: Acessar req.body (objetivo, nome, etc.), req.file (imagem), req.user (para tokens e IDs)
+  // Chamar API da Meta para criar a campanha com os dados fornecidos
+  // Retornar o ID da campanha criada ou detalhes
+
+  // Resposta placeholder
+  res.status(201).json({
+    message: 'Placeholder: Campanha de tráfego recomendada criada com sucesso (implementação pendente)!',
+    userId: req.user?.id,
+    campaignDetails: { // Exemplo de dados que podem ser retornados
+      objective: req.body?.objective || 'TRAFFIC',
+      name: req.body?.name || 'Campanha Recomendada',
+      image: req.file ? req.file.path : 'Nenhuma imagem enviada'
+    }
+  });
+});
 
