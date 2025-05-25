@@ -64,7 +64,7 @@ async function generateDescriptionAndCaptionFromImage(imageBuffer) {
     // Detectar tipo de imagem seria ideal, mas vamos assumir jpeg/png por enquanto
     const dataUrl = `data:image/jpeg;base64,${base64Image}`; 
 
-    const modelToUse = "gpt-4o"; // Usar gpt-4o que é mais recente e tem visão
+    const modelToUse = "gpt-3.5-turbo"; // Alterado conforme solicitado, VAI QUEBRAR A FUNCIONALIDADE DE VISÃO
 
     // Corrigido: Usar template literals (backticks) para a string multi-linha do prompt
     const promptText = `Analise esta imagem de um prato de comida. Forneça:
