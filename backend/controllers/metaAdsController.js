@@ -267,79 +267,83 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     const campaign = await adAccount.createCampaign([], campaignData);
     console.log(`[Ad Creation] Campanha criada com sucesso. ID: ${campaign.id}`);
 
-    // 2. Criar Ad Set (Conjunto de Anúncios)
+    // 3. Criar Ad Creative (Criativo do Anúncio) - MOVIDO PARA ANTES DO AD SET
+    let adCreative; // Declare outside try block
+    try {
+      console.log("[Ad Creation] Criando Ad Creative...");
+      console.log("[Ad Creation] Criando AdCreative com:", {
+        adAccountId: adAccountId,
+        postId: objectStoryId,
+        name: `Criativo para ${campaignName}`,
+      });
+      const adCreativeData = {
+        [AdCreative.Fields.name]: `Criativo para ${campaignName}`,
+        [AdCreative.Fields.object_story_id]: objectStoryId, // <<< USA O ID DO POST (postId)
+      };
+      console.log("[Ad Creation] Payload para createAdCreative (SDK):", JSON.stringify(adCreativeData, null, 2));
+      adCreative = await adAccount.createAdCreative([], adCreativeData);
+      console.log(`[Ad Creation] Ad Creative criado com sucesso. ID: ${adCreative.id}`);
+    } catch (error) {
+      console.error("[Ad Creation - Specific Catch] Erro completo ao criar AdCreative:", error);
+      if (error.response && error.response.error) {
+        console.error("[Ad Creation - Specific Catch] Facebook API Error Response:", JSON.stringify(error.response.error, null, 2));
+      } else {
+        console.error("[Ad Creation - Specific Catch] Detalhes adicionais do erro (message):", error.message);
+        console.error("[Ad Creation - Specific Catch] Detalhes adicionais do erro (stack):", error.stack);
+      }
+      throw error;
+    }
+
+    // 4. Criar Ad Set (Conjunto de Anúncios) - MOVIDO PARA DEPOIS DO AD CREATIVE
     console.log("[Ad Creation] Criando Ad Set...");
     const adSetData = {
       [AdSet.Fields.name]: `Ad Set para ${campaignName}`,
       [AdSet.Fields.campaign_id]: campaign.id,
-      [AdSet.Fields.status]: AdSet.Status.paused,
+      [AdSet.Fields.status]: AdSet.Status.active, // <<< CORRIGIDO PARA ACTIVE >>>
       [AdSet.Fields.billing_event]: AdSet.BillingEvent.impressions,
-      [AdSet.Fields.optimization_goal]: AdSet.OptimizationGoal.post_engagement, 
+      [AdSet.Fields.optimization_goal]: AdSet.OptimizationGoal.post_engagement,
       [AdSet.Fields.daily_budget]: dailyBudget,
       [AdSet.Fields.start_time]: new Date(startDate).toISOString(),
       [AdSet.Fields.targeting]: {
         geo_locations: { countries: ["BR"] },
       },
     };
-    if (endDate) {
-      adSetData[AdSet.Fields.end_time] = new Date(endDate).toISOString();
+    // <<< TRATAMENTO ROBUSTO PARA ENDDATE >>>
+    if (endDate && endDate !== 'undefined' && endDate !== null && endDate !== '') {
+      try {
+          adSetData[AdSet.Fields.end_time] = new Date(endDate).toISOString();
+          console.log(`[Ad Creation] Adicionando end_time ao Ad Set: ${adSetData[AdSet.Fields.end_time]}`);
+      } catch (dateError) {
+          console.warn(`[Ad Creation] endDate fornecido ('${endDate}') é inválido. Ignorando end_time. Erro: ${dateError.message}`);
+          // Não definir end_time se a data for inválida
+      }
+    } else {
+        console.log("[Ad Creation] endDate não fornecido ou inválido. Ad Set será contínuo.");
+        // Opcional: Definir uma data de término padrão se necessário
+        // const defaultEndDate = new Date();
+        // defaultEndDate.setDate(defaultEndDate.getDate() + 7); // Ex: 7 dias a partir de hoje
+        // adSetData[AdSet.Fields.end_time] = defaultEndDate.toISOString();
     }
-    console.log("[Ad Creation] Payload para createAdSet:", JSON.stringify(adSetData, null, 2)); // <<< ADICIONADO LOG DETALHADO
+    console.log("[Ad Creation] Payload para createAdSet:", JSON.stringify(adSetData, null, 2));
     const adSet = await adAccount.createAdSet([], adSetData);
     console.log(`[Ad Creation] Ad Set criado com sucesso. ID: ${adSet.id}`);
 
-    // 3. Criar Ad Creative (Criativo do Anúncio)
-    let adCreative; // Declare outside try block
-    try {
-      console.log("[Ad Creation] Criando Ad Creative...");
-      // <<< LOG CONFORME SUGESTÃO DO USUÁRIO >>>
-      console.log("[Ad Creation] Criando AdCreative com:", { // <<< USANDO FORMATO SUGERIDO PELO USUÁRIO >>>
-        adAccountId: adAccountId,
-        postId: objectStoryId, // Renomeado para postId para clareza no log
-        name: `Criativo para ${campaignName}`,
-        // token: userAccessToken // Não enviar token no log por segurança
-      });
-      const adCreativeData = {
-        [AdCreative.Fields.name]: `Criativo para ${campaignName}`,
-        [AdCreative.Fields.object_story_id]: objectStoryId, // <<< USA O ID DO POST (postId)
-        // [AdCreative.Fields.page_id]: pageId // <<< Considerar adicionar page_id se necessário para visibilidade do post
-      };
-      console.log("[Ad Creation] Payload para createAdCreative (SDK):", JSON.stringify(adCreativeData, null, 2)); // <<< LOG DETALHADO JÁ EXISTENTE
-
-      // <<< ENVOLVER CHAMADA ESPECÍFICA COM TRY/CATCH ROBUSTO >>>
-      adCreative = await adAccount.createAdCreative([], adCreativeData);
-      console.log(`[Ad Creation] Ad Creative criado com sucesso. ID: ${adCreative.id}`);
-
-    } catch (error) {
-        console.error("[Ad Creation - Specific Catch] Erro completo ao criar AdCreative:", error); // <<< LOG COMPLETO DO ERRO >>>
-        // Tenta logar a resposta do erro da API do Facebook, se disponível
-        if (error.response && error.response.error) {
-            console.error("[Ad Creation - Specific Catch] Facebook API Error Response:", JSON.stringify(error.response.error, null, 2));
-        } else {
-            // Log adicional para casos onde error.response.error não existe (como o erro 'undefined' original)
-            console.error("[Ad Creation - Specific Catch] Detalhes adicionais do erro (message):", error.message);
-            console.error("[Ad Creation - Specific Catch] Detalhes adicionais do erro (stack):", error.stack);
-        }
-        // <<< RE-THROW PARA SER CAPTURADO PELO CATCH EXTERNO E MANTER FLUXO DE ERRO >>>
-        throw error; // Re-lança o erro para ser pego pelo catch geral da função publishPostAndCreateAd
-    }
-
-    // 4. Criar Ad (Anúncio)
+    // 5. Criar Ad (Anúncio)
     console.log("[Ad Creation] Criando Ad...");
     const adData = {
       [Ad.Fields.name]: `Anúncio para ${campaignName}`,
       [Ad.Fields.adset_id]: adSet.id,
       [Ad.Fields.creative]: { creative_id: adCreative.id }, // <<< USA O ID DO CRIATIVO GERADO
-      [Ad.Fields.status]: Ad.Status.paused,
+      [Ad.Fields.status]: Ad.Status.active, // <<< CORRIGIDO PARA ACTIVE >>>
     };
-    console.log("[Ad Creation] Payload para createAd:", JSON.stringify(adData, null, 2)); // <<< ADICIONADO LOG DETALHADO
+    console.log("[Ad Creation] Payload para createAd:", JSON.stringify(adData, null, 2));
     const ad = await adAccount.createAd([], adData);
     console.log(`[Ad Creation] Ad criado com sucesso. ID: ${ad.id}`);
 
     // --- Resposta Final --- 
     res.status(201).json({
       success: true,
-      message: "Post publicado e anúncio criado com sucesso (iniciado em modo pausado).",
+      message: "Post publicado e anúncio criado e ATIVADO com sucesso.", // <<< MENSAGEM ATUALIZADA >>>
       postId: postId,
       campaignId: campaign.id,
       adSetId: adSet.id,
