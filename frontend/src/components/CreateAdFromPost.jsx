@@ -11,16 +11,26 @@ import { CalendarIcon, InfoIcon, LoaderIcon } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { useMetaAds } from "../contexts/MetaAdsContext"; // Import the context hook
+import { useAuth } from "../hooks/useAuth"; // Import useAuth
 
 export default function CreateAdFromPost() {
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const { userToken } = useAuth(); // Get user token
+  // Consume Meta Ads context
+  const { metaStatus, loading: metaLoading, error: metaError, connectMeta } = useMetaAds(); 
+
+  const [formLoading, setFormLoading] = useState(false); // Local loading state for form submission
+  const [formError, setFormError] = useState(null); // Local error state for form submission
   const [success, setSuccess] = useState(false);
   const [adDetails, setAdDetails] = useState(null);
-  const [metaConnected, setMetaConnected] = useState(false);
-  const [metaConnectionChecked, setMetaConnectionChecked] = useState(false);
   
+  // Determine connection status from context
+  const isFullyConnected = 
+    metaStatus.status === 'connected' && 
+    metaStatus.pages?.length > 0 && 
+    metaStatus.adAccounts?.length > 0;
+
   // Pré-preencher com a URL fornecida pelo usuário
   const [formData, setFormData] = useState({
     postUrl: "https://www.facebook.com/photo/?fbid=122102873852863870&set=a.122102873882863870",
@@ -67,34 +77,39 @@ export default function CreateAdFromPost() {
     setFormData(prev => ({ ...prev, [name]: date }));
   };
 
+  // Removed the local useEffect for checking connection status
+  // Validation now uses the isFullyConnected derived from context
   const validateForm = () => {
-    if (!metaConnected) {
-      setError("Você precisa conectar sua conta ao Meta Ads primeiro");
+    setFormError(null); // Clear previous form errors
+    if (!isFullyConnected) {
+      // This case should ideally be handled by disabling the form/button
+      // but we keep a check here as a safeguard.
+      setFormError("Conexão com Meta Ads não está ativa ou completa.");
       return false;
     }
     
     if (!formData.postUrl) {
-      setError("URL da publicação é obrigatória");
+      setFormError("URL da publicação é obrigatória");
       return false;
     }
     if (!formData.adName) {
-      setError("Nome do anúncio é obrigatório");
+      setFormError("Nome do anúncio é obrigatório");
       return false;
     }
     if (!formData.dailyBudget || isNaN(formData.dailyBudget) || parseFloat(formData.dailyBudget) < 70) {
-      setError("Orçamento diário deve ser um número maior ou igual a R$70");
+      setFormError("Orçamento diário deve ser um número maior ou igual a R$70");
       return false;
     }
     if (!formData.startDate) {
-      setError("Data de início é obrigatória");
+      setFormError("Data de início é obrigatória");
       return false;
     }
     if (formData.endDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
-      setError("Data de término deve ser posterior à data de início");
+      setFormError("Data de término deve ser posterior à data de início");
       return false;
     }
     if (!formData.objective) {
-      setError("Objetivo da campanha é obrigatório");
+      setFormError("Objetivo da campanha é obrigatório");
       return false;
     }
     return true;
@@ -102,27 +117,25 @@ export default function CreateAdFromPost() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
+    setFormError(null);
     setSuccess(false);
     setAdDetails(null);
     
+    // Re-validate using the context status before submitting
+    if (!isFullyConnected) {
+       setFormError("Conexão com Meta Ads perdida. Por favor, verifique a conexão.");
+       toast({ title: "Erro de Conexão", description: "Conexão com Meta Ads não está ativa.", variant: "destructive" });
+       return;
+    }
+
     if (!validateForm()) return;
     
-    setLoading(true);
+    setFormLoading(true);
     
     try {
-      // Obter token do localStorage
-      const userInfo = localStorage.getItem("userInfo");
-      const parsedUserInfo = userInfo ? JSON.parse(userInfo) : null;
-      const token = parsedUserInfo?.token;
-      
-      if (!token) {
+      // Token check remains important
+      if (!userToken) {
         throw new Error("Você precisa estar logado para criar anúncios");
-      }
-      
-      // Verificar se o usuário está conectado ao Meta
-      if (!metaConnected) {
-        throw new Error("Você precisa conectar sua conta ao Meta Ads primeiro");
       }
       
       // Configurar cliente axios com o token
@@ -130,7 +143,7 @@ export default function CreateAdFromPost() {
       const api = axios.create({
         baseURL: API_BASE_URL,
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${userToken}`,
           'Content-Type': 'application/json'
         }
       });
@@ -161,80 +174,19 @@ export default function CreateAdFromPost() {
       
     } catch (err) {
       console.error("Erro ao criar anúncio:", err);
-      
-      if (err.response?.data?.message) {
-        setError(err.response.data.message);
-      } else {
-        setError(err.message || "Erro ao criar anúncio. Tente novamente.");
-      }
-      
+      const errorMsg = err.response?.data?.message || err.message || "Erro ao criar anúncio. Tente novamente.";
+      setFormError(errorMsg);
       toast({
         title: "Erro ao criar anúncio",
-        description: err.response?.data?.message || err.message || "Ocorreu um erro ao criar o anúncio",
+        description: errorMsg,
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   };
 
-  // Verificar status de conexão Meta ao carregar o componente
-  useEffect(() => {
-    const checkMetaConnection = async () => {
-      try {
-        const userInfo = localStorage.getItem("userInfo");
-        const parsedUserInfo = userInfo ? JSON.parse(userInfo) : null;
-        const token = parsedUserInfo?.token;
-        
-        if (!token) {
-          setMetaConnected(false);
-          setMetaConnectionChecked(true);
-          return;
-        }
-        
-        const API_BASE_URL = `${(import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app").replace(/\/+$/, "")}/api`;
-        const api = axios.create({
-          baseURL: API_BASE_URL,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        const response = await api.get("/meta/connection-status");
-        
-        // Verificar se o usuário está conectado e tem páginas/contas de anúncio
-        const isFullyConnected = 
-          response.data?.status === 'connected' && 
-          response.data?.pages?.length > 0 && 
-          response.data?.adAccounts?.length > 0;
-        setMetaConnected(isFullyConnected);
-        
-        if (!isFullyConnected) {
-          // Ajustar a mensagem de erro para ser mais específica se faltar páginas/contas
-          let errorMsg = "Você precisa conectar sua conta ao Meta Ads primeiro";
-          if (response.data?.status === 'connected' && (!response.data?.pages?.length || !response.data?.adAccounts?.length)) {
-            errorMsg = "Sua conta Meta está conectada, mas não foram encontradas páginas ou contas de anúncio válidas.";
-          }
-          setError(errorMsg);
-          toast({
-            title: "Conexão Meta incompleta ou ausente",
-            description: errorMsg,
-            variant: "destructive",
-          });
-        }
-      } catch (err) {
-        console.error("Erro ao verificar status de conexão Meta:", err);
-        setMetaConnected(false);
-        setError("Não foi possível verificar sua conexão com o Meta Ads. Por favor, tente novamente mais tarde.");
-      } finally {
-        setMetaConnectionChecked(true);
-      }
-    };
-    
-    checkMetaConnection();
-  }, [toast]);
-
+  // Render logic now uses context state
   return (
     <div className="container mx-auto py-8 max-w-3xl">
       <Card>
@@ -246,29 +198,39 @@ export default function CreateAdFromPost() {
         </CardHeader>
         
         <CardContent>
-          {!metaConnectionChecked ? (
+          {/* Show loading indicator from context */}
+          {metaLoading ? (
             <div className="flex justify-center items-center py-8">
               <LoaderIcon className="h-8 w-8 animate-spin text-blue-600" />
               <span className="ml-2">Verificando conexão com Meta Ads...</span>
             </div>
-          ) : !metaConnected ? (
+          ) : !isFullyConnected ? (
+            // Show connection required message if not fully connected
             <Alert variant="destructive" className="mb-6">
               <InfoIcon className="h-4 w-4" />
               <AlertTitle>Conexão Meta necessária</AlertTitle>
               <AlertDescription>
-                Você precisa conectar sua conta ao Meta Ads antes de criar anúncios.
+                {metaStatus.status === 'connected' 
+                  ? "Sua conta Meta está conectada, mas não foram encontradas páginas ou contas de anúncio válidas. Verifique as permissões no Meta."
+                  : "Você precisa conectar sua conta ao Meta Ads antes de criar anúncios."
+                }
                 <div className="mt-4">
+                  {/* Option to trigger connection from context or redirect */}
                   <Button 
-                    onClick={() => window.location.href = "/connect-meta"}
+                    onClick={connectMeta} // Use connect function from context
                     variant="outline"
+                    disabled={metaLoading}
                   >
-                    Ir para página de conexão Meta
+                    {metaLoading ? 'Conectando...' : 'Conectar/Reconectar Meta Ads'}
                   </Button>
+                  {/* Or redirect: onClick={() => window.location.href = "/connect-meta"} */}
                 </div>
               </AlertDescription>
             </Alert>
           ) : !success ? (
+            // Show form only if fully connected and ad not created yet
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Form fields remain the same */}
               <div className="space-y-2">
                 <Label htmlFor="postUrl">URL da Publicação do Facebook</Label>
                 <Input
@@ -296,7 +258,6 @@ export default function CreateAdFromPost() {
                 />
               </div>
               
-              {/* Novo campo de seleção de objetivo */}
               <div className="space-y-2">
                 <Label htmlFor="objective">Objetivo da Campanha *</Label>
                 <Select 
@@ -410,20 +371,22 @@ export default function CreateAdFromPost() {
                 </Select>
               </div>
               
-              {error && (
+              {/* Display form-specific errors */}
+              {formError && (
                 <Alert variant="destructive">
                   <InfoIcon className="h-4 w-4" />
-                  <AlertTitle>Erro</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertTitle>Erro no Formulário</AlertTitle>
+                  <AlertDescription>{formError}</AlertDescription>
                 </Alert>
               )}
             
+              {/* Disable button based on form loading OR meta connection status */}
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={loading || !metaConnected}
+                disabled={formLoading || metaLoading || !isFullyConnected}
               >
-                {loading ? (
+                {formLoading ? (
                   <>
                     <LoaderIcon className="mr-2 h-4 w-4 animate-spin" />
                     Criando anúncio...
@@ -434,6 +397,7 @@ export default function CreateAdFromPost() {
               </Button>
             </form>
           ) : (
+            // Show success message
             <div className="space-y-6">
               <Alert className="bg-green-50 border-green-200">
                 <InfoIcon className="h-4 w-4 text-green-600" />
@@ -502,3 +466,4 @@ export default function CreateAdFromPost() {
     </div>
   );
 }
+
