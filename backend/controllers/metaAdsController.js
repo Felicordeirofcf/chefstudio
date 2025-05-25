@@ -296,6 +296,14 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
 
     // 4. Criar Ad Set (Conjunto de Anúncios) - MOVIDO PARA DEPOIS DO AD CREATIVE
     console.log("[Ad Creation] Criando Ad Set...");
+    console.log("[Ad Creation Debug] Valores para Ad Set:", { pageId: pageId, objectStoryId: objectStoryId }); // Log adicionado para depuração
+
+    // <<< VALIDAÇÃO ADICIONADA PARA PAGEID >>>
+    if (!pageId) {
+      console.error("[Ad Creation] Erro Crítico: pageId está ausente ou inválido antes de criar o Ad Set.");
+      throw new Error("pageId ausente ou inválido. Não é possível criar o Ad Set.");
+    }
+
     const adSetData = {
       [AdSet.Fields.name]: `Ad Set para ${campaignName}`,
       [AdSet.Fields.campaign_id]: campaign.id,
