@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../lib/api';
 
 const MetaAdsConnection = () => {
-  const [connected, setConnected] = useState(false);
+  const [metaStatus, setMetaStatus] = useState({ status: 'disconnected', pages: [], adAccounts: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { userToken } = useAuth();
@@ -19,43 +19,28 @@ const MetaAdsConnection = () => {
       setLoading(true);
       
       if (!userToken) {
-        setConnected(false);
+        setMetaStatus({ status: 'disconnected', pages: [], adAccounts: [] }); // Reset state if no token
+        setLoading(false); // Ensure loading stops
         return;
       }
-      
-      try {
-        const response = await api.get('/api/meta/status');
-        setConnected(response.data.connected || false);
+       try {
+        // Use the correct endpoint and update the metaStatus state object
+        const response = await api.get("/api/meta/connection-status");
+        // Ensure response.data has the expected structure, provide defaults if not
+        setMetaStatus({
+          status: response.data?.status || 'disconnected',
+          pages: response.data?.pages || [],
+          adAccounts: response.data?.adAccounts || []
+        });
       } catch (err) {
-        // Se o primeiro endpoint falhar, tentar endpoint alternativo
-        if (err.response && err.response.status === 404) {
-          try {
-            const altResponse = await api.get('/api/users/meta-status');
-            setConnected(altResponse.data.connected || false);
-          } catch (altErr) {
-            console.error('Erro ao verificar status alternativo:', altErr);
-            setConnected(false);
-          }
-        } else {
-          console.error('Erro ao verificar status:', err);
-          setConnected(false);
-        }
-        
-        // Verificar também no localStorage como fallback
-        try {
-          const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-          if (userInfo.metaConnectionStatus === 'connected' || userInfo.isMetaConnected === true) {
-            setConnected(true);
-          }
-        } catch (localErr) {
-          console.error('Erro ao verificar status no localStorage:', localErr);
-          setConnected(false);
-        }
+        console.error("Erro ao verificar status da conexão Meta:", err);
+        // Reset state on error
+        setMetaStatus({ status: 'disconnected', pages: [], adAccounts: [] });
       }
     } catch (err) {
-      console.error('Erro ao verificar conexão com Meta Ads:', err);
-      // Não mostrar erro ao usuário neste momento
-      setConnected(false);
+      // Este catch captura erros gerais fora da chamada da API (ex: erro no userToken)
+      console.error("Erro geral ao verificar conexão com Meta Ads:", err);
+      setMetaStatus({ status: 'disconnected', pages: [], adAccounts: [] }); // Garante reset em erro geral
     } finally {
       setLoading(false);
     }
@@ -113,12 +98,12 @@ const MetaAdsConnection = () => {
       
       try {
         await api.post('/api/meta/disconnect', {});
-        setConnected(false);
+        setMetaStatus({ status: 'disconnected', pages: [], adAccounts: [] }); // Reset state on disconnect
       } catch (err) {
         // Se o primeiro endpoint falhar, tentar endpoint alternativo
         if (err.response && err.response.status === 404) {
           await api.post('/api/users/meta-disconnect', {});
-          setConnected(false);
+          setMetaStatus({ status: 'disconnected', pages: [], adAccounts: [] }); // Reset state on disconnect
         } else {
           throw err;
         }
@@ -166,7 +151,8 @@ const MetaAdsConnection = () => {
         </div>
       )}
       
-      {connected ? (
+      {/* Conditional rendering based on metaStatus */}
+      {metaStatus.status === 'connected' && metaStatus.pages?.length > 0 && metaStatus.adAccounts?.length > 0 ? (
         <div>
           <div className="p-4 mb-4 bg-green-50 border border-green-200 text-green-700 rounded-md">
             Sua conta está conectada ao Meta Ads
