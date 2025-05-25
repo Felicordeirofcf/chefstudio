@@ -275,8 +275,9 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     console.log("[Ad Creation] Criando Ad Creative...");
     const adCreativeData = {
       [AdCreative.Fields.name]: `Criativo para ${campaignName}`,
-      [AdCreative.Fields.object_story_id]: objectStoryId,
+      [AdCreative.Fields.object_story_id]: objectStoryId, // <<< USA O ID DO POST (postId)
     };
+    console.log("[Ad Creation] Payload para createAdCreative:", JSON.stringify(adCreativeData, null, 2)); // <<< ADICIONADO LOG DETALHADO
     const adCreative = await adAccount.createAdCreative([], adCreativeData);
     console.log(`[Ad Creation] Ad Creative criado com sucesso. ID: ${adCreative.id}`);
 
@@ -285,9 +286,10 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     const adData = {
       [Ad.Fields.name]: `Anúncio para ${campaignName}`,
       [Ad.Fields.adset_id]: adSet.id,
-      [Ad.Fields.creative]: { creative_id: adCreative.id },
+      [Ad.Fields.creative]: { creative_id: adCreative.id }, // <<< USA O ID DO CRIATIVO GERADO
       [Ad.Fields.status]: Ad.Status.paused,
     };
+    console.log("[Ad Creation] Payload para createAd:", JSON.stringify(adData, null, 2)); // <<< ADICIONADO LOG DETALHADO
     const ad = await adAccount.createAd([], adData);
     console.log(`[Ad Creation] Ad criado com sucesso. ID: ${ad.id}`);
 
