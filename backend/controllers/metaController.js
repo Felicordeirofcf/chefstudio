@@ -203,29 +203,19 @@ const getMetaStatus = asyncHandler(async (req, res) => {
     return res.status(404).json({ message: 'Usuário não encontrado' });
   }
 
-  // Manually build the response arrays to ensure correct structure
-  const responsePages = [];
-  if (Array.isArray(user.metaPages)) {
-    for (const page of user.metaPages) {
-      if (page && page.id && page.name) {
-        responsePages.push({ id: page.id, name: page.name });
-      }
-    }
-  }
+  // Use map and filter explicitly as suggested by the user
+  const pages = (user.metaPages || [])
+    .map(p => ({ id: p?.id, name: p?.name })) // Map first, handle potential undefined properties
+    .filter(p => p.id && p.name); // Then filter for valid items
 
-  const responseAdAccounts = [];
-  if (Array.isArray(user.metaAdAccounts)) {
-    for (const acc of user.metaAdAccounts) {
-      if (acc && acc.id && acc.name) {
-        responseAdAccounts.push({ id: acc.id, name: acc.name });
-      }
-    }
-  }
+  const adAccounts = (user.metaAdAccounts || [])
+    .map(a => ({ id: a?.id, name: a?.name })) // Map first, handle potential undefined properties
+    .filter(a => a.id && a.name); // Then filter for valid items
 
   res.json({
     status: user.metaConnectionStatus || 'disconnected',
-    pages: responsePages,
-    adAccounts: responseAdAccounts
+    pages: pages,
+    adAccounts: adAccounts
   });
 });
 
