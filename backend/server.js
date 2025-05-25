@@ -153,7 +153,7 @@ app.use(
 app.use(
 "/api/ads"
 , adRoutes); 
-aapp.use("/api/openai", openaiRoutes); // <<< MONTAR ROTAS OPENAI
+app.use("/api/openai", openaiRoutes); // <<< MONTAR ROTAS OPENAI
 app.use("/api/ifood", ifoodRoutes); // <<< MONTAR ROTAS IFOODI
 
 // Rota básica para verificar se o servidor está funcionando

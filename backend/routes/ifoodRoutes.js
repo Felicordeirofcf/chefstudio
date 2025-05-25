@@ -7,7 +7,7 @@ const authMiddleware = require("../middleware/authMiddleware"); // Proteger a ro
 // Rota para fazer o scraping de uma URL do iFood
 // POST /api/ifood/extrair  <<< ROTA AJUSTADA
 // Protegida por autenticação
-router.post("/extrair", authMiddleware, extrairDadosIfood); // <<< USAR FUNÇÃO CORRETA
+router.post("/extrair", extrairDadosIfood); // <<< USAR FUNÇÃO CORRETA E REMOVER MIDDLEWARE CONFORME INSTRUÇÃO
 
 module.exports = router;
 
