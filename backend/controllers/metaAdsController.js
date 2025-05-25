@@ -299,14 +299,20 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     const adSetData = {
       [AdSet.Fields.name]: `Ad Set para ${campaignName}`,
       [AdSet.Fields.campaign_id]: campaign.id,
-      [AdSet.Fields.status]: AdSet.Status.active, // <<< CORRIGIDO PARA ACTIVE >>>
+      [AdSet.Fields.status]: AdSet.Status.active, // <<< RE-CONFIRMADO PARA ACTIVE >>>
       [AdSet.Fields.billing_event]: AdSet.BillingEvent.impressions,
       [AdSet.Fields.optimization_goal]: AdSet.OptimizationGoal.post_engagement,
       [AdSet.Fields.daily_budget]: dailyBudget,
       [AdSet.Fields.start_time]: new Date(startDate).toISOString(),
       [AdSet.Fields.targeting]: {
         geo_locations: { countries: ["BR"] },
+        // publisher_platforms: ["facebook", "instagram"], // Exemplo: Definir placements se necessário
+        // facebook_positions: ["feed"], // Exemplo: Posições específicas
       },
+      // <<< ADICIONADO PROMOTED_OBJECT PARA POST_ENGAGEMENT >>>
+      [AdSet.Fields.promoted_object]: { 
+          post_id: objectStoryId // Usar o ID do post criado
+      }
     };
     // <<< TRATAMENTO ROBUSTO PARA ENDDATE >>>
     if (endDate && endDate !== 'undefined' && endDate !== null && endDate !== '') {
@@ -315,14 +321,9 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
           console.log(`[Ad Creation] Adicionando end_time ao Ad Set: ${adSetData[AdSet.Fields.end_time]}`);
       } catch (dateError) {
           console.warn(`[Ad Creation] endDate fornecido ('${endDate}') é inválido. Ignorando end_time. Erro: ${dateError.message}`);
-          // Não definir end_time se a data for inválida
       }
     } else {
         console.log("[Ad Creation] endDate não fornecido ou inválido. Ad Set será contínuo.");
-        // Opcional: Definir uma data de término padrão se necessário
-        // const defaultEndDate = new Date();
-        // defaultEndDate.setDate(defaultEndDate.getDate() + 7); // Ex: 7 dias a partir de hoje
-        // adSetData[AdSet.Fields.end_time] = defaultEndDate.toISOString();
     }
     console.log("[Ad Creation] Payload para createAdSet:", JSON.stringify(adSetData, null, 2));
     const adSet = await adAccount.createAdSet([], adSetData);
@@ -333,8 +334,8 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     const adData = {
       [Ad.Fields.name]: `Anúncio para ${campaignName}`,
       [Ad.Fields.adset_id]: adSet.id,
-      [Ad.Fields.creative]: { creative_id: adCreative.id }, // <<< USA O ID DO CRIATIVO GERADO
-      [Ad.Fields.status]: Ad.Status.active, // <<< CORRIGIDO PARA ACTIVE >>>
+      [Ad.Fields.creative]: { creative_id: adCreative.id },
+      [Ad.Fields.status]: Ad.Status.active, // <<< RE-CONFIRMADO PARA ACTIVE >>>
     };
     console.log("[Ad Creation] Payload para createAd:", JSON.stringify(adData, null, 2));
     const ad = await adAccount.createAd([], adData);
