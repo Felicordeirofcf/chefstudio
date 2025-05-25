@@ -31,7 +31,7 @@ const initFacebookApi = (accessToken) => {
 // Helper function to get Page Access Token
 const getPageAccessToken = async (userAccessToken, pageId) => {
   try {
-    console.log(`[Page Token] Buscando Page Access Token para a página ${pageId} usando token do usuário...`);
+    console.log(`[Page Token] Buscando Page Access Token para a página ${pageId} usando token do usuário (últimos 5: ...${userAccessToken.slice(-5)})...`);
     const response = await axios.get(`https://graph.facebook.com/v18.0/me/accounts`, {
       params: {
         fields: "id,name,access_token",
@@ -42,7 +42,7 @@ const getPageAccessToken = async (userAccessToken, pageId) => {
     if (response.data && response.data.data) {
       const pageAccount = response.data.data.find(acc => acc.id === pageId);
       if (pageAccount && pageAccount.access_token) {
-        console.log(`[Page Token] Page Access Token encontrado para a página ${pageId}.`);
+        console.log(`[Page Token] Page Access Token encontrado para a página ${pageId}. Últimos 5: ...${pageAccount.access_token.slice(-5)}`);
         return pageAccount.access_token; // Return the specific page's token
       } else {
         console.error(`[Page Token] Página com ID ${pageId} não encontrada ou sem token nas contas do usuário.`);
@@ -53,9 +53,10 @@ const getPageAccessToken = async (userAccessToken, pageId) => {
       throw new Error("Não foi possível obter as contas da página do usuário.");
     }
   } catch (error) {
-    console.error("[Page Token] Erro ao buscar Page Access Token:", error.response ? error.response.data : error.message);
-    // Rethrow with a more specific message
-    throw new Error(`Falha ao obter o token de acesso da página: ${error.message}`);
+    const errorDetails = error.response ? JSON.stringify(error.response.data, null, 2) : error.message;
+    console.error(`[Page Token] Erro ao buscar Page Access Token para pageId ${pageId}:`, errorDetails);
+    // Rethrow with a more specific message including details if available
+    throw new Error(`Falha ao obter o token de acesso da página ${pageId}: ${error.response?.data?.error?.message || error.message}`);
   }
 };
 
@@ -65,6 +66,7 @@ const getPageAccessToken = async (userAccessToken, pageId) => {
  * @access Privado
  */
 const listCampaigns = asyncHandler(async (req, res) => {
+  // ... (código de listCampaigns permanece o mesmo, já usa user token corretamente para SDK)
   const { adAccountId } = req.query;
   if (!adAccountId) {
     return res.status(400).json({ message: "O parâmetro 'adAccountId' é obrigatório." });
@@ -82,7 +84,7 @@ const listCampaigns = asyncHandler(async (req, res) => {
   }
 
   try {
-    console.log(`[List Campaigns] Buscando campanhas para Ad Account ID: ${adAccountId} usando token do usuário...`);
+    console.log(`[List Campaigns] Buscando campanhas para Ad Account ID: ${adAccountId} usando token do usuário (últimos 5: ...${userAccessToken.slice(-5)})...`);
     const account = new AdAccount(adAccountId);
     const campaigns = await account.getCampaigns([
       Campaign.Fields.id,
@@ -104,16 +106,21 @@ const listCampaigns = asyncHandler(async (req, res) => {
     res.json({ success: true, campaigns: formattedCampaigns });
 
   } catch (error) {
-    console.error(`[List Campaigns] Erro ao buscar campanhas para a conta ${adAccountId}:`, error.response ? error.response.data : error.message);
+    const errorDetails = error.response ? JSON.stringify(error.response.data, null, 2) : error.message;
+    console.error(`[List Campaigns] Erro ao buscar campanhas para a conta ${adAccountId}:`, errorDetails);
     let errorMessage = "Falha ao buscar campanhas no Facebook.";
-    if (error.response?.data?.error?.message) {
-      errorMessage = error.response.data.error.message;
+    let statusCode = 500;
+    if (error.response?.data?.error) {
+        const fbError = error.response.data.error;
+        errorMessage = `(#${fbError.code || 'N/A'}) ${fbError.message || 'Erro desconhecido do Facebook.'}`;
+        if (fbError.code === 200 || fbError.error_subcode === 200) {
+            errorMessage = `Erro de permissão ao buscar campanhas: ${errorMessage}. Verifique as permissões do token do usuário.`;
+            statusCode = 403;
+        } else {
+            errorMessage = `Erro do Facebook ao buscar campanhas: ${errorMessage}`;
+        }
     }
-    // Check for permission error specifically
-    if (error.response?.data?.error?.code === 200 || error.response?.data?.error?.error_subcode === 200) {
-        errorMessage = `(#200) Erro de permissão ao buscar campanhas. Verifique as permissões do token: ${errorMessage}`;
-    }
-    res.status(500).json({ message: `Erro na integração com Facebook: ${errorMessage}` });
+    res.status(statusCode).json({ message: `Erro na integração com Facebook: ${errorMessage}`, details: error.response?.data?.error });
   }
 });
 
@@ -150,30 +157,27 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     return res.status(500).json({ message: "Falha ao inicializar a API do Facebook." });
   }
 
+  let pageAccessToken;
   try {
     // *** OBTER O PAGE ACCESS TOKEN ***
-    const pageAccessToken = await getPageAccessToken(userAccessToken, pageId);
-    console.log(`[Publish Post] Token da página ${pageId} obtido. Últimos 5 chars: ...${pageAccessToken.slice(-5)}`);
+    pageAccessToken = await getPageAccessToken(userAccessToken, pageId);
+    // Log já está dentro de getPageAccessToken
 
     // --- Publicação da Foto (usando Page Access Token via Axios/FormData ou Axios JSON) ---
     let postId;
     let photoId; // ID da foto, usado no AdCreative
 
     if (imageFile) {
-      console.log("[Publish Post] Publicando foto via upload de arquivo usando Page Token...");
+      console.log(`[Publish Post - File] Preparando para publicar foto via upload para pageId ${pageId} usando Page Token (últimos 5: ...${pageAccessToken.slice(-5)})...`);
       const photoFormData = new FormData();
       photoFormData.append("caption", caption);
-      // Define published=false para criar um post não publicado (dark post) que pode ser usado em anúncios
-      // Se quiser que apareça na timeline, remova ou defina como true.
-      photoFormData.append("published", "false");
+      photoFormData.append("published", "false"); // Cria como dark post
       photoFormData.append("source", imageFile.buffer, {
         filename: imageFile.originalname,
         contentType: imageFile.mimetype
       });
 
-      // *** USAR PAGE ACCESS TOKEN AQUI ***
-      // Não precisa adicionar ao FormData, será passado no header ou params
-
+      // *** USAR PAGE ACCESS TOKEN NO HEADER ***
       const uploadResponse = await axios.post(
         `https://graph.facebook.com/${facebookApiVersion}/${pageId}/photos`,
         photoFormData,
@@ -182,21 +186,20 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
             ...photoFormData.getHeaders(),
             Authorization: `Bearer ${pageAccessToken}` // Passa o token no Header
           }
-          // params: { access_token: pageAccessToken } // Alternativa: passar como parâmetro
         }
       );
+      console.log(`[Publish Post - File] Resposta da API /photos (upload):`, uploadResponse.data);
 
       if (!uploadResponse.data || (!uploadResponse.data.post_id && !uploadResponse.data.id)) {
-        console.error("[Publish Post] Facebook Photo Upload Response (File):", uploadResponse.data);
+        console.error("[Publish Post - File] Resposta inválida da API /photos (upload):", uploadResponse.data);
         throw new Error("Falha ao fazer upload da foto (arquivo) para o Facebook. Resposta inválida.");
       }
-      // O ID do post pode vir em post_id (se publicado) ou id (se não publicado)
-      postId = uploadResponse.data.post_id || `${pageId}_${uploadResponse.data.id}`; // Formato comum para posts
-      photoId = uploadResponse.data.id; // ID da foto em si
-      console.log(`[Publish Post] Foto publicada via arquivo com sucesso. Post ID: ${postId}, Photo ID: ${photoId}`);
+      postId = uploadResponse.data.post_id || `${pageId}_${uploadResponse.data.id}`; 
+      photoId = uploadResponse.data.id;
+      console.log(`[Publish Post - File] Foto publicada com sucesso. Post ID: ${postId}, Photo ID: ${photoId}`);
 
     } else if (imageUrl) {
-      console.log(`[Publish Post] Publicando foto via URL: ${imageUrl} usando Page Token...`);
+      console.log(`[Publish Post - URL] Preparando para publicar foto via URL (${imageUrl}) para pageId ${pageId} usando Page Token (últimos 5: ...${pageAccessToken.slice(-5)})...`);
       const uploadResponse = await axios.post(
         `https://graph.facebook.com/${facebookApiVersion}/${pageId}/photos`,
         {
@@ -208,34 +211,31 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
           params: { access_token: pageAccessToken } // Passa o token como parâmetro
         }
       );
+      console.log(`[Publish Post - URL] Resposta da API /photos (URL):`, uploadResponse.data);
 
       if (!uploadResponse.data || (!uploadResponse.data.post_id && !uploadResponse.data.id)) {
-        console.error("[Publish Post] Facebook Photo Upload Response (URL):", uploadResponse.data);
+        console.error("[Publish Post - URL] Resposta inválida da API /photos (URL):", uploadResponse.data);
         throw new Error("Falha ao fazer upload da foto (URL) para o Facebook. Resposta inválida.");
       }
       postId = uploadResponse.data.post_id || `${pageId}_${uploadResponse.data.id}`;
       photoId = uploadResponse.data.id;
-      console.log(`[Publish Post] Foto publicada via URL com sucesso. Post ID: ${postId}, Photo ID: ${photoId}`);
+      console.log(`[Publish Post - URL] Foto publicada com sucesso. Post ID: ${postId}, Photo ID: ${photoId}`);
     }
 
     // O object_story_id para AdCreative geralmente é o ID do post (postId)
-    // O object_id para AdCreative pode ser o ID da foto (photoId)
     const objectStoryId = postId;
     console.log(`[Ad Creation] Object Story ID (Post ID) para o anúncio: ${objectStoryId}`);
     console.log(`[Ad Creation] Photo ID para o criativo: ${photoId}`);
 
     // --- Criação da Campanha de Anúncio (usando SDK inicializado com User Token) ---
-    console.log(`[Ad Creation] Iniciando criação da campanha: ${campaignName} na conta ${adAccountId} usando token do usuário...`);
+    console.log(`[Ad Creation] Iniciando criação da campanha: ${campaignName} na conta ${adAccountId} usando token do usuário (últimos 5: ...${userAccessToken.slice(-5)})...`);
     const adAccount = new AdAccount(adAccountId);
 
     // Orçamento: Converter para centavos e calcular diário
     const budgetInCents = Math.round(parseFloat(weeklyBudget) * 100);
     const dailyBudget = Math.round(budgetInCents / 7);
     if (dailyBudget < 100) { // Verifica orçamento mínimo (ex: $1 por dia)
-        console.warn(`[Ad Creation] Orçamento diário calculado (${dailyBudget} centavos) é muito baixo. Ajustando para o mínimo (100 centavos).`);
-        // dailyBudget = 100;
-        // Ou lançar erro:
-        throw new Error("Orçamento semanal resulta em um orçamento diário abaixo do mínimo permitido pelo Facebook.");
+        throw new Error("Orçamento semanal resulta em um orçamento diário abaixo do mínimo permitido pelo Facebook (aprox. $1/dia).");
     }
     console.log(`[Ad Creation] Orçamento semanal: R$${weeklyBudget}, Orçamento diário calculado: ${dailyBudget} centavos`);
 
@@ -243,9 +243,9 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     console.log("[Ad Creation] Criando Campanha...");
     const campaignData = {
       [Campaign.Fields.name]: campaignName,
-      [Campaign.Fields.objective]: Campaign.Objective.outcome_engagement, // Objetivo de Engajamento com a Publicação
-      [Campaign.Fields.status]: Campaign.Status.paused, // Começa pausada
-      [Campaign.Fields.special_ad_categories]: [], // Categoria especial (se aplicável)
+      [Campaign.Fields.objective]: Campaign.Objective.outcome_engagement, 
+      [Campaign.Fields.status]: Campaign.Status.paused, 
+      [Campaign.Fields.special_ad_categories]: [], 
       [Campaign.Fields.buying_type]: "AUCTION",
     };
     const campaign = await adAccount.createCampaign([], campaignData);
@@ -258,15 +258,11 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
       [AdSet.Fields.campaign_id]: campaign.id,
       [AdSet.Fields.status]: AdSet.Status.paused,
       [AdSet.Fields.billing_event]: AdSet.BillingEvent.impressions,
-      [AdSet.Fields.optimization_goal]: AdSet.OptimizationGoal.post_engagement, // Otimizar para engajamento
+      [AdSet.Fields.optimization_goal]: AdSet.OptimizationGoal.post_engagement, 
       [AdSet.Fields.daily_budget]: dailyBudget,
       [AdSet.Fields.start_time]: new Date(startDate).toISOString(),
-      // Targeting (Exemplo: Brasil)
       [AdSet.Fields.targeting]: {
         geo_locations: { countries: ["BR"] },
-        // Adicionar mais opções de segmentação aqui (idade, interesses, etc.)
-        // publisher_platforms: ["facebook", "instagram"], // Onde exibir
-        // facebook_positions: ["feed"], // Posições específicas
       },
     };
     if (endDate) {
@@ -279,13 +275,7 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     console.log("[Ad Creation] Criando Ad Creative...");
     const adCreativeData = {
       [AdCreative.Fields.name]: `Criativo para ${campaignName}`,
-      // Usar object_story_id para promover um post existente
       [AdCreative.Fields.object_story_id]: objectStoryId,
-      // OU usar object_id para criar um anúncio com a foto diretamente (sem post visível)
-      // [AdCreative.Fields.object_id]: photoId, 
-      // [AdCreative.Fields.body]: caption, // Se usar object_id, precisa do body
-      // [AdCreative.Fields.image_hash]: imageFile ? await getAdImageHash(adAccountId, imageFile) : undefined, // Se usar object_id com upload
-      // [AdCreative.Fields.image_url]: imageUrl, // Se usar object_id com URL
     };
     const adCreative = await adAccount.createAdCreative([], adCreativeData);
     console.log(`[Ad Creation] Ad Creative criado com sucesso. ID: ${adCreative.id}`);
@@ -313,23 +303,32 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     });
 
   } catch (error) {
-    console.error("[Publish Post/Ad Creation] ERRO GERAL:", error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
+    // Log detalhado do erro, incluindo a resposta completa da API se disponível
+    const errorDetails = error.response ? JSON.stringify(error.response.data, null, 2) : error.message;
+    console.error(`[Publish Post/Ad Creation] ERRO GERAL ao processar para pageId ${pageId}, adAccountId ${adAccountId}:`, errorDetails);
+    if (error.stack) {
+        console.error("[Publish Post/Ad Creation] Stack Trace:", error.stack);
+    }
+
     let errorMessage = "Falha ao publicar post ou criar anúncio no Facebook.";
     let statusCode = 500;
+    let fbErrorData = null;
 
     if (error.response?.data?.error) {
-      const fbError = error.response.data.error;
-      errorMessage = `(#${fbError.code || 'N/A'}) ${fbError.message || 'Erro desconhecido do Facebook.'}`;
+      fbErrorData = error.response.data.error;
+      errorMessage = `(#${fbErrorData.code || 'N/A'}) ${fbErrorData.message || 'Erro desconhecido do Facebook.'}`;
       // Specific error handling for permissions
-      if (fbError.code === 200 || fbError.error_subcode === 200) {
-        errorMessage = `Erro de permissão: ${errorMessage}. Verifique se o token (usuário para SDK, página para post) tem as permissões necessárias (ads_management, pages_manage_posts, etc.).`;
+      if (fbErrorData.code === 200 || fbErrorData.error_subcode === 200) {
+        errorMessage = `Erro de permissão: ${errorMessage}. Verifique se o token (usuário para SDK: ...${userAccessToken.slice(-5)}, página para post: ...${pageAccessToken ? pageAccessToken.slice(-5) : 'N/A'}) tem as permissões necessárias (ads_management, pages_manage_posts, etc.).`;
         statusCode = 403; // Forbidden due to permissions
-      } else if (fbError.code === 10) {
+      } else if (fbErrorData.code === 10) {
          errorMessage = `Erro de permissão da aplicação: ${errorMessage}. Verifique as configurações do app e permissões do usuário.`;
          statusCode = 403;
-      } else if (fbError.code === 100) {
+      } else if (fbErrorData.code === 100) {
           errorMessage = `Parâmetro inválido: ${errorMessage}. Verifique os dados enviados.`;
           statusCode = 400; // Bad request
+      } else {
+          errorMessage = `Erro do Facebook: ${errorMessage}`;
       }
     } else if (error.message.includes("token de acesso da página")) {
         // Error from getPageAccessToken helper
@@ -338,9 +337,16 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     } else if (error.message.includes("Orçamento semanal")) {
         errorMessage = error.message;
         statusCode = 400; // Bad request due to budget
+    } else {
+        // Erro genérico ou de outra parte do processo
+        errorMessage = `Erro interno: ${error.message}`;
     }
 
-    res.status(statusCode).json({ message: `Erro na integração com Facebook: ${errorMessage}` });
+    // Retorna a mensagem de erro e os detalhes do erro do Facebook (se houver)
+    res.status(statusCode).json({ 
+        message: `Erro na integração com Facebook: ${errorMessage}`, 
+        details: fbErrorData // Inclui o objeto de erro completo do Facebook para depuração
+    });
   }
 });
 
