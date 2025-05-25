@@ -1,12 +1,26 @@
 const express = require("express");
 const router = express.Router();
 const { protect } = require("../middleware/authMiddleware");
+const multer = require("multer");
+const path = require("path");
 
-// Importar os controllers e o middleware de upload
+// Configuração do multer para upload de arquivos
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, "../uploads/"));
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage: storage });
+
+// Importar os controllers
 const { 
   publishPostAndCreateAd, 
   listCampaigns, // Importar a nova função
-  upload, 
   criarCampanha // Manter se necessário para outras rotas
 } = require("../controllers/metaAdsController");
 
@@ -168,4 +182,3 @@ router.post(
 );
 
 module.exports = router;
-
