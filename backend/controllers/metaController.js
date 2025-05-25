@@ -195,45 +195,32 @@ const facebookCallback = asyncHandler(async (req, res) => {
 });
 
 // @desc    Obter status da conexão Meta
-// @route   GET /api/meta/status
+// @route   GET /api/meta/connection-status
 // @access  Private
 const getMetaStatus = asyncHandler(async (req, res) => {
-  console.log(`[DEBUG] getMetaStatus - Iniciando para userId: ${req.user.id}`);
-  const user = await User.findById(req.user.id).select('metaConnectionStatus metaPages metaAdAccounts').lean(); // Add .lean() here
+  const user = await User.findById(req.user.id).select('metaConnectionStatus metaPages metaAdAccounts').lean();
   if (!user) {
-    console.log(`[DEBUG] getMetaStatus - Usuário não encontrado: ${req.user.id}`);
     return res.status(404).json({ message: 'Usuário não encontrado' });
   }
 
-  console.log(`[DEBUG] getMetaStatus - Dados brutos do usuário (metaPages):`, JSON.stringify(user.metaPages, null, 2));
-  console.log(`[DEBUG] getMetaStatus - Dados brutos do usuário (metaAdAccounts):`, JSON.stringify(user.metaAdAccounts, null, 2));
-
-  // Use map and filter explicitly as suggested by the user
+  // Refined map and filter to ensure objects and their id/name properties are valid
   const pages = (user.metaPages || [])
-    .map(p => ({ id: p?.id, name: p?.name })) // Map first, handle potential undefined properties
-    .filter(p => p.id && p.name); // Then filter for valid items
-
-  console.log(`[DEBUG] getMetaStatus - Pages após map/filter:`, JSON.stringify(pages, null, 2));
+    .map(p => (p ? { id: p.id, name: p.name } : null)) // Map, ensure p exists and extract id/name
+    .filter(p => p && p.id && p.name); // Filter for valid objects with truthy id and name
 
   const adAccounts = (user.metaAdAccounts || [])
-    .map(a => ({ id: a?.id, name: a?.name })) // Map first, handle potential undefined properties
-    .filter(a => a.id && a.name); // Then filter for valid items
+    .map(a => (a ? { id: a.id, name: a.name } : null)) // Map, ensure a exists and extract id/name
+    .filter(a => a && a.id && a.name); // Filter for valid objects with truthy id and name
 
-  console.log(`[DEBUG] getMetaStatus - AdAccounts após map/filter:`, JSON.stringify(adAccounts, null, 2));
-
-  const responsePayload = {
+  res.json({
     status: user.metaConnectionStatus || 'disconnected',
     pages: pages,
     adAccounts: adAccounts
-  };
-
-  console.log(`[DEBUG] getMetaStatus - Payload final da resposta:`, JSON.stringify(responsePayload, null, 2));
-
-  res.json(responsePayload);
+  });
 });
 
 // @desc    Desconectar da Meta
-// @route   DELETE /api/meta/disconnect
+// @route   POST /api/meta/disconnect  // Note: Route file uses POST, Swagger uses POST
 // @access  Private
 const disconnectMeta = asyncHandler(async (req, res) => {
   const userId = req.user.id;
@@ -282,10 +269,6 @@ const getMetaMetrics = asyncHandler(async (req, res) => {
   });
 });
 
-// <<< Definição da função getMetaMetrics movida para ANTES do module.exports
-
-
-
 // @desc    Criar campanha de tráfego recomendada (Placeholder)
 // @route   POST /api/ads/create-recommended-traffic-campaign
 // @access  Private
@@ -308,12 +291,12 @@ const createRecommendedTrafficCampaign = asyncHandler(async (req, res) => {
   });
 });
 
-
 module.exports = {
   getMetaAuthUrl,
   facebookCallback,
   getMetaStatus,
   disconnectMeta,
-  getMetaMetrics, // Agora a função está definida acima e pode ser exportada corretamente
-  createRecommendedTrafficCampaign, // Adicionando a nova função exportada
+  getMetaMetrics,
+  createRecommendedTrafficCampaign,
 };
+

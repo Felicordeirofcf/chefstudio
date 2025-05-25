@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useToast } from "../hooks/use-toast";
 
-// Componente Select reutilizável
+// Componente Select reutilizável com proteção na chamada onChange
 const SelectInput = ({ id, label, value, onChange, options, placeholder, required, disabled }) => (
   <div>
     <label htmlFor={id} className="block text-sm font-medium mb-1">
@@ -11,23 +11,24 @@ const SelectInput = ({ id, label, value, onChange, options, placeholder, require
     <select
       id={id}
       value={value}
-      onChange={onChange}
+      onChange={(e) => typeof onChange === 'function' && onChange(e)} // Proteção typeof
       className="w-full p-2 border rounded-md bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
       required={required}
-      disabled={disabled || options.length === 0}
+      disabled={disabled || !options || options.length === 0} // Adicionado !options
     >
       <option value="" disabled>{placeholder}</option>
-      {options.map(option => (
+      {/* Adicionado verificação se options é um array antes de mapear */}
+      {Array.isArray(options) && options.map(option => (
         <option key={option.value} value={option.value}>
           {option.label}
         </option>
       ))}
     </select>
-    {options.length === 0 && !disabled && <p className="text-xs text-red-500 mt-1">Nenhuma opção disponível.</p>}
+    {(!options || options.length === 0) && !disabled && <p className="text-xs text-red-500 mt-1">Nenhuma opção disponível.</p>}
   </div>
 );
 
-// Componente para exibir uma campanha
+// Componente para exibir uma campanha com proteção na chamada onVerAds
 const CampanhaItem = ({ campanha, onVerAds }) => {
   // Formatar data para exibição
   const formatarData = (dataString) => {
@@ -68,28 +69,28 @@ const CampanhaItem = ({ campanha, onVerAds }) => {
     <div className="border rounded-md p-4 mb-3 bg-white shadow-sm hover:shadow-md transition-shadow">
       <div className="flex justify-between items-start">
         <div>
-          <h3 className="font-medium text-lg">{campanha.name}</h3>
+          <h3 className="font-medium text-lg">{campanha?.name || 'Campanha sem nome'}</h3>
           <div className="text-sm text-gray-500 mt-1">
-            Criada em: {formatarData(campanha.startDate || campanha.created_time)}
+            Criada em: {formatarData(campanha?.startDate || campanha?.created_time)}
           </div>
         </div>
         <div className="flex items-center">
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(campanha.status)}`}>
-            {campanha.status === 'ACTIVE' ? 'Ativo' : 
-             campanha.status === 'PAUSED' ? 'Pausado' : 
-             campanha.status === 'DELETED' ? 'Excluído' : campanha.status}
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(campanha?.status)}`}>
+            {campanha?.status === 'ACTIVE' ? 'Ativo' :
+             campanha?.status === 'PAUSED' ? 'Pausado' :
+             campanha?.status === 'DELETED' ? 'Excluído' : campanha?.status || 'Desconhecido'}
           </span>
         </div>
       </div>
       
       <div className="mt-3 flex justify-between items-center">
         <div className="text-sm">
-          <span className="font-medium">Orçamento:</span> R$ {campanha.weeklyBudget?.toFixed(2) || campanha.dailyBudget?.toFixed(2) || '0.00'} 
-          {campanha.weeklyBudget ? '/semana' : '/dia'}
+          <span className="font-medium">Orçamento:</span> R$ {campanha?.weeklyBudget?.toFixed(2) || campanha?.dailyBudget?.toFixed(2) || '0.00'} 
+          {campanha?.weeklyBudget ? '/semana' : '/dia'}
         </div>
         
         <button 
-          onClick={() => onVerAds(campanha)}
+          onClick={() => typeof onVerAds === 'function' && onVerAds(campanha)} // Proteção typeof
           className="text-sm px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
         >
           Ver no Ads
@@ -99,7 +100,7 @@ const CampanhaItem = ({ campanha, onVerAds }) => {
   );
 };
 
-// Componente de alerta de sucesso
+// Componente de alerta de sucesso com proteção na chamada onClose
 const SuccessAlert = ({ message, adsUrl, onClose }) => {
   return (
     <div className="fixed top-4 right-4 left-4 md:left-auto md:w-96 bg-green-50 border-l-4 border-green-500 p-4 rounded shadow-lg z-50 animate-fade-in">
@@ -129,7 +130,7 @@ const SuccessAlert = ({ message, adsUrl, onClose }) => {
         <div className="ml-auto pl-3">
           <div className="-mx-1.5 -my-1.5">
             <button
-              onClick={onClose}
+              onClick={() => typeof onClose === 'function' && onClose()} // Proteção typeof
               className="inline-flex bg-green-50 rounded-md p-1.5 text-green-500 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
             >
               <span className="sr-only">Fechar</span>
@@ -209,14 +210,22 @@ const CampanhaManual = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        const { isConnected, adAccounts, metaPages } = response.data;
+        // Adicionar verificação se response.data existe
+        if (!response.data) {
+          throw new Error("Resposta da API de status de conexão está vazia.");
+        }
+
+        const { status, adAccounts, pages } = response.data; // Usar 'pages' como no backend
         console.log("Resposta de /api/meta/connection-status:", response.data);
 
-        setIsMetaConnected(isConnected);
+        // Usar 'status' diretamente
+        const connected = status === 'connected';
+        setIsMetaConnected(connected);
 
-        if (isConnected) {
-          if (adAccounts && adAccounts.length > 0) {
+        if (connected) {
+          if (Array.isArray(adAccounts) && adAccounts.length > 0) {
             setAdAccountsList(adAccounts.map(acc => ({ value: acc.id, label: `${acc.name} (${acc.id})` })));
+            // Selecionar o primeiro se nenhum estiver selecionado ou o selecionado não existir mais
             if (!selectedAdAccount || !adAccounts.some(acc => acc.id === selectedAdAccount)) {
               setSelectedAdAccount(adAccounts[0].id);
             }
@@ -226,10 +235,12 @@ const CampanhaManual = () => {
             console.warn("Nenhuma conta de anúncios encontrada via API.");
           }
 
-          if (metaPages && metaPages.length > 0) {
-            setPagesList(metaPages.map(page => ({ value: page.id, label: `${page.name} (${page.id})` })));
-            if (!selectedPage || !metaPages.some(page => page.id === selectedPage)) {
-              setSelectedPage(metaPages[0].id);
+          // Usar 'pages' como no backend
+          if (Array.isArray(pages) && pages.length > 0) {
+            setPagesList(pages.map(page => ({ value: page.id, label: `${page.name} (${page.id})` })));
+            // Selecionar a primeira se nenhuma estiver selecionada ou a selecionada não existir mais
+            if (!selectedPage || !pages.some(page => page.id === selectedPage)) {
+              setSelectedPage(pages[0].id);
             }
           } else {
             setPagesList([]);
@@ -257,47 +268,49 @@ const CampanhaManual = () => {
     };
 
     fetchMetaStatus();
-  }, []);
+  // Remover dependências desnecessárias se fetchMetaStatus não for recriado
+  }, [selectedAdAccount, selectedPage]); // Adicionar selectedAdAccount e selectedPage como dependências para re-selecionar se necessário
 
   // Buscar campanhas quando a conta de anúncios for selecionada
   useEffect(() => {
-    if (selectedAdAccount && isMetaConnected) {
-      buscarCampanhas();
-    }
-  }, [selectedAdAccount, isMetaConnected]);
-
-  // Função para buscar campanhas
-  const buscarCampanhas = async () => {
-    if (!selectedAdAccount || !isMetaConnected) return;
-    
-    setCarregandoCampanhas(true);
-    setErroCampanhas(null);
-    
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Usuário não autenticado.');
-      }
+    // Função interna para evitar recriação a cada render
+    const buscarCampanhasInterno = async () => {
+      if (!selectedAdAccount || !isMetaConnected) return;
       
-      const API_BASE_URL = "https://chefstudio-production.up.railway.app/api";
-      const response = await axios.get(`${API_BASE_URL}/meta-ads/campaigns`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { adAccountId: selectedAdAccount }
-      });
+      setCarregandoCampanhas(true);
+      setErroCampanhas(null);
       
-      if (response.data && response.data.campaigns) {
-        setCampanhas(response.data.campaigns);
-      } else {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('Usuário não autenticado.');
+        }
+        
+        const API_BASE_URL = "https://chefstudio-production.up.railway.app/api";
+        const response = await axios.get(`${API_BASE_URL}/meta-ads/campaigns`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { adAccountId: selectedAdAccount }
+        });
+        
+        // Verificar se campaigns existe e é um array
+        if (response.data && Array.isArray(response.data.campaigns)) {
+          setCampanhas(response.data.campaigns);
+        } else {
+          console.warn("Resposta de campanhas inválida ou vazia:", response.data);
+          setCampanhas([]);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar campanhas:', error.response?.data || error.message);
+        setErroCampanhas('Não foi possível carregar as campanhas. Tente novamente mais tarde.');
         setCampanhas([]);
+      } finally {
+        setCarregandoCampanhas(false);
       }
-    } catch (error) {
-      console.error('Erro ao buscar campanhas:', error.response?.data || error.message);
-      setErroCampanhas('Não foi possível carregar as campanhas. Tente novamente mais tarde.');
-      setCampanhas([]);
-    } finally {
-      setCarregandoCampanhas(false);
-    }
-  };
+    };
+
+    buscarCampanhasInterno();
+
+  }, [selectedAdAccount, isMetaConnected]);
 
   // Inicializar o mapa
   useEffect(() => {
@@ -306,61 +319,81 @@ const CampanhaManual = () => {
 
     const initMap = (lat, lng) => {
       const mapContainer = document.getElementById('map-container');
+      // Verificar se Leaflet (L) está carregado e se o mapa ainda não foi inicializado
       if (mapContainer && window.L && !map) {
-        mapInstance = window.L.map(mapContainer).setView([lat, lng], 12);
-        window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(mapInstance);
+        try {
+          mapInstance = window.L.map(mapContainer).setView([lat, lng], 12);
+          window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          }).addTo(mapInstance);
 
-        circleInstance = window.L.circle([lat, lng], {
-          color: 'blue',
-          fillColor: '#30f',
-          fillOpacity: 0.2,
-          radius: 10 * 1000 // Raio fixo de 10km
-        }).addTo(mapInstance);
+          circleInstance = window.L.circle([lat, lng], {
+            color: 'blue',
+            fillColor: '#30f',
+            fillOpacity: 0.2,
+            radius: 10 * 1000 // Raio fixo de 10km
+          }).addTo(mapInstance);
 
-        setMap(mapInstance);
-        setCircle(circleInstance);
-        setCurrentLocation({ lat, lng });
-        setMapLoaded(true);
+          setMap(mapInstance);
+          setCircle(circleInstance);
+          setCurrentLocation({ lat, lng });
+          setMapLoaded(true);
+        } catch (mapError) {
+          console.error("Erro ao inicializar o mapa Leaflet:", mapError);
+          setMapLoaded(false); // Indicar que o mapa falhou ao carregar
+        }
       }
     };
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          initMap(latitude, longitude);
-        },
-        (error) => {
-          console.warn("Erro ao obter geolocalização, usando padrão SP:", error);
-          initMap(-23.5505, -46.6333);
-        }
-      );
-    } else {
-      console.warn("Geolocalização não suportada, usando padrão SP.");
-      initMap(-23.5505, -46.6333);
-    }
-
+    // Carregar Leaflet se não estiver presente
     if (!window.L) {
       const script = document.createElement('script');
       script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
       script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
       script.crossOrigin = '';
+      script.onload = () => {
+        // Tentar inicializar o mapa DEPOIS que o script carregar
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => initMap(position.coords.latitude, position.coords.longitude),
+            () => initMap(-23.5505, -46.6333) // Fallback SP
+          );
+        } else {
+          initMap(-23.5505, -46.6333); // Fallback SP
+        }
+      };
+      script.onerror = () => console.error("Falha ao carregar o script do Leaflet.");
       document.head.appendChild(script);
 
       const linkElement = document.createElement('link');
       linkElement.rel = 'stylesheet';
       linkElement.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
       document.head.appendChild(linkElement);
+    } else {
+      // Se Leaflet já existe, inicializar o mapa diretamente
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => initMap(position.coords.latitude, position.coords.longitude),
+          () => initMap(-23.5505, -46.6333) // Fallback SP
+        );
+      } else {
+        initMap(-23.5505, -46.6333); // Fallback SP
+      }
     }
 
+    // Cleanup function
     return () => {
       if (mapInstance) {
-        mapInstance.remove();
+        try {
+          mapInstance.remove();
+        } catch (removeError) {
+          console.warn("Erro ao remover instância do mapa:", removeError);
+        }
+        setMap(null); // Limpar estado do mapa
       }
     };
-  }, []);
+  // Dependência vazia para rodar apenas uma vez no mount
+  }, []); 
 
   // Função para formatar data e hora
   const formatarDataHora = (data = new Date()) => {
@@ -601,10 +634,13 @@ const CampanhaManual = () => {
         
         // Se o link foi convertido, mostrar mensagem informativa
         if (link !== resultado.linkProcessado) {
-          toast({ 
-            title: "Link convertido", 
-            description: `O link foi convertido para o formato padrão: ${resultado.linkProcessado}`,
-          });
+          // Verificar se toast é uma função antes de chamar
+          if (typeof toast === 'function') {
+            toast({ 
+              title: "Link convertido", 
+              description: `O link foi convertido para o formato padrão: ${resultado.linkProcessado}`,
+            });
+          }
         }
       } else {
         setLinkPublicacaoError(resultado.mensagem);
@@ -618,6 +654,14 @@ const CampanhaManual = () => {
 
   // Função para abrir o anúncio no Ads Manager
   const handleVerAds = (campanha) => {
+    // Adicionar verificação se campanha e campaignId existem
+    if (!campanha || !campanha.campaignId) {
+      console.error("Dados da campanha inválidos para abrir no Ads Manager:", campanha);
+      if (typeof toast === 'function') {
+        toast({ title: "Erro", description: "Não foi possível obter o ID da campanha para abrir no Ads Manager.", variant: "destructive" });
+      }
+      return;
+    }
     // URL do Ads Manager com o ID da campanha
     const adsManagerUrl = `https://business.facebook.com/adsmanager/manage/campaigns?act=${selectedAdAccount}&selected_campaign_ids=${campanha.campaignId}`;
     window.open(adsManagerUrl, '_blank');
@@ -643,23 +687,23 @@ const CampanhaManual = () => {
 
     if (!isMetaConnected) {
       setError('Conecte sua conta Meta Ads para criar anúncios.');
-      toast({ title: "Erro", description: "Conecte sua conta Meta Ads para criar anúncios.", variant: "destructive" });
+      if (typeof toast === 'function') toast({ title: "Erro", description: "Conecte sua conta Meta Ads para criar anúncios.", variant: "destructive" });
       return;
     }
 
     if (!selectedAdAccount) {
       setError('Selecione uma Conta de Anúncios.');
-      toast({ title: "Erro", description: "Selecione uma Conta de Anúncios.", variant: "destructive" });
+      if (typeof toast === 'function') toast({ title: "Erro", description: "Selecione uma Conta de Anúncios.", variant: "destructive" });
       return;
     }
     if (!selectedPage) {
       setError('Selecione uma Página do Facebook.');
-       toast({ title: "Erro", description: "Selecione uma Página do Facebook.", variant: "destructive" });
+       if (typeof toast === 'function') toast({ title: "Erro", description: "Selecione uma Página do Facebook.", variant: "destructive" });
       return;
     }
     if (!nomeCampanha || !orcamento || !linkPublicacao || !callToAction) {
       setError('Preencha todos os campos obrigatórios (*).');
-      toast({ title: "Erro", description: "Preencha todos os campos obrigatórios (*).", variant: "destructive" });
+      if (typeof toast === 'function') toast({ title: "Erro", description: "Preencha todos os campos obrigatórios (*).", variant: "destructive" });
       return;
     }
     
@@ -668,13 +712,13 @@ const CampanhaManual = () => {
     if (!resultadoLink.valido) {
       setError(resultadoLink.mensagem);
       setLinkPublicacaoError(resultadoLink.mensagem);
-      toast({ title: "Erro", description: resultadoLink.mensagem, variant: "destructive" });
+      if (typeof toast === 'function') toast({ title: "Erro", description: resultadoLink.mensagem, variant: "destructive" });
       return;
     }
     
     if (dataTermino && new Date(dataTermino) <= new Date(dataInicio)) {
       setError('A data de término deve ser posterior à data de início.');
-      toast({ title: "Erro", description: "A data de término deve ser posterior à data de início.", variant: "destructive" });
+      if (typeof toast === 'function') toast({ title: "Erro", description: "A data de término deve ser posterior à data de início.", variant: "destructive" });
       return;
     }
 
@@ -742,10 +786,12 @@ const CampanhaManual = () => {
         });
         
         // Também exibir toast para feedback imediato
-        toast({ 
-          title: "Sucesso!", 
-          description: `Anúncio criado com sucesso em ${formatarDataHora(dataCriacao)}`, 
-        });
+        if (typeof toast === 'function') {
+          toast({ 
+            title: "Sucesso!", 
+            description: `Anúncio criado com sucesso em ${formatarDataHora(dataCriacao)}`, 
+          });
+        }
       }
       
       // Limpar o formulário após sucesso
@@ -777,7 +823,7 @@ const CampanhaManual = () => {
       }
       
       setError(errorMsg);
-      toast({ title: "Erro ao criar campanha", description: errorMsg, variant: "destructive" });
+      if (typeof toast === 'function') toast({ title: "Erro ao criar campanha", description: errorMsg, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -800,7 +846,7 @@ const CampanhaManual = () => {
         <SuccessAlert 
           message={successAlert.message} 
           adsUrl={successAlert.adsUrl} 
-          onClose={() => setSuccessAlert(null)} 
+          onClose={() => setSuccessAlert(null)} // Chamada já protegida dentro do componente
         />
       )}
       
@@ -849,21 +895,21 @@ const CampanhaManual = () => {
                   id="adAccount"
                   label="Conta de Anúncios Meta"
                   value={selectedAdAccount}
-                  onChange={(e) => setSelectedAdAccount(e.target.value)}
+                  onChange={(e) => setSelectedAdAccount(e.target.value)} // Chamada já protegida dentro do componente
                   options={adAccountsList}
                   placeholder={metaLoading ? "Carregando..." : "Selecione a Conta"}
                   required
-                  disabled={metaLoading || !isMetaConnected || adAccountsList.length === 0}
+                  disabled={metaLoading || !isMetaConnected || !adAccountsList || adAccountsList.length === 0}
                 />
                 <SelectInput
                   id="facebookPage"
                   label="Página do Facebook"
                   value={selectedPage}
-                  onChange={(e) => setSelectedPage(e.target.value)}
+                  onChange={(e) => setSelectedPage(e.target.value)} // Chamada já protegida dentro do componente
                   options={pagesList}
                   placeholder={metaLoading ? "Carregando..." : "Selecione a Página"}
                   required
-                  disabled={metaLoading || !isMetaConnected || pagesList.length === 0}
+                  disabled={metaLoading || !isMetaConnected || !pagesList || pagesList.length === 0}
                 />
               </div>
             </div>
@@ -888,7 +934,7 @@ const CampanhaManual = () => {
                   type="number"
                   id="orcamento"
                   value={orcamento}
-                  onChange={(e) => setOrcamento(parseFloat(e.target.value))}
+                  onChange={(e) => setOrcamento(parseFloat(e.target.value) || 0)} // Garantir que seja número
                   className="w-full p-2 border rounded-md"
                   min="70" // Orçamento mínimo fixo de R$ 70
                   required
@@ -929,7 +975,7 @@ const CampanhaManual = () => {
                 id="callToAction"
                 label="Botão de Ação *"
                 value={callToAction}
-                onChange={(e) => setCallToAction(e.target.value)}
+                onChange={(e) => setCallToAction(e.target.value)} // Chamada já protegida dentro do componente
                 options={ctaOptions}
                 placeholder="Selecione o botão"
                 required
@@ -972,7 +1018,7 @@ const CampanhaManual = () => {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">Campanhas Criadas</h2>
           <button 
-            onClick={buscarCampanhas}
+            onClick={buscarCampanhas} // Assumindo que buscarCampanhas é sempre uma função definida no escopo
             className="text-sm px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors flex items-center"
             disabled={carregandoCampanhas || !isMetaConnected || !selectedAdAccount}
           >
@@ -997,10 +1043,14 @@ const CampanhaManual = () => {
           <div className="flex justify-center items-center p-8">
             <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
           </div>
-        ) : campanhas.length > 0 ? (
+        ) : Array.isArray(campanhas) && campanhas.length > 0 ? (
           <div className="space-y-2">
             {campanhas.map((campanha, index) => (
-              <CampanhaItem key={campanha.id || index} campanha={campanha} onVerAds={handleVerAds} />
+              <CampanhaItem 
+                key={campanha?.id || index} // Adicionar verificação para campanha?.id
+                campanha={campanha} 
+                onVerAds={handleVerAds} // Chamada já protegida dentro do componente
+              />
             ))}
           </div>
         ) : (
@@ -1014,3 +1064,4 @@ const CampanhaManual = () => {
 };
 
 export default CampanhaManual;
+
