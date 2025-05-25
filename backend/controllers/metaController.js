@@ -203,10 +203,14 @@ const getMetaStatus = asyncHandler(async (req, res) => {
     return res.status(404).json({ message: 'Usuário não encontrado' });
   }
 
+  // Filter pages and adAccounts to ensure they have id and name
+  const validPages = (user.metaPages || []).filter(page => page && page.id && page.name);
+  const validAdAccounts = (user.metaAdAccounts || []).filter(acc => acc && acc.id && acc.name);
+
   res.json({
     status: user.metaConnectionStatus || 'disconnected',
-    pages: user.metaPages || [],
-    adAccounts: user.metaAdAccounts || []
+    pages: validPages,
+    adAccounts: validAdAccounts
   });
 });
 
