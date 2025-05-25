@@ -38,3 +38,20 @@ exports.extrairDadosIfood = async (req, res) => { // <<< RENOMEADO AQUI
   }
 };
 
+
+
+
+// Nova função para scraping com mock data
+exports.scrapeIfood = async (req, res) => {
+  const { url } = req.body;
+
+  // Por enquanto pode retornar um mock
+  console.log(`Recebida requisição para /scrape com URL: ${url}`); // Log para depuração
+  return res.json({
+    nome: "Yakissoba de Legumes",
+    descricao: "Macarrão oriental com legumes frescos e molho shoyu",
+    preco: "13,99",
+    imagem: "https://static.ifood.com.br/img.jpg",
+    restaurante: "Sushi Rão - Jacarepaguá"
+  });
+};

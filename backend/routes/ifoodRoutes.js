@@ -1,13 +1,15 @@
 const express = require("express");
 const router = express.Router();
-// Importar a função renomeada do controller
-const { extrairDadosIfood } = require("../controllers/ifoodController"); 
-const authMiddleware = require("../middleware/authMiddleware"); // Proteger a rota
+// Importar as funções do controller
+const { extrairDadosIfood, scrapeIfood } = require("../controllers/ifoodController"); // <<< ADICIONAR scrapeIfood
 
-// Rota para fazer o scraping de uma URL do iFood
-// POST /api/ifood/extrair  <<< ROTA AJUSTADA
-// Protegida por autenticação
-router.post("/extrair", extrairDadosIfood); // <<< USAR FUNÇÃO CORRETA E REMOVER MIDDLEWARE CONFORME INSTRUÇÃO
+// Rota para fazer o scraping de uma URL do iFood (extração detalhada)
+// POST /api/ifood/extrair
+router.post("/extrair", extrairDadosIfood); // <<< ROTA EXISTENTE
+
+// Nova rota para scraping simplificado (mock)
+// POST /api/ifood/scrape
+router.post("/scrape", scrapeIfood); // <<< NOVA ROTA
 
 module.exports = router;
 
