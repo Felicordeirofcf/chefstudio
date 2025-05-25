@@ -319,6 +319,11 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
       }
       // <<< REMOVIDO: promoted_object não é necessário/permitido no Ad Set para POST_ENGAGEMENT >>>
     };
+
+    // <<< GARANTIR QUE O CAMPO 'id' NÃO SEJA ENVIADO NO PAYLOAD >>>
+    const finalAdSetData = { ...adSetData }; // Cria uma cópia
+    delete finalAdSetData.id; // Remove o campo 'id' se existir
+
     // <<< TRATAMENTO ROBUSTO PARA ENDDATE >>>
     if (endDate && endDate !== 'undefined' && endDate !== null && endDate !== '') {
       try {
