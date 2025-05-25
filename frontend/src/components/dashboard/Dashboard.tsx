@@ -130,6 +130,12 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
+      {/* ===== TESTE DE RENDERIZAÇÃO ===== */}
+      <h1 style={{ color: 'red', fontSize: '2rem', border: '3px dashed green', padding: '10px', textAlign: 'center', margin: '20px 0' }}>
+        SE ESTE TEXTO APARECER, O ARQUIVO Dashboard.tsx ESTÁ SENDO CARREGADO.
+      </h1>
+      {/* ===== FIM DO TESTE ===== */}
+
       {/* Seção de Criação de Anúncios com Abas */}
       <AnunciosTabsContainer /> 
       {/* <<< RENDERIZA O CONTAINER DE ABAS DIRETAMENTE AQUI */}
