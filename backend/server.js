@@ -48,7 +48,10 @@ const metaAdsRoutes = require(
 ); 
 const adRoutes = require(
 "./routes/adRoutes"
-); // Importando adRoutes
+); 
+const openaiRoutes = require(
+"./routes/openaiRoutes"
+); // <<< IMPORTAR ROTAS OPENAI
 
 // Configurar variáveis de ambiente
 dotenv.config();
@@ -106,7 +109,7 @@ const swaggerOptions = {
   },
   apis: [
 "./routes/*.js"
-], // Caminho para os arquivos com anotações JSDoc (já inclui adRoutes.js)
+], // Caminho para os arquivos com anotações JSDoc (inclui openaiRoutes.js se estiver na pasta)
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
@@ -150,7 +153,10 @@ app.use(
 , metaAdsRoutes); 
 app.use(
 "/api/ads"
-, adRoutes); // Montando as rotas de Ads sob /api/ads/
+, adRoutes); 
+app.use(
+"/api/openai"
+, openaiRoutes); // <<< MONTAR ROTAS OPENAI
 
 // Rota básica para verificar se o servidor está funcionando
 app.get(

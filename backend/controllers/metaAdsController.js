@@ -3,7 +3,7 @@ const multer = require("multer");
 const FormData = require("form-data");
 const axios = require("axios");
 const User = require("../models/user"); // Corrigido: nome do arquivo em minúsculo
-const { FacebookAdsApi, AdAccount, Campaign, AdSet, AdCreative, Ad } = require('facebook-nodejs-business-sdk');
+const { FacebookAdsApi, AdAccount, Campaign, AdSet, AdCreative, Ad } = require("facebook-nodejs-business-sdk");
 
 // Configure Multer for image upload (in-memory storage)
 const storage = multer.memoryStorage();
@@ -23,7 +23,7 @@ const initFacebookApi = (accessToken) => {
       console.warn("Erro não esperado ao inicializar FacebookAdsApi:", e.message);
     }
     // Retorna a instância existente ou null se falhar por outro motivo
-    return FacebookAdsApi.getInstance(); 
+    return FacebookAdsApi.getInstance();
   }
 };
 
@@ -42,11 +42,12 @@ const listCampaigns = asyncHandler(async (req, res) => {
 
   // 1. Get User's Facebook Access Token
   const user = await User.findById(req.user.id);
-  if (!user || !user.facebookAccessToken) {
+  // CORRIGIDO: Usar metaAccessToken, que é o campo correto onde o token é salvo
+  if (!user || !user.metaAccessToken) { 
     res.status(401);
     throw new Error("Usuário não encontrado ou token do Facebook ausente.");
   }
-  const accessToken = user.facebookAccessToken;
+  const accessToken = user.metaAccessToken; // CORRIGIDO
   const api = initFacebookApi(accessToken);
 
   if (!api) {
@@ -128,11 +129,12 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
 
   // 1. Get User's Facebook Access Token
   const user = await User.findById(req.user.id); // Assuming req.user is populated by 'protect' middleware
-  if (!user || !user.facebookAccessToken) {
+  // CORRIGIDO: Usar metaAccessToken, que é o campo correto onde o token é salvo
+  if (!user || !user.metaAccessToken) { 
     res.status(401);
     throw new Error("Usuário não encontrado ou token do Facebook ausente.");
   }
-  const accessToken = user.facebookAccessToken;
+  const accessToken = user.metaAccessToken; // CORRIGIDO
   const api = initFacebookApi(accessToken);
    if (!api) {
       res.status(500);

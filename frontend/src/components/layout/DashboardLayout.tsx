@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
-import { User, LogOut, Menu as MenuIcon, X as XIcon, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { User, LogOut, Menu as MenuIcon, X as XIcon, Settings, ChevronDown, ChevronUp, Megaphone, Bot } from 'lucide-react'; // Adicionado Megaphone e Bot
 import { useState, useEffect } from 'react';
 import { getUserProfile, logoutUser } from "../../lib/api";
 import { useToast } from "../../hooks/use-toast";
@@ -18,6 +18,7 @@ const DashboardLayout: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isManagementOpen, setIsManagementOpen] = useState(true);
+  const [isAdsOpen, setIsAdsOpen] = useState(true); // Estado para o menu de anúncios
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -37,13 +38,18 @@ const DashboardLayout: React.FC = () => {
     navigate('/');
   };
 
-  // Removido o item de Planos do menu lateral
   const managementSubItems = [
     { name: 'Meu Perfil', path: '/dashboard/profile', icon: User },
   ];
 
-  const isActive = (path: string) => location.pathname === path || (path === '/dashboard/profile' && location.pathname.startsWith('/dashboard/profile'));
+  // Adicionado item de Anúncios
+  const adsSubItems = [
+    { name: 'Criar Anúncio', path: '/dashboard/anuncios', icon: Megaphone },
+  ];
+
+  const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/'); // Ajuste para subrotas
   const isManagementActive = () => managementSubItems.some(item => isActive(item.path));
+  const isAdsActive = () => adsSubItems.some(item => isActive(item.path)); // Verifica se alguma rota de anúncios está ativa
 
   return (
     <div className="min-h-screen flex bg-gray-100">
@@ -55,6 +61,7 @@ const DashboardLayout: React.FC = () => {
           </button>
         </div>
         <nav className="flex-grow">
+          {/* Menu Gerenciamento */}
           <button
             onClick={() => setIsManagementOpen(!isManagementOpen)}
             className={`w-full flex items-center justify-between py-2.5 px-4 rounded transition duration-200 hover:bg-purple-700 hover:text-white ${isManagementActive() ? 'bg-purple-700' : ''}`}
@@ -81,6 +88,35 @@ const DashboardLayout: React.FC = () => {
               ))}
             </div>
           )}
+
+          {/* Menu Anúncios (Novo) */}
+          <button
+            onClick={() => setIsAdsOpen(!isAdsOpen)}
+            className={`w-full flex items-center justify-between py-2.5 px-4 rounded transition duration-200 hover:bg-purple-700 hover:text-white mt-4 ${isAdsActive() ? 'bg-purple-700' : ''}`}
+          >
+            <div className="flex items-center">
+              <Bot className="mr-3" size={20} /> {/* Ícone de Anúncios/IA */}
+              Anúncios
+            </div>
+            {isAdsOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+          </button>
+
+          {isAdsOpen && (
+            <div className="pl-4 mt-1 space-y-1">
+              {adsSubItems.map((item) => (
+                <Link
+                  key={item.name}
+                  to={item.path}
+                  onClick={() => setIsSidebarOpen(false)}
+                  className={`flex items-center py-2 px-4 rounded transition duration-200 hover:bg-purple-600 hover:text-white ${isActive(item.path) ? 'bg-purple-600 font-semibold' : 'text-purple-100'}`}
+                >
+                  <item.icon className="mr-3" size={18} />
+                  {item.name}
+                </Link>
+              ))}
+            </div>
+          )}
+
         </nav>
         <div className="px-4 pb-4">
           <Button variant="ghost" onClick={handleLogout} className="w-full flex items-center justify-start text-gray-300 hover:bg-purple-700 hover:text-white">
@@ -123,3 +159,4 @@ const DashboardLayout: React.FC = () => {
 };
 
 export default DashboardLayout;
+
