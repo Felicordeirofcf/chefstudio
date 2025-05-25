@@ -274,3 +274,33 @@ module.exports = {
   getMetaMetrics, // <-- Adicionado para exportar a função que faltava
 };
 
+
+
+// @desc    Obter métricas de anúncios do Meta Ads (Placeholder)
+// @route   GET /api/meta/metrics
+// @access  Private
+const getMetaMetrics = asyncHandler(async (req, res) => {
+  // TODO: Implementar lógica real para buscar métricas da API do Facebook
+  // Usar user.metaAccessToken e user.metaPrimaryAdAccountId (ou um selecionado)
+  // Considerar o timeRange da query (req.query.timeRange)
+  console.log(`[Meta Metrics] Rota /metrics chamada para userId: ${req.user.id}. Placeholder ativo.`);
+  res.json({ 
+    message: 'Placeholder: Métricas obtidas com sucesso!',
+    userId: req.user.id,
+    timeRange: req.query.timeRange || 'last_30_days',
+    // Dados de exemplo:
+    impressions: Math.floor(Math.random() * 10000),
+    clicks: Math.floor(Math.random() * 500),
+    spend: (Math.random() * 100).toFixed(2),
+    ctr: (Math.random() * 2).toFixed(2)
+  });
+});
+
+module.exports = {
+  getMetaAuthUrl,
+  facebookCallback,
+  getMetaStatus,
+  disconnectMeta,
+  getMetaMetrics, // Agora a função está definida acima
+};
+
