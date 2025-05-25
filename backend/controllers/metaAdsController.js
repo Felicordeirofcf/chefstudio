@@ -289,11 +289,21 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
 
     // 3. Criar Ad Creative (Criativo do Anúncio)
     console.log("[Ad Creation] Criando Ad Creative...");
+    // <<< ADICIONADO LOG SUGEERIDO PELO USUÁRIO ANTES DO ENVIO >>>
+    console.log("[Ad Creation] Enviando AdCreative para Meta com (dados relevantes):", {
+      page_id: pageId,
+      adAccountId: adAccountId,
+      object_story_id: objectStoryId, // ID do post que será impulsionado
+      campaignName: campaignName, // Usado no nome do criativo
+      // image_url: imageUrl || 'N/A', // imageUrl foi usada para criar o post (objectStoryId)
+      // link: link || 'N/A', // Link não é usado diretamente aqui, mas no post original se houver
+      // message: caption || 'N/A' // Caption foi usada para criar o post (objectStoryId)
+    });
     const adCreativeData = {
       [AdCreative.Fields.name]: `Criativo para ${campaignName}`,
       [AdCreative.Fields.object_story_id]: objectStoryId, // <<< USA O ID DO POST (postId)
     };
-    console.log("[Ad Creation] Payload para createAdCreative:", JSON.stringify(adCreativeData, null, 2)); // <<< ADICIONADO LOG DETALHADO
+    console.log("[Ad Creation] Payload para createAdCreative:", JSON.stringify(adCreativeData, null, 2)); // <<< LOG DETALHADO JÁ EXISTENTE
     const adCreative = await adAccount.createAdCreative([], adCreativeData);
     console.log(`[Ad Creation] Ad Creative criado com sucesso. ID: ${adCreative.id}`);
 
