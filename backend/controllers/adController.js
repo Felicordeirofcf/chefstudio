@@ -200,24 +200,24 @@ exports.getLocationSettings = async (req, res) => {
   }
 };
 
-// ----------- PUBLICAR ANÚNCIO -----------
+// ----------- PUBLICAR POST E ANÚNCIO -----------
 
-exports.publicarAnuncio = async (req, res) => {
+exports.publicarPostEAnuncio = async (req, res) => {
   try {
     // Implementação básica conforme solicitado pelo usuário
-    // Esta função pode ser expandida posteriormente com a lógica real de publicação de anúncios
+    // Esta função pode ser expandida posteriormente com a lógica real de publicação de posts e anúncios
     
-    console.log("Função publicarAnuncio chamada com sucesso");
+    console.log("Função publicarPostEAnuncio chamada com sucesso");
     
     // Retorna uma resposta de sucesso simulada
     res.status(200).json({ 
-      mensagem: "Anúncio publicado com sucesso",
+      mensagem: "Post e anúncio publicados com sucesso",
       success: true
     });
   } catch (err) {
-    console.error("❌ Erro ao publicar anúncio:", err.message);
+    console.error("❌ Erro ao publicar post e anúncio:", err.message);
     res.status(500).json({ 
-      message: "Erro ao publicar anúncio", 
+      message: "Erro ao publicar post e anúncio", 
       error: err.message 
     });
   }
