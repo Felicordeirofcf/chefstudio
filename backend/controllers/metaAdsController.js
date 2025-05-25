@@ -187,7 +187,7 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
       console.log(`[Publish Post - File] Preparando para publicar foto via upload para pageId ${pageId} usando Page Token (últimos 5: ...${pageAccessToken.slice(-5)})...`);
       const photoFormData = new FormData();
       photoFormData.append("caption", caption);
-      photoFormData.append("published", "false"); // Cria como dark post
+      photoFormData.append("published", "true"); // <<< ALTERADO: Tentar publicar o post diretamente
       photoFormData.append("source", imageFile.buffer, {
         filename: imageFile.originalname,
         contentType: imageFile.mimetype
