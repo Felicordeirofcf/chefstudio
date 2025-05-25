@@ -2,7 +2,7 @@ const asyncHandler = require("express-async-handler");
 const multer = require("multer");
 const FormData = require("form-data"); // Required if proxying upload
 const axios = require("axios"); // Required for direct API calls if SDK is complex for simple upload
-const User = require("../models/User"); // Assuming User model stores FB tokens
+const User = require("../models/user"); // Corrigido: nome do arquivo em minúsculo
 const { FacebookAdsApi, AdAccount, Campaign, AdSet, AdCreative, Ad } = require('facebook-nodejs-business-sdk');
 
 // Configure Multer for image upload (in-memory storage)
