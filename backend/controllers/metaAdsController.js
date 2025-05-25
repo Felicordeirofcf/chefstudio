@@ -317,10 +317,9 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
         // publisher_platforms: ["facebook", "instagram"], // Exemplo: Definir placements se necessário
         // facebook_positions: ["feed"], // Exemplo: Posições específicas
       },
-      // <<< ADICIONADO PROMOTED_OBJECT COM POST_ID E PAGE_ID PARA POST_ENGAGEMENT >>>
+      // <<< AJUSTADO: Incluindo promoted_object apenas com page_id para Ad Set >>>
       [AdSet.Fields.promoted_object]: { 
-          object_story_id: objectStoryId, // <<< CORRIGIDO: Usar object_story_id em vez de post_id >>>
-          page_id: pageId // <<< ADICIONADO PAGE_ID >>>
+          page_id: pageId 
       }
     };
     // <<< TRATAMENTO ROBUSTO PARA ENDDATE >>>
