@@ -10,11 +10,11 @@ const MetaAdsConnection = () => {
   const { metaStatus, loading, error, connectMeta, disconnectMeta } = useMetaAds();
   const { userToken } = useAuth(); // Still need auth token check
 
-  // Determine if fully connected based on context state
+  // Determine if fully connected based on context state, checking for valid data
   const isFullyConnected = 
     metaStatus.status === 'connected' && 
-    metaStatus.pages?.length > 0 && 
-    metaStatus.adAccounts?.length > 0;
+    Array.isArray(metaStatus.pages) && metaStatus.pages.length > 0 && metaStatus.pages[0]?.id &&
+    Array.isArray(metaStatus.adAccounts) && metaStatus.adAccounts.length > 0 && metaStatus.adAccounts[0]?.id;
 
   // Handle case where user is not logged in
   if (!userToken) {
