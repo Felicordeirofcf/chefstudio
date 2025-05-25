@@ -198,7 +198,7 @@ const facebookCallback = asyncHandler(async (req, res) => {
 // @route   GET /api/meta/status
 // @access  Private
 const getMetaStatus = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id).select('metaConnectionStatus metaPages metaAdAccounts');
+  const user = await User.findById(req.user.id).select('metaConnectionStatus metaPages metaAdAccounts').lean(); // Add .lean() here
   if (!user) {
     return res.status(404).json({ message: 'Usuário não encontrado' });
   }
