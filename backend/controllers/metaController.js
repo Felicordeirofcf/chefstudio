@@ -262,16 +262,6 @@ const getMetaMetrics = asyncHandler(async (req, res) => {
 
 // <<< Definição da função getMetaMetrics movida para ANTES do module.exports
 
-module.exports = {
-  getMetaAuthUrl,
-  facebookCallback,
-  getMetaStatus,
-  disconnectMeta,
-  getMetaMetrics, // Agora a função está definida acima e pode ser exportada corretamente
-  createRecommendedTrafficCampaign, // Adicionando a nova função exportada
-};
-
-
 
 
 // @desc    Criar campanha de tráfego recomendada (Placeholder)
@@ -296,3 +286,12 @@ const createRecommendedTrafficCampaign = asyncHandler(async (req, res) => {
   });
 });
 
+
+module.exports = {
+  getMetaAuthUrl,
+  facebookCallback,
+  getMetaStatus,
+  disconnectMeta,
+  getMetaMetrics, // Agora a função está definida acima e pode ser exportada corretamente
+  createRecommendedTrafficCampaign, // Adicionando a nova função exportada
+};
