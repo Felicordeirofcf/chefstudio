@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const { authenticateToken } = require('../middleware/authMiddleware');
-const { createFromImage, createFromPost, getCampaigns, getMetrics } = require('../controllers/metaAdsController');
+const { createFromImage, createFromPost, getCampaigns, getMetrics, criarCampanha } = require('../controllers/metaAdsController');
 const { publicarPostCriarAnuncio } = require('../controllers/metaPostController');
 
 // Configuração do multer para upload de arquivos
@@ -36,6 +36,9 @@ router.post('/create-from-post', authenticateToken, createFromPost);
 
 // Rota para publicar post e criar anúncio automaticamente
 router.post('/publicar-post-criar-anuncio', authenticateToken, upload.single('image'), publicarPostCriarAnuncio);
+
+// Rota para criar campanha
+router.post('/campanhas', authenticateToken, criarCampanha);
 
 // Rota para buscar campanhas
 router.get('/campaigns', authenticateToken, getCampaigns);
