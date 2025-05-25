@@ -1160,7 +1160,6 @@ const getMetrics = async (req, res) => {
 };
 
 module.exports = {
-    getUserMetaToken,
     createFromImage,
     createFromPost,
     getCampaigns,
