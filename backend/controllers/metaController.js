@@ -18,15 +18,12 @@ const getMetaAuthUrl = asyncHandler(async (req, res) => {
   }
 
   const scope = [
-    "ads_management", // Mantido conforme solicitado
-    // "ads_read", // Removido - não explicitamente solicitado para postagem
-    // "business_management", // Removido - não explicitamente solicitado para postagem
-    "pages_read_engagement", // Mantido conforme solicitado
-    "pages_manage_posts", // ADICIONADO conforme solicitado
-    // "pages_manage_ads", // Removido - não explicitamente solicitado para postagem
+    "ads_management",
+    "pages_read_engagement",
+    "pages_manage_posts",
     "public_profile",
     "email",
-    "pages_show_list" // Mantido conforme solicitado
+    "pages_show_list"
   ].join(",");
 
   const state = userId;
@@ -96,7 +93,6 @@ const facebookCallback = asyncHandler(async (req, res) => {
       console.log(`[Meta Callback] Token de longa duração (USUÁRIO) OK para ${userId}. Expira em: ${userTokenExpires}`);
     } else {
       console.warn(`[Meta Callback] Aviso ao trocar por token de longa duração (USUÁRIO) para ${userId}:`, longLivedTokenData.error || "Token não retornado. Usando curta duração.");
-      // Calcula expiração aproximada do token de curta duração (geralmente 1-2 horas)
       userTokenExpires = new Date(Date.now() + (shortLivedTokenData.expires_in || 3600) * 1000); // Default 1h
     }
 
@@ -134,7 +130,6 @@ const facebookCallback = asyncHandler(async (req, res) => {
 
     // --- Busca de Páginas e TOKENS DE PÁGINA (Page Access Tokens) --- << IMPORTANTE >>
     console.log(`[Meta Callback] Buscando Pages e Page Tokens (/me/accounts) para ${userId} usando token do usuário...`);
-    // Solicita explicitamente o access_token da página
     const pagesResponse = await fetch(
       `https://graph.facebook.com/v18.0/${metaUserId}/accounts?fields=id,name,access_token&access_token=${userAccessToken}`
     );
@@ -153,11 +148,11 @@ const facebookCallback = asyncHandler(async (req, res) => {
 
     // --- Salvamento no MongoDB --- 
     console.log(`[Meta Callback] Preparando para salvar no MongoDB para ${userId}...`);
-    user.metaAccessToken = userAccessToken; // Salva o token do USUÁRIO (pode ser útil para outras chamadas /me)
+    user.metaAccessToken = userAccessToken;
     user.metaUserId = metaUserId;
-    user.metaTokenExpires = userTokenExpires; // Expiração do token do USUÁRIO
-    user.metaAdAccounts = formattedAdAccounts; // Salva contas de anúncio
-    user.metaPages = formattedPages; // << SALVA AS PÁGINAS COM SEUS RESPECTIVOS TOKENS >>
+    user.metaTokenExpires = userTokenExpires;
+    user.metaAdAccounts = formattedAdAccounts;
+    user.metaPages = formattedPages;
     user.metaConnectionStatus = 'connected';
 
     console.log(`[Meta Callback] Dados a serem salvos para ${userId}:`, {
@@ -175,11 +170,10 @@ const facebookCallback = asyncHandler(async (req, res) => {
 
     // --- Redirecionamento --- 
     console.log(`[Meta Callback] Redirecionando ${userId} para dashboard com sucesso.`);
-    res.redirect(`${dashboardUrl}?meta_connect=success`); // Adiciona parâmetro de sucesso
+    res.redirect(`${dashboardUrl}?meta_connect=success`);
 
   } catch (error) {
     console.error(`[Meta Callback] ERRO GERAL para ${userId}:`, error);
-    // Tenta limpar dados Meta no usuário em caso de erro durante o processo
     try {
       console.log(`[Meta Callback] Tentando limpar dados Meta para ${userId} devido a erro...`);
       await User.findByIdAndUpdate(userId, {
@@ -196,7 +190,6 @@ const facebookCallback = asyncHandler(async (req, res) => {
     } catch (cleanupError) {
       console.error(`[Meta Callback] Erro ao limpar dados Meta para ${userId}:`, cleanupError);
     }
-    // Redireciona com mensagem de erro
     res.redirect(`${dashboardUrl}?meta_connect=error&message=${encodeURIComponent(error.message || 'Erro desconhecido durante conexão Meta')}`);
   }
 });
@@ -230,21 +223,6 @@ const disconnectMeta = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Usuário não encontrado' });
     }
 
-    // Opcional: Invalidar o token no Facebook (requer chamada à API)
-    // try {
-    //   if (user.metaAccessToken) {
-    //     console.log(`[Meta Disconnect] Invalidando token no Facebook para ${userId}...`);
-    //     await fetch(`https://graph.facebook.com/${user.metaUserId}/permissions`, {
-    //       method: 'DELETE',
-    //       headers: { 'Authorization': `Bearer ${user.metaAccessToken}` }
-    //     });
-    //     console.log(`[Meta Disconnect] Token invalidado (ou tentativa feita) para ${userId}.`);
-    //   }
-    // } catch (fbError) {
-    //   console.error(`[Meta Disconnect] Erro ao invalidar token no Facebook para ${userId}:`, fbError);
-    //   // Continua mesmo se a invalidação falhar
-    // }
-
     // Limpa os dados do usuário no banco de dados
     console.log(`[Meta Disconnect] Limpando dados Meta no DB para ${userId}...`);
     user.metaAccessToken = undefined;
@@ -265,30 +243,16 @@ const disconnectMeta = asyncHandler(async (req, res) => {
   }
 });
 
-
-module.exports = {
-  getMetaAuthUrl,
-  facebookCallback,
-  getMetaStatus,
-  disconnectMeta,
-  getMetaMetrics, // <-- Adicionado para exportar a função que faltava
-};
-
-
-
 // @desc    Obter métricas de anúncios do Meta Ads (Placeholder)
 // @route   GET /api/meta/metrics
 // @access  Private
 const getMetaMetrics = asyncHandler(async (req, res) => {
   // TODO: Implementar lógica real para buscar métricas da API do Facebook
-  // Usar user.metaAccessToken e user.metaPrimaryAdAccountId (ou um selecionado)
-  // Considerar o timeRange da query (req.query.timeRange)
   console.log(`[Meta Metrics] Rota /metrics chamada para userId: ${req.user.id}. Placeholder ativo.`);
   res.json({ 
     message: 'Placeholder: Métricas obtidas com sucesso!',
     userId: req.user.id,
     timeRange: req.query.timeRange || 'last_30_days',
-    // Dados de exemplo:
     impressions: Math.floor(Math.random() * 10000),
     clicks: Math.floor(Math.random() * 500),
     spend: (Math.random() * 100).toFixed(2),
@@ -296,11 +260,13 @@ const getMetaMetrics = asyncHandler(async (req, res) => {
   });
 });
 
+// <<< Definição da função getMetaMetrics movida para ANTES do module.exports
+
 module.exports = {
   getMetaAuthUrl,
   facebookCallback,
   getMetaStatus,
   disconnectMeta,
-  getMetaMetrics, // Agora a função está definida acima
+  getMetaMetrics, // Agora a função está definida acima e pode ser exportada corretamente
 };
 
