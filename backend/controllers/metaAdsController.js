@@ -334,11 +334,31 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
         console.log("[Ad Creation] endDate não fornecido ou inválido. Ad Set será contínuo.");
     }
     console.log("[Ad Creation] Payload para createAdSet:", JSON.stringify(adSetData, null, 2));
-    const adSet = await adAccount.createAdSet([], adSetData);
-    console.log(`[Ad Creation] Ad Set criado com sucesso. ID: ${adSet.id}`);
+    let adSet; // Declare outside try block
+    try {
+      adSet = await adAccount.createAdSet([], adSetData);
+      // <<< VALIDAÇÃO ADICIONADA >>>
+      if (!adSet || !adSet.id) {
+          console.error("[Ad Creation - AdSet Validation] A criação do AdSet retornou um objeto inválido ou sem ID:", adSet);
+          throw new Error("Falha ao criar AdSet: resposta da API inválida ou sem ID.");
+      }
+      console.log(`[Ad Creation] Ad Set criado com sucesso. ID: ${adSet.id}`);
+    } catch (error) {
+        console.error("[Ad Creation - Specific Catch] Erro ao criar AdSet:", error);
+        let detailedErrorMessage = error.message;
+        if (error.response && error.response.error) {
+            console.error("[Ad Creation - Specific Catch] Facebook API Error Response (createAdSet):", JSON.stringify(error.response.error, null, 2));
+            detailedErrorMessage = `(#${error.response.error.code || 'N/A'}) ${error.response.error.message || 'Erro desconhecido da API'}`;
+        } else {
+             console.error("[Ad Creation - Specific Catch] Detalhes adicionais do erro (createAdSet - stack):", error.stack);
+        }
+        // Lança um erro mais específico para o fluxo geral capturar
+        throw new Error(`Erro ao criar o AdSet no Facebook: ${detailedErrorMessage}`);
+    }
 
     // 5. Criar Ad (Anúncio)
-    console.log("[Ad Creation] Criando Ad...");
+    console.log("[Ad Creation] Preparando para criar Ad...");
+    console.log(`[Ad Creation Debug] Usando Ad Set ID: ${adSet.id}, Ad Creative ID: ${adCreative.id}`); // Log adicionado
     const adData = {
       [Ad.Fields.name]: `Anúncio para ${campaignName}`,
       [Ad.Fields.adset_id]: adSet.id,
@@ -346,8 +366,24 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
       [Ad.Fields.status]: Ad.Status.active, // <<< RE-CONFIRMADO PARA ACTIVE >>>
     };
     console.log("[Ad Creation] Payload para createAd:", JSON.stringify(adData, null, 2));
-    const ad = await adAccount.createAd([], adData);
-    console.log(`[Ad Creation] Ad criado com sucesso. ID: ${ad.id}`);
+
+    // <<< ADICIONADO TRY...CATCH ESPECÍFICO PARA CREATEAD >>>
+    let ad;
+    try {
+      ad = await adAccount.createAd([], adData);
+      console.log(`[Ad Creation] Ad criado com sucesso. ID: ${ad.id}`);
+    } catch (error) {
+      console.error("[Ad Creation - Specific Catch] Erro ao criar Ad:", error);
+      if (error.response && error.response.error) {
+        console.error("[Ad Creation - Specific Catch] Facebook API Error Response (createAd):", JSON.stringify(error.response.error, null, 2));
+        // Lança um erro mais específico para o frontend, se possível
+        throw new Error(`Erro ao criar o Ad no Facebook: ${error.response.error.message || 'Erro desconhecido'} (Code: ${error.response.error.code || 'N/A'})`);
+      } else {
+        console.error("[Ad Creation - Specific Catch] Detalhes adicionais do erro (createAd - message):", error.message);
+        console.error("[Ad Creation - Specific Catch] Detalhes adicionais do erro (createAd - stack):", error.stack);
+        throw new Error(`Erro interno ao tentar criar o Ad: ${error.message}`);
+      }
+    }
 
     // --- Resposta Final --- 
     res.status(201).json({
