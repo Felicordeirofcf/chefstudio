@@ -2,9 +2,10 @@ const express = require("express");
 const router = express.Router();
 const { protect } = require("../middleware/authMiddleware");
 
-// Importar o controller e o middleware de upload
+// Importar os controllers e o middleware de upload
 const { 
   publishPostAndCreateAd, 
+  listCampaigns, // Importar a nova função
   upload, 
   criarCampanha // Manter se necessário para outras rotas
 } = require("../controllers/metaAdsController");
@@ -18,6 +19,52 @@ const {
 
 // Rota antiga (manter se ainda usada, senão remover)
 // router.post("/campanhas", protect, criarCampanha);
+
+/**
+ * @swagger
+ * /api/meta-ads/campaigns:
+ *   get:
+ *     summary: Lista as campanhas de uma conta de anúncios específica.
+ *     tags: [Meta Ads]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: adAccountId
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: O ID da conta de anúncios (sem o prefixo 'act_').
+ *         example: "987654321098765"
+ *     responses:
+ *       200:
+ *         description: Lista de campanhas obtida com sucesso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 campaigns:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: string
+ *                       name: string
+ *                       status: string
+ *                       objective: string
+ *                       # Adicionar outros campos conforme necessário
+ *       400:
+ *         description: Requisição inválida (ex: adAccountId faltando).
+ *       401:
+ *         description: Não autorizado.
+ *       500:
+ *         description: Erro interno do servidor ou erro na API do Facebook.
+ */
+router.get("/campaigns", protect, listCampaigns); // Adicionar a rota GET
 
 /**
  * @swagger
