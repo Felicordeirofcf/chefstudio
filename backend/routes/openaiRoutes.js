@@ -35,7 +35,7 @@ const router = express.Router();
  *                 example: "Hambúrguer artesanal suculento com queijo cheddar e bacon crocante"
  *               contextoImagem:
  *                 type: string
- *                 description: (Opcional) Contexto adicional da imagem.
+ *                 description: "(Opcional) Contexto adicional da imagem."
  *                 example: "Foto de close-up do hambúrguer em um prato"
  *     responses:
  *       200:
@@ -52,7 +52,7 @@ const router = express.Router();
  *                   type: string
  *                   example: "🍔 Bacon, cheddar e suculência te esperam! Prove nosso hambúrguer artesanal hoje mesmo!"
  *       400:
- *         description: Requisição inválida (ex: descrição faltando)
+ *         description: "Requisição inválida (ex: descrição faltando)"
  *       401:
  *         description: Não autorizado (token inválido ou ausente)
  *       500:
