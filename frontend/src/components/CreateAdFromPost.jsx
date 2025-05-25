@@ -203,15 +203,23 @@ export default function CreateAdFromPost() {
         
         const response = await api.get("/meta/connection-status");
         
-        // Verificar se o usuário está conectado ao Meta
-        const isConnected = response.data.connected === true;
-        setMetaConnected(isConnected);
+        // Verificar se o usuário está conectado e tem páginas/contas de anúncio
+        const isFullyConnected = 
+          response.data?.status === 'connected' && 
+          response.data?.pages?.length > 0 && 
+          response.data?.adAccounts?.length > 0;
+        setMetaConnected(isFullyConnected);
         
-        if (!isConnected) {
-          setError("Você precisa conectar sua conta ao Meta Ads primeiro");
+        if (!isFullyConnected) {
+          // Ajustar a mensagem de erro para ser mais específica se faltar páginas/contas
+          let errorMsg = "Você precisa conectar sua conta ao Meta Ads primeiro";
+          if (response.data?.status === 'connected' && (!response.data?.pages?.length || !response.data?.adAccounts?.length)) {
+            errorMsg = "Sua conta Meta está conectada, mas não foram encontradas páginas ou contas de anúncio válidas.";
+          }
+          setError(errorMsg);
           toast({
-            title: "Conexão Meta necessária",
-            description: "Você precisa conectar sua conta Meta para criar anúncios.",
+            title: "Conexão Meta incompleta ou ausente",
+            description: errorMsg,
             variant: "destructive",
           });
         }
