@@ -316,12 +316,8 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
         geo_locations: { countries: ["BR"] },
         // publisher_platforms: ["facebook", "instagram"], // Exemplo: Definir placements se necessário
         // facebook_positions: ["feed"], // Exemplo: Posições específicas
-      },
-      // <<< AJUSTADO: Incluindo promoted_object com page_id E object_story_id para Ad Set POST_ENGAGEMENT >>>
-      [AdSet.Fields.promoted_object]: { 
-          page_id: pageId, 
-          object_story_id: objectStoryId // <<< ADICIONADO object_story_id (post_id) >>>
       }
+      // <<< REMOVIDO: promoted_object não é necessário/permitido no Ad Set para POST_ENGAGEMENT >>>
     };
     // <<< TRATAMENTO ROBUSTO PARA ENDDATE >>>
     if (endDate && endDate !== 'undefined' && endDate !== null && endDate !== '') {
