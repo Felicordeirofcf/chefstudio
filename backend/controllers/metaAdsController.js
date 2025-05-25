@@ -132,14 +132,30 @@ const listCampaigns = asyncHandler(async (req, res) => {
  * @access Privado
  */
 const publishPostAndCreateAd = asyncHandler(async (req, res) => {
-  const { caption, pageId, adAccountId, campaignName, weeklyBudget, startDate, endDate, imageUrl } = req.body;
+  const { caption, pageId, adAccountId, campaignName, weeklyBudget, startDate, endDate, imageUrl, link } = req.body; // Adicionado 'link' se vier do body
   const imageFile = req.file;
   const facebookApiVersion = "v18.0"; // Manter a versão consistente
+
+  // <<< ADICIONADO LOG INICIAL DETALHADO >>>
+  console.log("[Publish Post/Ad] Dados recebidos do frontend:", {
+    caption,
+    pageId,
+    adAccountId,
+    campaignName,
+    weeklyBudget,
+    startDate,
+    endDate,
+    imageUrl: imageUrl || 'N/A',
+    link: link || 'N/A', // Logar o link recebido
+    imageFile: imageFile ? { name: imageFile.originalname, size: imageFile.size, type: imageFile.mimetype } : 'Nenhum arquivo enviado'
+  });
 
   // --- Validação de Entrada ---
   if (!imageFile && !imageUrl) {
     return res.status(400).json({ message: "Nenhuma imagem foi enviada (nem arquivo, nem URL)." });
   }
+  // Adicionar validação para link se for obrigatório
+  // if (!link) { return res.status(400).json({ message: "O campo 'link' é obrigatório." }); }
   if (!caption || !pageId || !adAccountId || !campaignName || !weeklyBudget || !startDate) {
     return res.status(400).json({ message: "Campos obrigatórios faltando: caption, pageId, adAccountId, campaignName, weeklyBudget, startDate." });
   }
