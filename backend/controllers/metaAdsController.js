@@ -279,7 +279,7 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
       const adCreativeData = {
         [AdCreative.Fields.name]: `Criativo para ${campaignName}`,
         [AdCreative.Fields. // <<< USA O ID DO POST (postId)
-      };
+      
       console.log("[Ad Creation] Payload para createAdCreative (SDK):", JSON.stringify(adCreativeData, null, 2));
       adCreative = await adAccount.createAdCreative([], adCreativeData);
       console.log(`[Ad Creation] Ad Creative criado com sucesso. ID: ${adCreative.id}`);
