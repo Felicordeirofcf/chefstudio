@@ -115,7 +115,7 @@ router.get("/callback", metaController.facebookCallback);
  *       500:
  *         description: Erro interno ao verificar status da conexão Meta
  */
-router.get("/connection-status", protect, metaController.getConnectionStatus); // Rota adicionada e protegida
+router.get("/connection-status", protect, metaController.getMetaStatus); // Rota corrigida para usar getMetaStatus
 
 /**
  * @swagger
@@ -138,9 +138,6 @@ router.get("/connection-status", protect, metaController.getConnectionStatus); /
 router.post("/disconnect", protect, metaController.disconnectMeta); // Rota adicionada e protegida (se existir)
 
 module.exports = router;
-
-
-
 
 /**
  * @swagger
@@ -184,3 +181,4 @@ module.exports = router;
  *         description: Erro interno ao buscar métricas
  */
 router.get("/metrics", protect, metaController.getMetaMetrics); // Rota para buscar métricas
+

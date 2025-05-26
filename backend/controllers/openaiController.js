@@ -23,7 +23,7 @@ A legenda deve ser atrativa, usar emojis e hashtags, e incentivar o cliente a vi
 
     // Fazer a chamada para a API da OpenAI usando o modelo GPT-4
     const response = await openai.chat.completions.create({
-      model: "gpt-4", // Usando o modelo GPT-4 conforme solicitado
+      model: "gpt-3.5-turbo", // Usando o modelo GPT-4 conforme solicitado
       messages: [
         {
           role: "system",
