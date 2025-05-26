@@ -148,7 +148,7 @@ const publicarPostCriarAnuncio = async (req, res) => {
     console.log('Criando criativo com object_story_id...');
     const creativePayload = {
       name: `${campaignName} - Creative`,
-      object_story_id: objectStoryId,
+      
       access_token: userAccessToken
     };
     
