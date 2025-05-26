@@ -36,7 +36,7 @@ Estilo: Informal e convidativo.
 Legenda:`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo', // Usando o modelo gpt-4 conforme solicitado
+      model: 'gpt-4', // Usando o modelo gpt-4 conforme solicitado
       messages: [
         { role: 'system', content: 'Você é um assistente de marketing especializado em criar legendas para anúncios de restaurantes.' },
         { role: 'user', content: promptContent },

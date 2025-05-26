@@ -1,178 +1,70 @@
-const axios = require("axios");
-const { chromium } = require("playwright");
-const fs = require("fs");
-const path = require("path");
-const { v4: uuidv4 } = require("uuid");
+const axios = require('axios');
+const cheerio = require('cheerio');
 
 /**
- * Baixa uma imagem de uma URL e salva localmente.
- * @param {string} url A URL da imagem.
- * @param {string} uploadsDir O diretório onde salvar a imagem.
- * @returns {Promise<string|null>} O caminho local relativo da imagem salva ou null se falhar.
- */
-async function downloadImage(url, uploadsDir) {
-  try {
-    if (!url || typeof url !== "string" || !url.startsWith("http")) {
-      console.warn(`URL da imagem inválida ou ausente: ${url}. Pulando download.`);
-      return null;
-    }
-    const response = await axios.get(url, { responseType: "stream" });
-    const urlPath = new URL(url).pathname;
-    const extension = path.extname(urlPath) || ".jpg";
-    const fileName = `${uuidv4()}${extension}`;
-    const filePath = path.join(uploadsDir, fileName);
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-    const writer = fs.createWriteStream(filePath);
-    response.data.pipe(writer);
-    return new Promise((resolve, reject) => {
-      writer.on("finish", () => resolve(`/uploads/${fileName}`));
-      writer.on("error", (err) => {
-        console.error("Erro ao salvar a imagem:", err);
-        fs.unlink(filePath, () => {});
-        resolve(null);
-      });
-    });
-  } catch (error) {
-    console.error(`Erro ao baixar a imagem da URL ${url}:`, error.message);
-    return null;
-  }
-}
-
-/**
- * Extrai dados de um produto a partir de uma URL do iFood usando Playwright e metadados.
+ * Extrai dados de um produto a partir de uma URL do iFood.
  * @param {string} url A URL completa do produto no iFood.
- * @returns {Promise<object>} Um objeto com os dados extraídos ou lança um erro.
+ * @returns {Promise<object>} Um objeto com os dados extraídos (nome, descricao, preco, imagem, restaurante) ou lança um erro.
  */
 async function scrapeIfoodProduct(url) {
-  let browser = null;
   try {
-    console.log(`Iniciando scraping com Playwright (metadados) para URL: ${url}`);
-    browser = await chromium.launch();
-    const context = await browser.newContext({
-      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    });
-    const page = await context.newPage();
-    await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
-    await page.waitForTimeout(2000); // Espera adicional para garantir carregamento
-
-    // --- Extração via Metadados (JSON-LD e Open Graph) --- 
-
-    let extractedProductName = null;
-    let extractedDescription = null;
-    let extractedPrice = "Preço não encontrado";
-    let extractedRestaurantName = null;
-    let extractedImageUrl = null;
-
-    // 1. Tentar JSON-LD
-    const jsonLdContents = await page.locator("script[type=\"application/ld+json\"]").allTextContents();
-    let restaurantJson = null;
-    let productJson = null; // Pode não haver um JSON específico para o produto
-
-    for (const content of jsonLdContents) {
-      try {
-        const parsedJson = JSON.parse(content);
-        if (parsedJson["@type"] === "Restaurant") {
-          restaurantJson = parsedJson;
-          extractedRestaurantName = restaurantJson.name;
-        }
-        // Tentar encontrar dados do produto (pode estar em makesOffer ou outro tipo)
-        // A estrutura exata pode variar, esta é uma tentativa genérica
-        if (parsedJson.makesOffer) {
-            // Heurística: Tentar encontrar a oferta correspondente ao título da página
-            const pageTitle = await page.title();
-            const potentialOffer = parsedJson.makesOffer.find(offer => 
-                offer.itemOffered && pageTitle.includes(offer.itemOffered.name)
-            );
-            if (potentialOffer && potentialOffer.itemOffered) {
-                productJson = potentialOffer.itemOffered;
-                extractedProductName = productJson.name;
-                extractedDescription = productJson.description;
-                if (potentialOffer.priceSpecification && potentialOffer.priceSpecification.price) {
-                    // Preço pode estar em formato range "13.99-13.99" ou simples "13.99"
-                    const priceParts = potentialOffer.priceSpecification.price.split("-");
-                    extractedPrice = priceParts[0]; // Pegar o primeiro valor
-                }
-            }
-        }
-      } catch (e) {
-        console.warn("Erro ao parsear JSON-LD:", e.message);
+    console.log(`Iniciando scraping para URL: ${url}`);
+    const { data: html } = await axios.get(url, {
+      headers: {
+        // Simular um navegador comum para evitar bloqueios simples
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
       }
-    }
+    });
+    const $ = cheerio.load(html);
 
-    // 2. Usar Open Graph (og:) tags como fallback ou para complementar
-    if (!extractedProductName) {
-        extractedProductName = await page.locator("meta[property=\"og:title\"]").first().getAttribute("content");
-        // O título OG pode incluir o nome do restaurante, tentar remover
-        if (extractedProductName && extractedRestaurantName && extractedProductName.includes(extractedRestaurantName)) {
-            extractedProductName = extractedProductName.split("|")[0].trim(); // Heurística comum
-        }
-    }
-    if (!extractedDescription) {
-        extractedDescription = await page.locator("meta[property=\"og:description\"]").first().getAttribute("content");
-    }
-    if (!extractedImageUrl) {
-        // Pegar a imagem de maior resolução (og:image pode ter várias tags)
-        const ogImages = await page.locator("meta[property=\"og:image\"]").all();
-        if (ogImages.length > 0) {
-             extractedImageUrl = await ogImages[ogImages.length - 1].getAttribute("content"); // Última geralmente é a maior
-        }
-    }
-     if (!extractedRestaurantName && restaurantJson) {
-         extractedRestaurantName = restaurantJson.name;
-     }
+    // --- Seletores (Estes podem precisar de ajuste se o iFood mudar o layout) ---
+    const productNameSelector = 'h1[data-testid="product-name"]'; // Seletor comum para nome do produto
+    const productDescriptionSelector = 'span[data-testid="product-description"]'; // Seletor comum para descrição
+    const productPriceSelector = 'p[data-testid="product-price__value"]'; // Seletor comum para preço
+    const productImageSelector = 'img[data-testid="product-image"]'; // Seletor comum para imagem
+    const restaurantNameSelector = 'a[data-testid="restaurant-header-name"]'; // Seletor comum para nome do restaurante
+    // ---------------------------------------------------------------------------
 
-    // 3. Tentar extrair o preço do DOM como último recurso se não veio do JSON-LD
-    if (extractedPrice === "Preço não encontrado") {
-        try {
-            // Usar seletores que podem aparecer no modal ou na página principal
-            const priceElements = await page.locator(".price__value, .dish-price, .dish-details__price").all();
-            for (const element of priceElements) {
-                const text = await element.textContent();
-                if (text && text.includes("R$")) {
-                    const priceMatch = text.match(/[\d,.]+/);
-                    if (priceMatch) {
-                        extractedPrice = priceMatch[0];
-                        break;
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn("Não foi possível extrair o preço do DOM.");
-        }
+    const nome = $(productNameSelector).first().text().trim();
+    const descricao = $(productDescriptionSelector).first().text().trim();
+    const precoText = $(productPriceSelector).first().text().trim();
+    // Extrair apenas o valor numérico do preço (ex: "R$ 13,99" -> "13,99")
+    const precoMatch = precoText.match(/[\d,.]+/);
+    const preco = precoMatch ? precoMatch[0] : 'Preço não encontrado';
+
+    const imagem = $(productImageSelector).first().attr('src');
+    const restaurante = $(restaurantNameSelector).first().text().trim();
+
+    // Validar se os dados essenciais foram encontrados
+    if (!nome || !preco || !imagem || !restaurante) {
+      console.error('Falha ao extrair dados essenciais do iFood. Seletores podem estar desatualizados.');
+      // Logar o HTML para depuração (opcional, pode ser muito grande)
+      // console.log('HTML recebido:', html);
+      throw new Error('Não foi possível extrair todos os dados do produto. Verifique a URL ou o layout da página pode ter mudado.');
     }
-
-    await browser.close();
-    browser = null;
-
-    console.log("Dados brutos extraídos (Metadados):", { extractedProductName, extractedDescription, extractedPrice, extractedImageUrl, extractedRestaurantName });
-
-    // Validar dados essenciais
-    if (!extractedProductName || extractedPrice === "Preço não encontrado" || !extractedImageUrl || !extractedRestaurantName) {
-      throw new Error("Não foi possível extrair todos os dados essenciais do produto via Metadados. A estrutura da página pode ter mudado significativamente.");
-    }
-
-    const uploadsDir = path.join(__dirname, "../uploads");
-    const imagemLocal = await downloadImage(extractedImageUrl, uploadsDir);
 
     const productData = {
-      nome: extractedProductName.trim(),
-      descricao: extractedDescription ? extractedDescription.trim() : "Descrição não disponível",
-      preco: extractedPrice,
-      imagem: imagemLocal, // Caminho local ou null
-      restaurante: extractedRestaurantName.trim(),
+      nome,
+      descricao: descricao || 'Descrição não disponível',
+      preco,
+      imagem,
+      restaurante,
     };
 
-    console.log("Dados extraídos e imagem processada com sucesso (Metadados):", productData);
+    console.log('Dados extraídos com sucesso:', productData);
     return productData;
 
   } catch (error) {
-    console.error(`Erro durante o scraping com Playwright (Metadados) para URL ${url}:`, error);
-    if (browser) {
-      await browser.close();
+    console.error(`Erro durante o scraping da URL ${url}:`, error.message);
+    if (axios.isAxiosError(error)) {
+      console.error('Detalhes do erro Axios:', error.response?.status, error.response?.data);
+      throw new Error(`Erro ao buscar a página do iFood: ${error.response?.statusText || error.message}`);
+    } else if (error.message.includes('Não foi possível extrair')) {
+      throw error; // Re-lançar o erro específico de extração
+    } else {
+      throw new Error(`Erro inesperado durante o scraping: ${error.message}`);
     }
-    throw new Error(`Falha no scraping do iFood com Playwright (Metadados): ${error.message}`);
   }
 }
 

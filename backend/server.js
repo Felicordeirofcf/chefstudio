@@ -128,9 +128,6 @@ app.use(
 "/api-docs"
 , swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Servir arquivos estáticos da pasta uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 // Rotas de API - incluindo todas as necessárias
 app.use(
 "/api/auth"

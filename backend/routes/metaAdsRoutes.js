@@ -58,7 +58,7 @@ const {
  *                       objective: string
  *                       # Adicionar outros campos conforme necessário
  *       400:
- *         description: "Requisição inválida (ex: adAccountId faltando)."
+ *         description: Requisição inválida (ex: adAccountId faltando).
  *       401:
  *         description: Não autorizado.
  *       500:
@@ -112,7 +112,7 @@ router.get("/campaigns", protect, listCampaigns); // Adicionar a rota GET
  *               weeklyBudget:
  *                 type: number
  *                 format: float
- *                 description: "Orçamento semanal desejado em BRL (ex: 70.00)."
+ *                 description: Orçamento semanal desejado em BRL (ex: 70.00).
  *                 example: 70
  *               startDate:
  *                 type: string
@@ -122,7 +122,7 @@ router.get("/campaigns", protect, listCampaigns); // Adicionar a rota GET
  *               endDate:
  *                 type: string
  *                 format: date
- *                 description: "(Opcional) Data de término da campanha (YYYY-MM-DD)."
+ *                 description: (Opcional) Data de término da campanha (YYYY-MM-DD).
  *                 example: "2025-06-01"
  *     responses:
  *       200:
