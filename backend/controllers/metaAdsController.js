@@ -339,7 +339,7 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
     let adSet; // Declare outside try block
     try {
       // <<< Usar finalAdSetData limpo e com endDate (se aplicável) >>>
-      adSet = await adAccount.createAdSet([], finalAdSetData);>>>
+      adSet = await adAccount.createAdSet([], finalAdSetData);
       if (!adSet || !adSet.id) {
           console.error("[Ad Creation - AdSet Validation] A criação do AdSet retornou um objeto inválido ou sem ID:", adSet);
           throw new Error("Falha ao criar AdSet: resposta da API inválida ou sem ID.");
