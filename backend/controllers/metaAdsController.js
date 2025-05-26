@@ -323,6 +323,6 @@ const publishPostAndCreateAd = asyncHandler(async (req, res) => {
 
     // <<< GARANTIR QUE O CAMPO 'id' NÃO SEJA ENVIADO NO PAYLOAD >>>
     const finalAdSetData = { ...adSetData }; // Cria uma cópia
-    delete finalAdSetData.id; // Remove o campo 'id' da cópia do payload
-    if (endDate && endDate !== 'undefined' && en
+    delete finalAdSetData.id; // Remove o    // <<< TRATAMENTO ROBUSTO PARA ENDDATE (Aplicado a finalAdSetData) >>>
+    i
 (Content truncated due to size limit. Use line ranges to read in chunks)
