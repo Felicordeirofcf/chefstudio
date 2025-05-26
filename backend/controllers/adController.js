@@ -200,28 +200,8 @@ exports.getLocationSettings = async (req, res) => {
   }
 };
 
-// ----------- PUBLICAR POST E ANÚNCIO -----------
 
-exports.publicarPostEAnuncio = async (req, res) => {
-  try {
-    // Implementação básica conforme solicitado pelo usuário
-    // Esta função pode ser expandida posteriormente com a lógica real de publicação de posts e anúncios
-    
-    console.log("Função publicarPostEAnuncio chamada com sucesso");
-    
-    // Retorna uma resposta de sucesso simulada
-    res.status(200).json({ 
-      mensagem: "Post e anúncio publicados com sucesso",
-      success: true
-    });
-  } catch (err) {
-    console.error("❌ Erro ao publicar post e anúncio:", err.message);
-    res.status(500).json({ 
-      message: "Erro ao publicar post e anúncio", 
-      error: err.message 
-    });
-  }
-};
 
 // Função movida para metaController.js
 // exports.createRecommendedTrafficCampaign = async (req, res) => { ... };
+

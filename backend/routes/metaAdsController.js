@@ -236,7 +236,7 @@ const convertPfbidToObjectStoryId = async (pfbid, pageId, accessToken) => {
             throw new Error(`Não foi possível obter o ID da publicação para o pfbid ${pfbid}`);
         }
     } catch (error) {
-        console.error(`❌ Erro ao converter pfbid para  error.response?.data || error.message);
+        console.error(`❌ Erro ao converter pfbid para object_story_id:`, error.response?.data || error.message);
         
         if (error.response?.data?.error?.code === 100) {
             // Erro específico de publicação não encontrada ou sem permissão
@@ -803,7 +803,7 @@ const createFromPost = async (req, res) => {
     console.log('Criando criativo com object_story_id...');
     const creativePayload = {
       name: `${campaignName} - Creative`,
-      
+      object_story_id: objectStoryId,
       access_token: userAccessToken
     };
     

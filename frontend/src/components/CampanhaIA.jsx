@@ -57,7 +57,7 @@ const CampanhaIA = () => {
       setError(null);
       try {
         // Usar a função getToken da api.ts para consistência
-        const token = JSON.parse(localStorage.getItem("user") || "{}").token;
+        const token = JSON.parse(localStorage.getItem('user') || '{}').token; 
         if (!token) {
           console.warn("Token não encontrado, usuário não autenticado.");
           setIsMetaConnected(false);
@@ -71,16 +71,12 @@ const CampanhaIA = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        // <<< CORRIGIDO: Usar 'status' e 'pages' da resposta da API >>>
-        const { status, adAccounts, pages } = response.data;
+        const { isConnected, adAccounts, metaPages } = response.data;
         console.log("Resposta de /api/meta/connection-status:", response.data);
 
-        // <<< CORRIGIDO: Definir isMetaConnected com base no 'status' >>>
-        const connected = status === "connected";
-        setIsMetaConnected(connected);
+        setIsMetaConnected(isConnected);
 
-        if (connected) { // <<< CORRIGIDO: Usar a variável 'connected' >>>
-          // Lógica para adAccounts (já estava correta)
+        if (isConnected) {
           if (adAccounts && adAccounts.length > 0) {
             setAdAccountsList(adAccounts.map(acc => ({ value: acc.id, label: `${acc.name} (${acc.id})` })));
             // Manter seleção se ainda válida, senão selecionar primeiro
@@ -89,37 +85,36 @@ const CampanhaIA = () => {
             }
           } else {
             setAdAccountsList([]);
-            setSelectedAdAccount("");
+            setSelectedAdAccount('');
             console.warn("Nenhuma conta de anúncios encontrada via API.");
           }
 
-          // <<< CORRIGIDO: Usar 'pages' ao invés de 'metaPages' >>>
-          if (pages && pages.length > 0) {
-            setPagesList(pages.map(page => ({ value: page.id, label: `${page.name} (${page.id})` })));
+          if (metaPages && metaPages.length > 0) {
+            setPagesList(metaPages.map(page => ({ value: page.id, label: `${page.name} (${page.id})` })));
              // Manter seleção se ainda válida, senão selecionar primeiro
-            if (!selectedPage || !pages.some(page => page.id === selectedPage)) {
-              setSelectedPage(pages[0].id);
+            if (!selectedPage || !metaPages.some(page => page.id === selectedPage)) {
+              setSelectedPage(metaPages[0].id);
             }
           } else {
             setPagesList([]);
-            setSelectedPage("");
+            setSelectedPage('');
             console.warn("Nenhuma página do Facebook encontrada via API.");
           }
         } else {
           setAdAccountsList([]);
           setPagesList([]);
-          setSelectedAdAccount("");
-          setSelectedPage("");
+          setSelectedAdAccount('');
+          setSelectedPage('');
         }
 
       } catch (error) {
-        console.error("Erro ao buscar status da conexão Meta:", error.response?.data || error.message);
-        setError("Erro ao verificar conexão com Meta Ads. Tente recarregar a página.");
+        console.error('Erro ao buscar status da conexão Meta:', error.response?.data || error.message);
+        setError('Erro ao verificar conexão com Meta Ads. Tente recarregar a página.');
         setIsMetaConnected(false);
         setAdAccountsList([]);
         setPagesList([]);
-        setSelectedAdAccount("");
-        setSelectedPage("");
+        setSelectedAdAccount('');
+        setSelectedPage('');
       } finally {
         setMetaLoading(false);
       }
@@ -127,7 +122,7 @@ const CampanhaIA = () => {
 
     fetchMetaStatus();
   // Remover selectedAdAccount e selectedPage das dependências para evitar loop
-  }, []);; 
+  }, []); 
 
   // Função para lidar com upload de imagem manual
   const handleImagemChange = (e) => {
@@ -239,6 +234,7 @@ const CampanhaIA = () => {
   // Função para publicar post e criar anúncio
   const publicarPostECriarAnuncio = async () => {
     // Validar campos obrigatórios
+    // Precisa de imagem (manual ou iFood) e legenda
     if (!nomeCampanha || (!imagem && !scrapedImageUrl) || !legendaGerada || !selectedAdAccount || !selectedPage || !orcamento) {
       toast({
         title: "Campos obrigatórios",
@@ -258,51 +254,45 @@ const CampanhaIA = () => {
       }
 
       const API_BASE_URL = import.meta.env.VITE_API_URL || "https://chefstudio-production.up.railway.app";
-      const url = `${API_BASE_URL}/api/meta-ads/publicar-post-criar-anuncio`;
+      
+      // Preparar FormData
+      const formData = new FormData();
+      formData.append('caption', legendaGerada);
+      formData.append('pageId', selectedPage);
+      formData.append('adAccountId', selectedAdAccount);
+      formData.append('campaignName', nomeCampanha);
+      
+      // Adicionar imagem: priorizar upload manual, senão usar URL do iFood
+      if (imagem) {
+        formData.append('image', imagem); // Envia o arquivo
+      } else if (scrapedImageUrl) {
+        formData.append('imageUrl', scrapedImageUrl); // Envia a URL
+        // IMPORTANTE: O backend (/api/meta-ads/publicar-post-criar-anuncio) PRECISA ser ajustado
+        // para aceitar 'imageUrl' além de 'image' (arquivo).
+        console.warn("Enviando imageUrl para o backend. Certifique-se que o endpoint /publicar-post-criar-anuncio aceita isso.");
+      }
       
       // Determinar o orçamento final
       const orcamentoFinal = orcamento === 'custom' ? orcamentoCustom : orcamento;
-
-      let requestData;
-      let requestHeaders = { Authorization: `Bearer ${token}` };
-
-      if (imagem) {
-        // Caso 1: Upload manual de imagem -> Usar FormData
-        const formData = new FormData();
-        formData.append('caption', legendaGerada);
-        formData.append('pageId', selectedPage);
-        formData.append('adAccountId', selectedAdAccount);
-        formData.append('campaignName', nomeCampanha);
-        formData.append('image', imagem); // Envia o arquivo
-        formData.append('weeklyBudget', orcamentoFinal);
-        formData.append('startDate', dataInicio);
-        if (dataTermino) {
-          formData.append('endDate', dataTermino);
-        }
-        requestData = formData;
-        // Content-Type é definido automaticamente pelo browser para FormData
-      } else if (scrapedImageUrl) {
-        // Caso 2: URL de imagem (iFood) -> Usar JSON
-        requestData = {
-          caption: legendaGerada,
-          pageId: selectedPage,
-          adAccountId: selectedAdAccount,
-          campaignName: nomeCampanha,
-          imageUrl: scrapedImageUrl, // Envia a URL
-          weeklyBudget: orcamentoFinal,
-          startDate: dataInicio,
-        };
-        if (dataTermino) {
-          requestData.endDate = dataTermino;
-        }
-        requestHeaders['Content-Type'] = 'application/json';
-      } else {
-        // Caso impossível devido à validação inicial, mas para segurança
-        throw new Error('Nenhuma imagem ou URL de imagem fornecida.');
+      formData.append('weeklyBudget', orcamentoFinal);
+      
+      // Adicionar datas
+      formData.append('startDate', dataInicio);
+      if (dataTermino) {
+        formData.append('endDate', dataTermino);
       }
 
       // Enviar requisição
-      const response = await axios.post(url, requestData, { headers: requestHeaders });
+      const response = await axios.post(
+        `${API_BASE_URL}/api/meta-ads/publicar-post-criar-anuncio`,
+        formData,
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            // Content-Type é definido automaticamente pelo browser para FormData
+          } 
+        }
+      );
 
       if (response.data && response.data.success) {
         const dataAtual = new Date();
@@ -323,10 +313,6 @@ const CampanhaIA = () => {
         setIfoodUrl('');
         setLegendaGerada('');
         setOrcamentoCustom('');
-        // Resetar datas? Depende do fluxo desejado
-        // const today = new Date().toISOString().split('T')[0];
-        // setDataInicio(today);
-        // setDataTermino('');
         
         toast({
           title: "Sucesso!",
@@ -337,12 +323,10 @@ const CampanhaIA = () => {
       }
     } catch (error) {
       console.error('Erro ao publicar post e criar anúncio:', error.response?.data || error.message);
-      // Tentar extrair mensagem de erro específica do backend, se disponível
-      const backendErrorMessage = error.response?.data?.message || error.response?.data?.error || 'Falha ao publicar post e criar anúncio.';
-      setError(backendErrorMessage + ' Por favor, tente novamente.');
+      setError('Falha ao publicar post e criar anúncio. Por favor, tente novamente.');
       toast({
         title: "Erro ao criar anúncio",
-        description: backendErrorMessage + " Verifique os dados e tente novamente.",
+        description: error.response?.data?.message || "Ocorreu um erro ao publicar o post e criar o anúncio. Tente novamente.",
         variant: "destructive"
       });
     } finally {

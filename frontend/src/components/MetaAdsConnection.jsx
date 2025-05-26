@@ -1,34 +1,155 @@
-import React from 'react';
-import { useMetaAds } from '../contexts/MetaAdsContext'; // Import the custom hook
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { Button } from "./ui/button"; // Assuming Button component exists
-import { Alert, AlertDescription, AlertTitle } from "./ui/alert"; // Assuming Alert components exist
-import { InfoIcon, LoaderIcon, CheckCircleIcon, AlertCircleIcon } from "lucide-react"; // Assuming icons exist
+import api from '../lib/api';
 
 const MetaAdsConnection = () => {
-  // Consume state and functions from the context
-  const { metaStatus, loading, error, connectMeta, disconnectMeta } = useMetaAds();
-  const { userToken } = useAuth(); // Still need auth token check
+  const [connected, setConnected] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { userToken } = useAuth();
+  
+  // Verificar status da conexão ao carregar o componente
+  useEffect(() => {
+    checkConnectionStatus();
+  }, [userToken]);
+  
+  // Função para verificar status da conexão
+  const checkConnectionStatus = async () => {
+    try {
+      setLoading(true);
+      
+      if (!userToken) {
+        setConnected(false);
+        return;
+      }
+      
+      try {
+        const response = await api.get('/api/meta/status');
+        setConnected(response.data.connected || false);
+      } catch (err) {
+        // Se o primeiro endpoint falhar, tentar endpoint alternativo
+        if (err.response && err.response.status === 404) {
+          try {
+            const altResponse = await api.get('/api/users/meta-status');
+            setConnected(altResponse.data.connected || false);
+          } catch (altErr) {
+            console.error('Erro ao verificar status alternativo:', altErr);
+            setConnected(false);
+          }
+        } else {
+          console.error('Erro ao verificar status:', err);
+          setConnected(false);
+        }
+        
+        // Verificar também no localStorage como fallback
+        try {
+          const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+          if (userInfo.metaConnectionStatus === 'connected' || userInfo.isMetaConnected === true) {
+            setConnected(true);
+          }
+        } catch (localErr) {
+          console.error('Erro ao verificar status no localStorage:', localErr);
+          setConnected(false);
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao verificar conexão com Meta Ads:', err);
+      // Não mostrar erro ao usuário neste momento
+      setConnected(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Refined check: Sufficiently connected if status is 'connected' and there's at least one valid page OR ad account
-  const hasValidPages = Array.isArray(metaStatus.pages) && metaStatus.pages.length > 0 && metaStatus.pages.some(p => p?.id);
-  const hasValidAdAccounts = Array.isArray(metaStatus.adAccounts) && metaStatus.adAccounts.length > 0 && metaStatus.adAccounts.some(a => a?.id);
-  const isSufficientlyConnected = metaStatus.status === 'connected' && (hasValidPages || hasValidAdAccounts);
+  // Função para conectar com Meta Ads
+  const handleConnect = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      if (!userToken) {
+        throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
+      }
+      
+      // Consumir a URL de autenticação diretamente da API do backend com header Authorization
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://chefstudio-production.up.railway.app';
+      const response = await fetch(`${apiUrl}/api/meta/auth-url`, {
+        headers: {
+          Authorization: `Bearer ${userToken}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro ao obter URL de autenticação: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.authUrl) {
+        throw new Error("URL de autenticação não retornada pelo servidor");
+      }
+      
+      // Redirecionar para a URL fornecida pelo backend
+      window.location.href = data.authUrl;
+      
+      return;
+    } catch (err) {
+      console.error('Erro ao conectar com Meta Ads:', err);
+      setError('Não foi possível iniciar a conexão com Meta Ads. Por favor, tente novamente mais tarde.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Handle case where user is not logged in
+  // Função para desconectar do Meta Ads
+  const handleDisconnect = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      if (!userToken) {
+        throw new Error('Usuário não autenticado');
+      }
+      
+      try {
+        await api.post('/api/meta/disconnect', {});
+        setConnected(false);
+      } catch (err) {
+        // Se o primeiro endpoint falhar, tentar endpoint alternativo
+        if (err.response && err.response.status === 404) {
+          await api.post('/api/users/meta-disconnect', {});
+          setConnected(false);
+        } else {
+          throw err;
+        }
+      }
+      
+      // Atualizar userInfo no localStorage
+      try {
+        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+        userInfo.metaConnectionStatus = 'disconnected';
+        userInfo.isMetaConnected = false;
+        localStorage.setItem('userInfo', JSON.stringify(userInfo));
+      } catch (localErr) {
+        console.error('Erro ao atualizar userInfo no localStorage:', localErr);
+      }
+    } catch (err) {
+      console.error('Erro ao desconectar do Meta Ads:', err);
+      setError('Não foi possível desconectar do Meta Ads. Por favor, tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!userToken) {
     return (
       <div className="p-4 bg-white border rounded-md mb-6 shadow-sm">
         <h2 className="text-xl font-semibold mb-2">
           Conexão com Meta Ads
         </h2>
-        <Alert variant="warning">
-           <AlertCircleIcon className="h-4 w-4" />
-           <AlertTitle>Autenticação Necessária</AlertTitle>
-           <AlertDescription>
-             Você precisa estar autenticado para conectar ao Meta Ads. Por favor, faça login novamente.
-           </AlertDescription>
-        </Alert>
+        <div className="p-4 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-md">
+          Você precisa estar autenticado para conectar ao Meta Ads. Por favor, faça login novamente.
+        </div>
       </div>
     );
   }
@@ -39,78 +160,51 @@ const MetaAdsConnection = () => {
         Conexão com Meta Ads
       </h2>
       
-      {/* Display context error if any */}
       {error && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircleIcon className="h-4 w-4" />
-          <AlertTitle>Erro na Conexão Meta</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <div className="p-4 mb-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+          {error}
+        </div>
       )}
       
-      {/* Display loading indicator from context */}
-      {loading && !error && (
-         <div className="flex items-center text-sm text-gray-500 mb-4">
-           <LoaderIcon className="mr-2 h-4 w-4 animate-spin" />
-           <span>Verificando status da conexão...</span>
-         </div>
+      {connected ? (
+        <div>
+          <div className="p-4 mb-4 bg-green-50 border border-green-200 text-green-700 rounded-md">
+            Sua conta está conectada ao Meta Ads
+          </div>
+          <button
+            className="px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50"
+            onClick={handleDisconnect}
+            disabled={loading}
+          >
+            {loading ? (
+              <span className="flex items-center">
+                <span className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full mr-2"></span>
+                Processando...
+              </span>
+            ) : 'Desconectar'}
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div className="p-4 mb-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-md">
+            Conecte sua conta ao Meta Ads para criar anúncios
+          </div>
+          <button
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            onClick={handleConnect}
+            disabled={loading}
+          >
+            {loading ? (
+              <span className="flex items-center">
+                <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                Processando...
+              </span>
+            ) : 'Conectar ao Meta Ads'}
+          </button>
+        </div>
       )}
-
-      {/* Conditional rendering based on context's metaStatus and refined check */}
-      {!loading && isSufficientlyConnected ? (
-        // Show connected status and disconnect button
-        <div>
-          <Alert variant="success" className="mb-4">
-             <CheckCircleIcon className="h-4 w-4" />
-             <AlertTitle>Conectado</AlertTitle>
-             <AlertDescription>
-               Sua conta está conectada.{hasValidPages ? " Páginas encontradas." : ""}{hasValidAdAccounts ? " Contas de anúncio encontradas." : ""} Você pode criar anúncios.
-             </AlertDescription>
-          </Alert>
-          <Button
-            variant="outline"
-            onClick={disconnectMeta} // Use disconnect function from context
-            disabled={loading} // Use loading state from context
-          >
-            {loading ? (
-              <span className="flex items-center">
-                <LoaderIcon className="mr-2 h-4 w-4 animate-spin" />
-                Processando...
-              </span>
-            ) : 'Desconectar Meta Ads'}
-          </Button>
-        </div>
-      ) : !loading ? (
-        // Show connect button or warning if not loading and not sufficiently connected
-        <div>
-           <Alert variant={metaStatus.status === 'connected' ? 'warning' : 'info'} className="mb-4">
-             {metaStatus.status === 'connected' ? <AlertCircleIcon className="h-4 w-4" /> : <InfoIcon className="h-4 w-4" />}
-             <AlertTitle>
-               {metaStatus.status === 'connected' ? 'Ação Necessária' : 'Conexão Necessária'}
-             </AlertTitle>
-             <AlertDescription>
-               {metaStatus.status === 'connected' 
-                 ? `Sua conta Meta está conectada, mas não encontramos ${!hasValidPages ? 'páginas válidas' : ''}${!hasValidPages && !hasValidAdAccounts ? ' ou ' : ''}${!hasValidAdAccounts ? 'contas de anúncio válidas' : ''} associadas. Verifique as permissões no Facebook ou tente reconectar.`
-                 : "Conecte sua conta ao Meta Ads para poder criar anúncios."
-               }
-             </AlertDescription>
-           </Alert>
-          <Button
-            onClick={connectMeta} // Use connect function from context
-            disabled={loading} // Use loading state from context
-          >
-            {loading ? (
-              <span className="flex items-center">
-                <LoaderIcon className="mr-2 h-4 w-4 animate-spin" />
-                Processando...
-              </span>
-            ) : (metaStatus.status === 'connected' ? 'Reconectar ao Meta Ads' : 'Conectar ao Meta Ads')}
-          </Button>
-        </div>
-      ) : null} {/* Render nothing while loading initially if preferred */}
     </div>
   );
 };
 
 export default MetaAdsConnection;
-

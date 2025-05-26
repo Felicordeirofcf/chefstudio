@@ -196,7 +196,7 @@ const CampanhaManual = () => {
       setMetaLoading(true);
       setError(null);
       try {
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem('token');
         if (!token) {
           console.warn("Token não encontrado, usuário não autenticado.");
           setIsMetaConnected(false);
@@ -209,16 +209,12 @@ const CampanhaManual = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        // <<< CORRIGIDO: Usar 'status' e 'pages' da resposta da API >>>
-        const { status, adAccounts, pages } = response.data;
+        const { isConnected, adAccounts, metaPages } = response.data;
         console.log("Resposta de /api/meta/connection-status:", response.data);
 
-        // <<< CORRIGIDO: Definir isMetaConnected com base no 'status' >>>
-        const connected = status === "connected";
-        setIsMetaConnected(connected);
+        setIsMetaConnected(isConnected);
 
-        if (connected) { // <<< CORRIGIDO: Usar a variável 'connected' >>>
-          // Lógica para adAccounts (já estava correta)
+        if (isConnected) {
           if (adAccounts && adAccounts.length > 0) {
             setAdAccountsList(adAccounts.map(acc => ({ value: acc.id, label: `${acc.name} (${acc.id})` })));
             if (!selectedAdAccount || !adAccounts.some(acc => acc.id === selectedAdAccount)) {
@@ -226,36 +222,35 @@ const CampanhaManual = () => {
             }
           } else {
             setAdAccountsList([]);
-            setSelectedAdAccount("");
+            setSelectedAdAccount('');
             console.warn("Nenhuma conta de anúncios encontrada via API.");
           }
 
-          // <<< CORRIGIDO: Usar 'pages' ao invés de 'metaPages' >>>
-          if (pages && pages.length > 0) {
-            setPagesList(pages.map(page => ({ value: page.id, label: `${page.name} (${page.id})` })));
-            if (!selectedPage || !pages.some(page => page.id === selectedPage)) {
-              setSelectedPage(pages[0].id);
+          if (metaPages && metaPages.length > 0) {
+            setPagesList(metaPages.map(page => ({ value: page.id, label: `${page.name} (${page.id})` })));
+            if (!selectedPage || !metaPages.some(page => page.id === selectedPage)) {
+              setSelectedPage(metaPages[0].id);
             }
           } else {
             setPagesList([]);
-            setSelectedPage("");
+            setSelectedPage('');
             console.warn("Nenhuma página do Facebook encontrada via API.");
           }
         } else {
           setAdAccountsList([]);
           setPagesList([]);
-          setSelectedAdAccount("");
-          setSelectedPage("");
+          setSelectedAdAccount('');
+          setSelectedPage('');
         }
 
       } catch (error) {
-        console.error("Erro ao buscar status da conexão Meta:", error.response?.data || error.message);
-        setError("Erro ao verificar conexão com Meta Ads. Tente recarregar a página.");
+        console.error('Erro ao buscar status da conexão Meta:', error.response?.data || error.message);
+        setError('Erro ao verificar conexão com Meta Ads. Tente recarregar a página.');
         setIsMetaConnected(false);
         setAdAccountsList([]);
         setPagesList([]);
-        setSelectedAdAccount("");
-        setSelectedPage("");
+        setSelectedAdAccount('');
+        setSelectedPage('');
       } finally {
         setMetaLoading(false);
       }

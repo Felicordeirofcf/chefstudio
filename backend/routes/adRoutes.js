@@ -7,8 +7,7 @@ const {
   updateCampaignStatus, 
   getCampaignMetrics,
   saveLocationSettings,
-  getLocationSettings,
-  publicarPostEAnuncio
+  getLocationSettings
 } = require("../controllers/adController");
 // Importar a função correta do metaController
 const { createRecommendedTrafficCampaign } = require("../controllers/metaController"); 
@@ -38,24 +37,6 @@ const upload = multer({ storage: storage });
 // Rotas para configurações de localização
 router.post("/location", protect, saveLocationSettings);
 router.get("/location", protect, getLocationSettings);
-
-/**
- * @swagger
- * /api/ads/publicar-post-criar-anuncio:
- *   post:
- *     summary: Publica um post e cria um anúncio
- *     tags: [Ads]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Post e anúncio publicados com sucesso
- *       401:
- *         description: Não autorizado
- *       500:
- *         description: Erro interno do servidor
- */
-router.post("/publicar-post-criar-anuncio", protect, publicarPostEAnuncio);
 
 /**
  * @swagger

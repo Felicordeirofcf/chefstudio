@@ -1,26 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const { protect } = require("../middleware/authMiddleware");
-const multer = require("multer");
-const path = require("path");
 
-// Configuração do multer para upload de arquivos
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "../uploads/"));
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({ storage: storage });
-
-// Importar os controllers
+// Importar os controllers e o middleware de upload
 const { 
   publishPostAndCreateAd, 
-  listCampaigns
+  listCampaigns, // Importar a nova função
+  upload, 
+  criarCampanha // Manter se necessário para outras rotas
 } = require("../controllers/metaAdsController");
 
 /**
@@ -29,6 +16,9 @@ const {
  *   name: Meta Ads
  *   description: Integração com a API de Anúncios da Meta (Facebook/Instagram)
  */
+
+// Rota antiga (manter se ainda usada, senão remover)
+// router.post("/campanhas", protect, criarCampanha);
 
 /**
  * @swagger
@@ -178,3 +168,4 @@ router.post(
 );
 
 module.exports = router;
+
