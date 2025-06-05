@@ -45,6 +45,7 @@ export const AuthProvider = ({ children }) => {
       if (response.data && response.data._id) {
         const profileData = response.data;
         const updatedUserData = { ...profileData, token: token }; // Mantém o token original
+        // Atualiza o estado ANTES de salvar no localStorage
         setUser(updatedUserData);
         setIsAuthenticated(true);
         localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUserData));
@@ -54,6 +55,7 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (apiErr) {
       console.error('AuthProvider: Erro ao validar token/buscar perfil:', apiErr.message);
+      // Limpa o estado e o storage em caso de erro
       setUser(null);
       setIsAuthenticated(false);
       localStorage.removeItem(USER_STORAGE_KEY);
@@ -70,7 +72,7 @@ export const AuthProvider = ({ children }) => {
 
   // Função para login
   const login = useCallback(async (credentials) => {
-    setLoading(true);
+    setLoading(true); // Indica que uma operação de autenticação está em andamento
     try {
       const response = await api.post('/api/auth/login', credentials);
       const userData = response.data;
@@ -79,29 +81,36 @@ export const AuthProvider = ({ children }) => {
         throw new Error("Login mal sucedido: token ou ID do usuário ausente na resposta.");
       }
 
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
+      // Atualiza o estado PRIMEIRO para garantir reatividade
       setUser(userData);
       setIsAuthenticated(true);
-      console.log('AuthProvider: Login bem-sucedido, usuário definido:', userData._id);
+      // Depois salva no localStorage
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
+
+      console.log('AuthProvider: Login bem-sucedido, estado atualizado para isAuthenticated=true, usuário:', userData._id);
+      setLoading(false); // Finaliza o loading APÓS atualizar o estado
       return userData; // Retorna os dados para o AuthForm se necessário
+
     } catch (err) {
       console.error('AuthProvider: Erro no login:', err);
+      // Limpa o estado e o storage em caso de erro
       localStorage.removeItem(USER_STORAGE_KEY);
       setUser(null);
       setIsAuthenticated(false);
+      setLoading(false); // Finaliza o loading mesmo em caso de erro
       // Re-throw para que o AuthForm possa mostrar o erro
       throw err;
-    } finally {
-      setLoading(false);
     }
+    // Não precisa de finally aqui, pois setLoading(false) é chamado nos blocos try/catch
   }, []);
 
   // Função para logout
   const logout = useCallback(() => {
+    console.log("AuthProvider: Iniciando logout...");
     localStorage.removeItem(USER_STORAGE_KEY);
     setUser(null);
     setIsAuthenticated(false);
-    console.log('AuthProvider: Usuário deslogado.');
+    console.log('AuthProvider: Usuário deslogado, estado atualizado para isAuthenticated=false.');
     // O redirecionamento é feito no componente que chama logout (ex: DashboardLayout)
   }, []);
 
@@ -113,15 +122,16 @@ export const AuthProvider = ({ children }) => {
       const updatedProfile = response.data;
       const currentUserData = getUserDataFromStorage(); // Pega dados atuais para manter o token
       const newUserState = { ...updatedProfile, token: currentUserData?.token };
+      // Atualiza estado primeiro
       setUser(newUserState);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUserState));
       console.log('AuthProvider: Perfil atualizado.');
+      setLoading(false);
       return updatedProfile;
     } catch (err) {
       console.error('AuthProvider: Erro ao atualizar perfil:', err);
-      throw err; // Re-throw para o componente lidar
-    } finally {
       setLoading(false);
+      throw err; // Re-throw para o componente lidar
     }
   }, [getUserDataFromStorage]);
 
@@ -135,6 +145,9 @@ export const AuthProvider = ({ children }) => {
     updateProfile,
     validateTokenAndFetchProfile // Expor se necessário revalidar manualmente
   };
+
+  // Adiciona um log para quando o provider renderiza e qual o estado atual
+  console.log(`AuthProvider Render: loading=${loading}, isAuthenticated=${isAuthenticated}`);
 
   return (
     <AuthContext.Provider value={contextValue}>
