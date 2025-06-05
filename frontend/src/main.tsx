@@ -9,32 +9,36 @@ import DashboardLayout from './components/layout/DashboardLayout';
 import DashboardHome from './components/dashboard/Dashboard';
 import ProfilePage from './components/dashboard/ProfilePage';
 import PlansPage from './components/dashboard/PlansPage';
-import ConnectMeta from './components/auth/ConnectMeta'; // Manter se ainda for usado
-import MetaCallback from './components/auth/MetaCallback'; // Manter se ainda for usado
-import AnunciosTabsContainer from './components/AnunciosTabsContainer';
+import ConnectMeta from './components/auth/ConnectMeta';
+import MetaCallback from './components/auth/MetaCallback';
+import { AuthProvider } from './contexts/AuthProvider'; // <<< IMPORTAR AuthProvider
 import { MetaAdsProvider } from './contexts/MetaAdsContext';
-import { useAuth } from './hooks/useAuth'; // <<< IMPORTAR useAuth
-import { Toaster } from "./components/ui/toaster"; // Importar Toaster
+import { useAuth } from './hooks/useAuth';
+import { Toaster } from "./components/ui/toaster";
 import './index.css';
 
-// 🔒 Componente de Rota Protegida Refatorado
+// 🔒 Componente de Rota Protegida Refatorado para usar o contexto
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, loading } = useAuth(); // <<< USAR useAuth
+  // useAuth agora obtém os valores do AuthContext
+  const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
 
+  console.log(`ProtectedRoute: Loading=${loading}, IsAuthenticated=${isAuthenticated}`);
+
   if (loading) {
-    // Exibir um indicador de carregamento enquanto valida a autenticação
-    // TODO: Criar um componente de Spinner/Loading mais elaborado
+    // Exibe um indicador de carregamento enquanto valida a autenticação
+    // Idealmente, um componente de Spinner/Loading mais elaborado
     return <div>Verificando autenticação...</div>;
   }
 
   if (!isAuthenticated) {
-    console.log("ProtectedRoute: Usuário não autenticado (via useAuth), redirecionando para login");
+    console.log("ProtectedRoute: Usuário não autenticado (via useAuth/Context), redirecionando para login");
     // Redireciona para a página de login, guardando a localização original
     return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   // Se autenticado, renderiza o componente filho
+  console.log("ProtectedRoute: Usuário autenticado, renderizando children.");
   return children;
 };
 
@@ -73,16 +77,9 @@ const router = createBrowserRouter([
             path: "plans",
             element: <PlansPage />,
           },
-          // A rota "anuncios" provavelmente não é necessária aqui,
-          // pois AnunciosTabsContainer é renderizado dentro de DashboardHome.
-          // Se for uma página separada, manter:
-          // {
-          //   path: "anuncios",
-          //   element: <AnunciosTabsContainer />,
-          // },
         ],
       },
-      // Rotas auxiliares de conexão Meta (manter protegidas se necessário)
+      // Rotas auxiliares de conexão Meta (manter protegidas)
       {
         path: "connect-meta",
         element: (
@@ -103,23 +100,17 @@ const router = createBrowserRouter([
   },
 ]);
 
-// Componente Raiz que fornece o contexto de autenticação
+// Componente Raiz que fornece os contextos
 const Root = () => {
-  // O hook useAuth precisa ser chamado dentro de um componente funcional.
-  // Como main.tsx não é um componente, criamos um componente Root
-  // que pode usar o hook e passá-lo para o RouterProvider ou filhos.
-  // No entanto, a forma mais comum é que os componentes que precisam
-  // de autenticação (como ProtectedRoute) chamem useAuth diretamente.
-  // O AuthProvider (se existir) deve envolver a aplicação.
-  // Neste caso, como useAuth busca dados na inicialização, ele funciona
-  // corretamente quando chamado dentro de ProtectedRoute.
-
   return (
     <React.StrictMode>
-      <MetaAdsProvider>
-        <RouterProvider router={router} />
-        <Toaster /> {/* Adicionar Toaster globalmente */}
-      </MetaAdsProvider>
+      {/* Envolver a aplicação com AuthProvider */}
+      <AuthProvider>
+        <MetaAdsProvider>
+          <RouterProvider router={router} />
+          <Toaster />
+        </MetaAdsProvider>
+      </AuthProvider>
     </React.StrictMode>
   );
 };
