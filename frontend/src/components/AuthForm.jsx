@@ -8,10 +8,10 @@ import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import FacebookLoginButton from './FacebookLoginButton';
 import { useToast } from '../hooks/use-toast';
-import { api } from '../lib/api';
-import { useAuth } from '../hooks/useAuth'; // Import useAuth para acessar a função de validação
+// Removido: import { api } from '../lib/api'; // Não precisamos mais da instância direta aqui
+import { useAuth } from '../hooks/useAuth'; // Importar useAuth para acessar login e validate
 
-// Chave padrão para armazenar dados do usuário no localStorage (deve ser a mesma usada em useAuth.js)
+// Chave padrão para armazenar dados do usuário no localStorage (deve ser a mesma usada em AuthProvider)
 const USER_STORAGE_KEY = 'chefstudio_user';
 
 const AuthForm = ({ isLogin = true }) => {
@@ -22,72 +22,66 @@ const AuthForm = ({ isLogin = true }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const { validateTokenAndFetchProfile } = useAuth(); // Obter a função de validação do hook
+  // Obter as funções necessárias do contexto de autenticação
+  const { login, validateTokenAndFetchProfile } = useAuth();
 
-  // Verificar se há um token na URL (retorno do login com Facebook)
-  // Esta lógica pode precisar ser ajustada dependendo de como o backend retorna o token do Facebook
+  // Lógica para tratar callback do Facebook (se aplicável)
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const token = queryParams.get('token');
-    const userDataString = queryParams.get('user'); // Supondo que o backend envie dados do usuário também
+    const userDataString = queryParams.get('user');
 
-    if (token && userDataString) {
-      try {
-        const userData = JSON.parse(decodeURIComponent(userDataString));
-        const userToStore = { ...userData, token };
+    if (token) {
+        console.log("AuthForm: Token encontrado na URL (Facebook callback?)");
+        setLoading(true); // Mostrar loading durante o processamento do callback
+        try {
+            let userToStore = { token };
+            if (userDataString) {
+                const userData = JSON.parse(decodeURIComponent(userDataString));
+                userToStore = { ...userData, token };
+            }
 
-        // Salvar na chave padronizada
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userToStore));
-        // Limpar chaves antigas
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('userInfo');
+            // Salvar na chave padronizada (AuthProvider lerá isso na próxima validação)
+            localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userToStore));
+            // Limpar chaves antigas por segurança
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('userInfo');
 
-        console.log('Dados do Facebook salvos em', USER_STORAGE_KEY);
+            console.log('AuthForm: Dados do Facebook salvos, forçando revalidação...');
 
-        // Forçar revalidação do estado de autenticação ANTES de navegar
-        validateTokenAndFetchProfile().then(() => {
-          toast({
-            title: 'Login com Facebook realizado!',
-            description: 'Bem-vindo ao ChefStudio.',
-            variant: 'success'
-          });
-          // Limpar a URL e navegar para o dashboard
-          navigate('/dashboard', { replace: true });
-        });
-
-      } catch (error) {
-        console.error("Erro ao processar dados do Facebook:", error);
-        toast({
-          title: 'Erro no Login com Facebook',
-          description: 'Não foi possível processar os dados recebidos.',
-          variant: 'destructive'
-        });
-      }
-    } else if (token) {
-        // Se só veio o token (menos ideal, mas tratar)
-        console.warn("Recebido apenas token do Facebook, buscando perfil...");
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify({ token })); // Salva temporariamente só com token
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('userInfo');
-
-        validateTokenAndFetchProfile().then(() => {
-            toast({
-                title: 'Login com Facebook realizado!',
-                description: 'Bem-vindo ao ChefStudio.',
-                variant: 'success'
+            // Forçar revalidação do estado de autenticação ANTES de navegar
+            validateTokenAndFetchProfile().then(() => {
+                console.log("AuthForm: Revalidação pós-Facebook concluída.");
+                toast({
+                    title: 'Login com Facebook realizado!',
+                    description: 'Bem-vindo ao ChefStudio.',
+                    variant: 'success'
+                });
+                // Limpar a URL e navegar para o dashboard
+                navigate('/dashboard', { replace: true });
+            }).catch((err) => {
+                console.error("AuthForm: Falha na revalidação pós-Facebook:", err);
+                localStorage.removeItem(USER_STORAGE_KEY); // Limpar se a validação falhar
+                toast({
+                    title: 'Erro no Login com Facebook',
+                    description: 'Não foi possível validar sua sessão.',
+                    variant: 'destructive'
+                });
+            }).finally(() => {
+                setLoading(false);
             });
-            navigate('/dashboard', { replace: true });
-        }).catch(() => {
-            // Se a validação falhar, limpar e ficar no login
-            localStorage.removeItem(USER_STORAGE_KEY);
+
+        } catch (error) {
+            console.error("AuthForm: Erro ao processar dados do Facebook:", error);
             toast({
                 title: 'Erro no Login com Facebook',
-                description: 'Não foi possível validar a sessão.',
+                description: 'Não foi possível processar os dados recebidos.',
                 variant: 'destructive'
             });
-        });
+            localStorage.removeItem(USER_STORAGE_KEY); // Limpar em caso de erro
+            setLoading(false);
+        }
     }
   }, [location, navigate, toast, validateTokenAndFetchProfile]);
 
@@ -97,53 +91,46 @@ const AuthForm = ({ isLogin = true }) => {
     setLoading(true);
 
     try {
-      let response;
+      let userData;
       if (isLogin) {
-        response = await api.post('/api/auth/login', { email, password });
+        // Chamar a função login do AuthProvider
+        console.log("AuthForm: Chamando login do AuthProvider...");
+        userData = await login({ email, password });
+        console.log("AuthForm: Login do AuthProvider concluído.");
       } else {
-        response = await api.post('/api/auth/register', { name, email, password });
+        // TODO: Implementar registro se necessário, chamando uma função register do AuthProvider
+        // Por enquanto, vamos focar no login
+        // response = await api.post('/api/auth/register', { name, email, password });
+        // userData = response.data;
+        // localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
+        // await validateTokenAndFetchProfile(); // Precisaria revalidar após registro também
+        toast({ title: "Registro não implementado", variant: "destructive" });
+        setLoading(false);
+        return;
       }
 
-      const userData = response.data; // Backend deve retornar { token, _id, name, email, ... }
-
-      if (!userData || !userData.token || !userData._id) {
-        throw new Error("Resposta inválida do servidor após autenticação.");
-      }
-
-      // Salvar na chave padronizada
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
-      // Limpar chaves antigas
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('userInfo');
-
-      console.log('Dados de login/registro salvos em', USER_STORAGE_KEY);
-
-      // Forçar revalidação do estado de autenticação ANTES de navegar
-      await validateTokenAndFetchProfile();
-
+      // Se o login foi bem-sucedido (sem exceção), o AuthProvider já atualizou o estado
       toast({
-        title: isLogin ? 'Login realizado com sucesso!' : 'Conta criada com sucesso!',
+        title: 'Login realizado com sucesso!',
         description: 'Bem-vindo ao ChefStudio.',
         variant: 'success'
       });
 
-      // Navegar para o dashboard APÓS a validação
+      // Navegar para o dashboard APÓS o login do AuthProvider ter concluído
+      console.log("AuthForm: Navegando para /dashboard...");
       navigate('/dashboard');
 
     } catch (error) {
-      console.error('Erro de autenticação:', error);
+      console.error('AuthForm: Erro de autenticação:', error);
       toast({
         title: 'Erro de autenticação',
+        // Usar a mensagem de erro lançada pelo AuthProvider
         description: error.message || 'Ocorreu um erro durante a autenticação.',
         variant: 'destructive'
       });
-      // Limpar storage em caso de erro
-      localStorage.removeItem(USER_STORAGE_KEY);
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('userInfo');
+      // O AuthProvider já limpou o storage em caso de erro no login
     } finally {
+      // Garantir que o loading seja desativado independentemente do resultado
       setLoading(false);
     }
   };
@@ -169,7 +156,7 @@ const AuthForm = ({ isLogin = true }) => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                autoComplete="name" // Add autocomplete
+                autoComplete="name"
               />
             </div>
           )}
@@ -182,7 +169,7 @@ const AuthForm = ({ isLogin = true }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              autoComplete="email" // Add autocomplete
+              autoComplete="email"
             />
           </div>
 
@@ -194,7 +181,8 @@ const AuthForm = ({ isLogin = true }) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              autoComplete={isLogin ? "current-password" : "new-password"} // Add autocomplete
+              // Autocomplete corrigido conforme solicitado
+              autoComplete={isLogin ? "current-password" : "new-password"}
             />
           </div>
 
@@ -210,8 +198,6 @@ const AuthForm = ({ isLogin = true }) => {
         </div>
 
         <div className="mt-4">
-          {/* O FacebookLoginButton deve apenas redirecionar para a URL de auth do backend */}
-          {/* O tratamento do callback (com token/user na URL) é feito no useEffect deste componente */}
           <FacebookLoginButton />
         </div>
       </CardContent>
