@@ -23,7 +23,7 @@ export const MetaAdsProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get("/api/meta/connection-status");
+      const response = await api.get(`/api/meta/connection-status?ts=${Date.now()}`);
       setMetaStatus({
         status: response.data?.status || 'disconnected',
         pages: response.data?.pages || [],

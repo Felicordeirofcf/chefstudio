@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { getUserProfile } from "../../lib/api";
 import { useToast } from "../../hooks/use-toast";
 import AnunciosTabsContainer from "../AnunciosTabsContainer";
+import MetaAdsConnection from "../MetaAdsConnection"; // <<< ADICIONADO: Importar o componente MetaAdsConnection
 
 interface UserProfile {
   _id: string;
@@ -76,6 +77,9 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 sm:p-8 space-y-8">
+      {/* <<< ADICIONADO: Renderizar o componente MetaAdsConnection >>> */}
+      <MetaAdsConnection />
+
       {/* Seção de Métricas */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -124,3 +128,4 @@ export default function Dashboard() {
     </div>
   );
 }
+

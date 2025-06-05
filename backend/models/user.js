@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
+    // Senha não é obrigatória se o login for via OAuth (ex: Facebook)
   },
   role: {
     type: String,
@@ -41,27 +42,27 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: "free",
   },
-  // Campos Meta Ads Padronizados
+  // --- Campos Meta Ads Padronizados ---
   metaUserId: {
     // ID do usuário no Facebook/Meta
     type: String,
   },
   metaAccessToken: {
-    // Token de acesso (longa duração preferencialmente)
+    // Token de acesso do USUÁRIO (longa duração preferencialmente)
     type: String,
   },
   metaTokenExpires: {
-    // Data de expiração do token (se disponível)
+    // Data de expiração do token do usuário (se disponível)
     type: Date,
   },
   metaConnectionStatus: {
-    // Status da conexão
+    // Status da conexão Meta
     type: String,
     enum: ["connected", "disconnected"],
     default: "disconnected",
   },
   metaAdAccounts: {
-    // Lista de contas de anúncios
+    // Lista de contas de anúncios associadas ao usuário
     type: [
       {
         id: String, // act_... ID
@@ -72,28 +73,17 @@ const userSchema = new mongoose.Schema({
     default: [],
   },
   metaPages: {
-    // Lista de páginas do Facebook gerenciadas
+    // Lista de páginas do Facebook gerenciadas pelo usuário
     type: [
       {
         id: String, // ID da página
         name: String,
-        access_token: String, // Page Access Token
+        access_token: String, // Page Access Token (importante!)
       },
     ],
     default: [],
   },
-  // Campos legados (remover ou marcar como deprecated se não forem mais usados)
-  facebookId: String,
-  facebookAccessToken: String,
-  facebookTokenExpiry: Date,
-  metaId: String,
-  metaName: String,
-  metaEmail: String,
-  adsAccountId: String,
-  adsAccountName: String,
-  instagramAccounts: Array,
-  metaPrimaryAdAccountId: String,
-  metaPrimaryAdAccountName: String,
+  // --- Fim dos Campos Meta Ads Padronizados ---
 
   createdAt: {
     type: Date,
@@ -101,7 +91,7 @@ const userSchema = new mongoose.Schema({
   },
 });
 
-// Hash da senha antes de salvar
+// Hash da senha antes de salvar (apenas se a senha foi modificada)
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password") || !this.password) return next();
   try {
@@ -115,6 +105,8 @@ userSchema.pre("save", async function (next) {
 
 // Método para comparar senha
 userSchema.methods.comparePassword = async function (candidatePassword) {
+  // Retorna false se não houver senha salva (ex: login OAuth)
+  if (!this.password) return false;
   try {
     return await bcryptjs.compare(candidatePassword, this.password);
   } catch (error) {

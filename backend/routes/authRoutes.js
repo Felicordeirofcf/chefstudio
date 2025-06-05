@@ -1,16 +1,19 @@
 const express = require("express");
 const router = express.Router();
-const { loginUser, registerUser, getProfile, facebookCallback, facebookLogout } = require("../controllers/authController");
+// <<< CORRIGIDO: Removida a importação de facebookCallback e facebookLogout >>>
+const { loginUser, registerUser, getProfile } = require("../controllers/authController");
 const { protect } = require("../middleware/authMiddleware");
 
 // Rotas públicas
 router.post("/login", loginUser);
 router.post("/register", registerUser);
-router.get("/facebook/callback", facebookCallback);
+// <<< REMOVIDO: Rota /facebook/callback - Lógica agora em metaRoutes.js >>>
+// router.get("/facebook/callback", facebookCallback);
 
 // Rotas protegidas
 router.get("/profile", protect, getProfile);
-router.post("/facebook/logout", protect, facebookLogout);
+// <<< REMOVIDO: Rota /facebook/logout - Lógica agora em metaRoutes.js >>>
+// router.post("/facebook/logout", protect, facebookLogout);
 
 // Rota de teste para verificar se a autenticação está funcionando
 router.get("/test", (req, res) => {
@@ -18,3 +21,4 @@ router.get("/test", (req, res) => {
 });
 
 module.exports = router;
+

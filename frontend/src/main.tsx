@@ -1,3 +1,4 @@
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Navigate, useLocation } from 'react-router-dom';
@@ -8,36 +9,32 @@ import DashboardLayout from './components/layout/DashboardLayout';
 import DashboardHome from './components/dashboard/Dashboard';
 import ProfilePage from './components/dashboard/ProfilePage';
 import PlansPage from './components/dashboard/PlansPage';
-import ConnectMeta from './components/auth/ConnectMeta';
-import MetaCallback from './components/auth/MetaCallback';
+import ConnectMeta from './components/auth/ConnectMeta'; // Manter se ainda for usado
+import MetaCallback from './components/auth/MetaCallback'; // Manter se ainda for usado
 import AnunciosTabsContainer from './components/AnunciosTabsContainer';
-import { MetaAdsProvider } from './contexts/MetaAdsContext'; // <<< IMPORTAR O PROVIDER
+import { MetaAdsProvider } from './contexts/MetaAdsContext';
+import { useAuth } from './hooks/useAuth'; // <<< IMPORTAR useAuth
+import { Toaster } from "./components/ui/toaster"; // Importar Toaster
 import './index.css';
 
-// 🔐 Lê informações do usuário armazenadas localmente
-const getUserInfo = () => {
-  const userInfo = localStorage.getItem('userInfo');
-  if (!userInfo) return null;
-  try {
-    return JSON.parse(userInfo);
-  } catch (e) {
-    localStorage.removeItem('userInfo');
-    return null;
-  }
-};
-
-// 🔒 Rota protegida simplificada - apenas verifica login básico
+// 🔒 Componente de Rota Protegida Refatorado
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const userInfo = getUserInfo();
+  const { isAuthenticated, loading } = useAuth(); // <<< USAR useAuth
   const location = useLocation();
-  
-  // Verificar apenas autenticação básica
-  if (!userInfo || !userInfo.token) {
-    console.log("ProtectedRoute: Usuário não autenticado, redirecionando para login");
+
+  if (loading) {
+    // Exibir um indicador de carregamento enquanto valida a autenticação
+    // TODO: Criar um componente de Spinner/Loading mais elaborado
+    return <div>Verificando autenticação...</div>;
+  }
+
+  if (!isAuthenticated) {
+    console.log("ProtectedRoute: Usuário não autenticado (via useAuth), redirecionando para login");
+    // Redireciona para a página de login, guardando a localização original
     return <Navigate to="/" state={{ from: location }} replace />;
   }
 
-  // Permitir acesso a todas as rotas protegidas se o usuário estiver autenticado
+  // Se autenticado, renderiza o componente filho
   return children;
 };
 
@@ -52,27 +49,12 @@ const router = createBrowserRouter([
         element: <Login />,
       },
       {
-        path: "/register",
+        path: "register",
         element: <Register />,
       },
+      // Rotas que precisam de autenticação
       {
-        path: "/connect-meta", // Esta rota pode precisar do contexto também?
-        element: (
-          <ProtectedRoute>
-            <ConnectMeta />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "/meta-callback", // Esta rota pode precisar do contexto também?
-        element: (
-          <ProtectedRoute>
-            <MetaCallback />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "/dashboard",
+        path: "dashboard",
         element: (
           <ProtectedRoute>
             <DashboardLayout />
@@ -91,23 +73,57 @@ const router = createBrowserRouter([
             path: "plans",
             element: <PlansPage />,
           },
-          {
-            path: "anuncios", // Esta rota provavelmente não é necessária aqui, pois AnunciosTabsContainer é renderizado dentro do DashboardHome
-            element: <AnunciosTabsContainer />,
-          },
+          // A rota "anuncios" provavelmente não é necessária aqui,
+          // pois AnunciosTabsContainer é renderizado dentro de DashboardHome.
+          // Se for uma página separada, manter:
+          // {
+          //   path: "anuncios",
+          //   element: <AnunciosTabsContainer />,
+          // },
         ],
+      },
+      // Rotas auxiliares de conexão Meta (manter protegidas se necessário)
+      {
+        path: "connect-meta",
+        element: (
+          <ProtectedRoute>
+            <ConnectMeta />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "meta-callback",
+        element: (
+          <ProtectedRoute>
+            <MetaCallback />
+          </ProtectedRoute>
+        ),
       },
     ],
   },
 ]);
 
+// Componente Raiz que fornece o contexto de autenticação
+const Root = () => {
+  // O hook useAuth precisa ser chamado dentro de um componente funcional.
+  // Como main.tsx não é um componente, criamos um componente Root
+  // que pode usar o hook e passá-lo para o RouterProvider ou filhos.
+  // No entanto, a forma mais comum é que os componentes que precisam
+  // de autenticação (como ProtectedRoute) chamem useAuth diretamente.
+  // O AuthProvider (se existir) deve envolver a aplicação.
+  // Neste caso, como useAuth busca dados na inicialização, ele funciona
+  // corretamente quando chamado dentro de ProtectedRoute.
+
+  return (
+    <React.StrictMode>
+      <MetaAdsProvider>
+        <RouterProvider router={router} />
+        <Toaster /> {/* Adicionar Toaster globalmente */}
+      </MetaAdsProvider>
+    </React.StrictMode>
+  );
+};
+
 // Renderização do React
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    {/* Envolver o RouterProvider com o MetaAdsProvider */}
-    <MetaAdsProvider>
-      <RouterProvider router={router} />
-    </MetaAdsProvider>
-  </React.StrictMode>
-);
+ReactDOM.createRoot(document.getElementById('root')!).render(<Root />);
 
